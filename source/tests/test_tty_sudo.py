@@ -254,8 +254,10 @@ class PortableSudoLimitsTests(SudoControlTests):
                 self.assertEqual(error.exception.code, "TTY_SUDO_SIZE_INVALID")
 
     def test_actual_nnp_mismatch_rolls_back_candidate(self):
-        with mock.patch.object(self.controller, "_inspect",
-                               return_value={"no_new_privs": 0, "busy": False}):
+        original = self.controller._inspect
+        def mismatch(record):
+            return {**original(record), "no_new_privs": 0}
+        with mock.patch.object(self.controller, "_inspect", side_effect=mismatch):
             with self.assertRaises(control.SudoControlError) as error:
                 self.controller.launch(uuid.uuid4().hex, mode="off")
         self.assertEqual(error.exception.code, "TTY_SUDO_PRIVILEGE_STATE_MISMATCH")

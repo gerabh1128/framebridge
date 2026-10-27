@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import pwd
 import re
+import signal
 import shutil
 import shlex
 import stat
@@ -122,6 +123,7 @@ class SudoConsoleController:
         self.timeout = float(timeout)
         self.prefix = "framebridge-tty-" + hashlib.sha256(str(self.base).encode()).hexdigest()[:12] + "-"
         self._records = {}
+        self._uncertain_launches = set()
         self._lock = threading.RLock()
 
     def _run(self, command, *, data=None, optional=False):
@@ -359,8 +361,12 @@ class SudoConsoleController:
             command.append("--setenv=" + key + "=" + value)
         command += [self.tmux, "-D", "-S", str(socket), "-f", "/dev/null"]
         launched = False
+        verified_record = None
         try:
             launched = True
+            # A failed partial launch must never disappear from shutdown
+            # evidence, even if its ordinary rollback also fails.
+            self._uncertain_launches.add(unit_name)
             self._run(command)
             deadline = time.monotonic() + self.timeout
             while time.monotonic() < deadline:
@@ -382,26 +388,37 @@ class SudoConsoleController:
             deadline = time.monotonic() + self.timeout
             while time.monotonic() < deadline:
                 current = self._inspect(record)
+                verified_record = current
                 if current["no_new_privs"] != expected:
                     _fail("TTY_SUDO_PRIVILEGE_STATE_MISMATCH")
                 if not current["busy"]:
+                    self._uncertain_launches.discard(unit_name)
                     return current
                 time.sleep(0.05)
             _fail("TTY_SUDO_CONSOLE_NOT_IDLE")
         except BaseException:
-            if launched:
+            # Only a fully inspected record can prove rollback. Incomplete
+            # launches retain uncertainty even if an ordinary stop was sent.
+            if verified_record is not None:
+                try:
+                    self._close(verified_record)
+                    self._uncertain_launches.discard(unit_name)
+                except SudoControlError:
+                    pass
+            elif launched:
                 try:
                     unit = self._unit(unit_name)
                     proc, _, _, _ = self._pane(record)
                     scope = self._pane_scope(self._pane_group(proc["pid"]), unit.get("ControlGroup"))
                     if scope:
-                        self._run([self.systemctl, "--user", "stop", scope], optional=True)
+                        self._run([self.systemctl, "--user", "--no-block", "stop", scope], optional=True)
                 except SudoControlError:
                     pass
-                self._run([self.systemctl, "--user", "stop", unit_name], optional=True)
-            socket.unlink(missing_ok=True)
-            marker.unlink(missing_ok=True)
-            rcfile.unlink(missing_ok=True)
+                self._run([self.systemctl, "--user", "--no-block", "stop", unit_name], optional=True)
+            if unit_name not in self._uncertain_launches:
+                socket.unlink(missing_ok=True)
+                marker.unlink(missing_ok=True)
+                rcfile.unlink(missing_ok=True)
             raise
 
     def launch(self, session_id, cwd=None, rows=24, cols=80, mode="off"):
@@ -433,6 +450,34 @@ class SudoConsoleController:
             _fail("TTY_SUDO_ELEVATED_PROCESS_PRESENT")
         return {**record, "busy_reason": None}
 
+    def _close_members(self, record):
+        members = self._scope_members_existing(record)
+        result = {}
+        for pid in members:
+            process = _proc(pid)
+            if process is None:
+                # An exited member can disappear between cgroup and /proc reads.
+                if pid in self._scope_members_existing(record):
+                    _fail("TTY_SUDO_PROCESS_STATE_UNVERIFIED")
+                continue
+            if any(uid != self.uid for uid in process["uids"]):
+                _fail("TTY_SUDO_ELEVATED_PROCESS_PRESENT")
+            if process["state"] not in {"Z", "X"}:
+                result[pid] = process
+        return result
+
+    def _scope_members_existing(self, record):
+        members = set()
+        for group in {record["control_group"], record["pane_control_group"]}:
+            path = Path("/sys/fs/cgroup") / group.lstrip("/")
+            if path.exists():
+                try:
+                    members.update(self._scope(group))
+                except SudoControlError:
+                    if path.exists():
+                        raise
+        return members
+
     def _close(self, record, require_idle=False):
         try:
             current = self._idle(record) if require_idle else self._inspect(record)
@@ -444,17 +489,60 @@ class SudoConsoleController:
         if current["busy_reason"] in {"TTY_SUDO_ELEVATED_PROCESS_PRESENT", "TTY_SUDO_PROCESS_STATE_UNVERIFIED"}:
             _fail(current["busy_reason"])
         if record.get("unit_name"):
+            # Close this private PTY before stopping its sibling tmux-spawn
+            # scope: interactive Bash ignores TERM and that scope may otherwise
+            # wait the user's default 90-second systemd stop timeout.
+            self._tmux(record, "kill-session", "-t", record["name"], optional=True)
             if current.get("pane_scope_unit"):
-                self._run([self.systemctl, "--user", "stop", current["pane_scope_unit"]], optional=True)
-            self._run([self.systemctl, "--user", "stop", record["unit_name"]], optional=True)
+                self._run([self.systemctl, "--user", "--no-block", "stop",
+                           current["pane_scope_unit"]], optional=True)
+            self._run([self.systemctl, "--user", "--no-block", "stop",
+                       record["unit_name"]], optional=True)
             deadline = time.monotonic() + self.timeout
+            escalate_at = time.monotonic() + min(1.0, self.timeout / 3)
+            escalated = False
             while time.monotonic() < deadline:
-                remaining = set()
-                for group in {current["control_group"], current["pane_control_group"]}:
-                    if (Path("/sys/fs/cgroup") / group.lstrip("/")).exists():
-                        remaining.update(self._scope(group))
-                if not remaining and _proc(current["pid"]) is None:
+                remaining = self._close_members(current)
+                shell = _proc(current["pid"])
+                server = _proc(current["server_pid"])
+                shell_alive = (shell and shell["birth"] == current["birth"]
+                               and shell["state"] not in {"Z", "X"})
+                server_alive = (server and server["birth"] == current["server_birth"]
+                                and server["state"] not in {"Z", "X"})
+                if not remaining and not shell_alive and not server_alive:
                     break
+                if not escalated and time.monotonic() >= escalate_at:
+                    # Revalidate the private service identity and all recorded
+                    # cgroup members before escalating. Never signal root jobs,
+                    # unverified processes or a reused PID.
+                    self._terminated(current)
+                    for identity in remaining.values():
+                        try:
+                            fd = os.pidfd_open(identity["pid"])
+                        except ProcessLookupError:
+                            continue
+                        except (AttributeError, OSError):
+                            _fail("TTY_SUDO_PIDFD_UNAVAILABLE")
+                        try:
+                            live = _proc(identity["pid"])
+                            if (not live or live["birth"] != identity["birth"]
+                                    or live["state"] in {"Z", "X"}):
+                                continue
+                            if any(uid != self.uid for uid in live["uids"]):
+                                _fail("TTY_SUDO_ELEVATED_PROCESS_PRESENT")
+                            group = self._pane_group(live["pid"])
+                            if not any(group == owned or group.startswith(owned + "/")
+                                       for owned in {current["control_group"], current["pane_control_group"]}):
+                                _fail("TTY_SUDO_CGROUP_UNEXPECTED")
+                            try:
+                                signal.pidfd_send_signal(fd, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                            except (AttributeError, OSError):
+                                _fail("TTY_SUDO_PIDFD_SIGNAL_FAILED")
+                        finally:
+                            os.close(fd)
+                    escalated = True
                 time.sleep(0.05)
             else:
                 _fail("TTY_SUDO_SCOPE_STILL_RUNNING")
@@ -505,7 +593,11 @@ class SudoConsoleController:
             except BaseException as error:
                 previous = _proc(current["pid"])
                 if previous and previous["birth"] == current["birth"] and previous["state"] not in {"Z", "X"}:
-                    self._close(candidate)
+                    try:
+                        self._close(candidate)
+                    except BaseException:
+                        self._uncertain_launches.add(candidate["unit_name"])
+                        raise
                     raise
                 # The former Bash is gone. Keep the verified replacement and
                 # retain old ownership metadata until all old scopes are empty.

@@ -212,7 +212,10 @@ class RealTerminalMixin:
 
     def shutdown(self):
         with self._lock:
+            errors=[]
             for sid in list(self._real):
                 try:self.abort(sid)
-                except (TerminalDenied,SudoControlError):pass
+                except (TerminalDenied,SudoControlError) as error:
+                    errors.append({'session_id':sid,'error':str(error)})
             super().shutdown()
+            return {'cleanup_verified':not self._real,'errors':errors}

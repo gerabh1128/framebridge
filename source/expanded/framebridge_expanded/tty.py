@@ -64,6 +64,7 @@ _core, _server = _load_captured()
 TerminalDenied = _core.TerminalDenied
 from ._tty_backend import RealTerminalMixin
 from .tty_sudo_control import SudoControlError
+from . import tty_cleanup
 
 
 @dataclass(frozen=True)
@@ -192,6 +193,7 @@ class PortableManager(RealTerminalMixin, _core.Manager):
                          idle_timeout_s=600)
         self.max_sessions = limits.max_sessions
         self._last_used = {}
+        self.cleanup_daemon = None
 
     @staticmethod
     def _local_context(context):
@@ -213,9 +215,13 @@ class PortableManager(RealTerminalMixin, _core.Manager):
         if program != "bash":
             raise TerminalDenied("PROGRAM_NOT_SUPPORTED")
         self._size(rows, cols)
-        result = super().open("bash", rows, cols)
-        self._last_used[result["session_id"]] = time.monotonic()
-        return result
+        self._record_cleanup(operation_pending=True)
+        try:
+            result = super().open("bash", rows, cols)
+            self._last_used[result["session_id"]] = time.monotonic()
+            return result
+        finally:
+            self._record_cleanup()
 
     def reap(self):
         super().reap()
@@ -238,7 +244,56 @@ class PortableManager(RealTerminalMixin, _core.Manager):
             raise TerminalDenied("SESSION_NOT_FOUND")
         result = super().abort(sid)
         self._last_used.pop(sid, None)
+        self._record_cleanup()
         return result
+
+    def sudo(self, sid, mode):
+        if mode == "status":
+            return super().sudo(sid, mode)
+        self._record_cleanup(operation_pending=True)
+        try:
+            return super().sudo(sid, mode)
+        finally:
+            self._record_cleanup()
+
+    def _cleanup_records(self):
+        keys = ("session_id", "pid", "birth", "server_pid", "server_birth",
+                "unit_name", "control_group", "pane_control_group")
+        records = []
+        source = {}
+        if self._real:
+            source.update({sid: session._sudo_record for sid, session in self._real.items()})
+        controller = getattr(self, "_sudo", None)
+        if controller is not None:
+            source.update(controller._records)
+        for record in source.values():
+            records.append({key: record.get(key) for key in keys})
+            if record.get("pending_old_record"):
+                records.append({key: record["pending_old_record"].get(key) for key in keys})
+        return records
+
+    def _record_cleanup(self, *, verified=False, errors=(), operation_pending=False):
+        if self.cleanup_daemon is not None:
+            tty_cleanup.write(self.profile, self.cleanup_daemon, self._cleanup_records(),
+                              verified=verified, errors=errors,
+                              operation_pending=operation_pending or self._cleanup_uncertain())
+
+    def _cleanup_uncertain(self):
+        controller = getattr(self, "_sudo", None)
+        return bool(controller is not None and controller._uncertain_launches)
+
+    def shutdown(self):
+        with self._lock:
+            outcome = {"cleanup_verified": False, "errors": [{"error": "TTY_INTERNAL_ERROR"}]}
+            try:
+                outcome = super().shutdown()
+                if self._cleanup_records() or self._cleanup_uncertain():
+                    outcome["cleanup_verified"] = False
+                    if not outcome["errors"]:
+                        outcome["errors"] = [{"error": "TTY_CLEANUP_PENDING"}]
+            finally:
+                self._record_cleanup(verified=outcome["cleanup_verified"], errors=outcome["errors"])
+            return outcome
 
     def status(self):
         result = super().status()
@@ -296,6 +351,13 @@ class PortableServer(_server.LocalServer):
         finally:
             os.umask(old)
         p.chmod(0o600)
+
+    def server_close(self):
+        try:
+            self.manager.shutdown()
+        finally:
+            socketserver.UnixStreamServer.server_close(self)
+            self._socket_path.unlink(missing_ok=True)
 
 
 _SHAPES = {
@@ -415,13 +477,19 @@ def serve(state=None):
         if not stat.S_ISSOCK(st.st_mode) or st.st_uid != os.geteuid():
             raise TerminalDenied("TTY_SOCKET_UNTRUSTED")
         path.unlink()
+    try:
+        tty_cleanup.require_prior_cleanup(state)
+    except tty_cleanup.CleanupUnverified:
+        raise TerminalDenied("TTY_CLEANUP_PENDING") from None
     manager = PortableManager(state, limits, home)
+    manager.cleanup_daemon = tty_cleanup.daemon_identity(_identity(os.getpid()))
+    manager._record_cleanup()
     def stopped(_signum, _frame):
         raise SystemExit(0)
     signal.signal(signal.SIGTERM, stopped)
     signal.signal(signal.SIGINT, stopped)
     pidfile = state / "tty-process.json"
-    _write_json(pidfile, {**_identity(os.getpid()), "socket": str(path), "state_dir": str(state)})
+    _write_json(pidfile, {**manager.cleanup_daemon, "socket": str(path), "state_dir": str(state)})
     try:
         with PortableServer(path, manager) as server:
             print(json.dumps({"ok": True, "ready": True, "socket": str(path),
@@ -436,6 +504,10 @@ def start(state=None):
     current = status(state)
     if current.get("ok"):
         return current
+    try:
+        tty_cleanup.require_prior_cleanup(state)
+    except tty_cleanup.CleanupUnverified:
+        return {"ok": False, "error": "TTY_CLEANUP_PENDING", "cleanup_verified": False}
     env = os.environ.copy()
     root = str(Path(__file__).resolve().parents[1])
     env["PYTHONPATH"] = root + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
@@ -458,19 +530,48 @@ def start(state=None):
 def stop(state=None):
     state = state_path(state)
     p = state / "tty-process.json"
-    if not p.is_file() or p.is_symlink():
-        return {"ok": True, "state": "STOPPED", "already_stopped": True}
+    expected = None
+    already = True
+    death_known = False
     try:
-        record = json.loads(p.read_text())
-        if not _alive(record):
-            return {"ok": True, "state": "STOPPED", "already_stopped": True}
-        os.kill(record["pid"], signal.SIGTERM)
-        deadline = time.monotonic() + 10
-        while _alive(record) and time.monotonic() < deadline:
-            time.sleep(0.1)
-        return {"ok": not _alive(record), "state": "STOPPED" if not _alive(record) else "STOP_TIMEOUT"}
-    except (ValueError, OSError, KeyError):
-        return {"ok": False, "error": "TTY_STOP_FAILED"}
+        receipt = state / tty_cleanup.NAME
+        if not p.exists() and not p.is_symlink() and not receipt.exists() and not receipt.is_symlink():
+            return {"ok": True, "state": "STOPPED", "already_stopped": True,
+                    "cleanup_verified": True}
+        outcome = tty_cleanup.read(state)
+        if p.exists() or p.is_symlink():
+            record = tty_cleanup.read_private(p)
+            if "boot" not in record:
+                raise tty_cleanup.CleanupUnverified()
+            expected = tty_cleanup.daemon_identity(record)
+            if outcome["daemon"] != expected:
+                raise tty_cleanup.CleanupUnverified()
+            if expected["boot"] == tty_cleanup.current_boot() and _alive(record):
+                already = False
+                fd = os.pidfd_open(record["pid"])
+                try:
+                    if _alive(record):
+                        signal.pidfd_send_signal(fd, signal.SIGTERM)
+                finally:
+                    os.close(fd)
+                deadline = time.monotonic() + 10
+                while _alive(record) and time.monotonic() < deadline:
+                    time.sleep(0.1)
+                if _alive(record):
+                    return {"ok": False, "state": "STOP_TIMEOUT", "cleanup_verified": False}
+        elif outcome["daemon"]["boot"] == tty_cleanup.current_boot() and _alive(outcome["daemon"]):
+            raise tty_cleanup.CleanupUnverified()
+        death_known = True
+        outcome = tty_cleanup.read(state)
+        if expected is not None and outcome["daemon"] != expected:
+            raise tty_cleanup.CleanupUnverified()
+        if not outcome["cleanup_verified"] and outcome["daemon"]["boot"] == tty_cleanup.current_boot():
+            raise tty_cleanup.CleanupUnverified()
+        return {"ok": True, "state": "STOPPED", "already_stopped": already,
+                "cleanup_verified": True}
+    except (tty_cleanup.CleanupUnverified, ValueError, OSError, KeyError, TypeError, AttributeError):
+        return {"ok": False, "state": "STOPPED" if death_known else "STOP_UNVERIFIED",
+                "error": "TTY_CLEANUP_UNVERIFIED", "cleanup_verified": False}
     finally:
         child = _STARTED_CHILDREN.get(str(state))
         if child is not None:

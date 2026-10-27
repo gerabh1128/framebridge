@@ -468,6 +468,17 @@ def stop(state):
     connection = disconnect(state)
     if not connection.get("ok"):
         raise RuntimeError("The background ChatGPT connection could not be stopped safely; local services were left unchanged.")
+    from . import tty
+
+    def verify_tty_stop():
+        outcome = tty.stop(state)
+        if (not isinstance(outcome, dict) or outcome.get("ok") is not True
+                or outcome.get("cleanup_verified") is not True):
+            raise RuntimeError("TTY cleanup could not be verified; inspect this profile's terminal status before retrying.")
+
+    # Verify terminal cleanup before stopping local services, then again after
+    # their termination to cover a terminal opened during the stop operation.
+    verify_tty_stop()
     from .autostart import mark_manual_stop
     mark_manual_stop(state)
     rec = _read(state / "manager.json")
@@ -478,7 +489,10 @@ def stop(state):
     for child in reversed(_read(state / "worker.json").get("processes", [])):
         _terminate(None, child)
     _atomic(state / "ready.json", {"ready": False})
-    return status(state)
+    verify_tty_stop()
+    result = status(state)
+    result["tty_cleanup_verified"] = True
+    return result
 
 def main():
     parser = argparse.ArgumentParser()
