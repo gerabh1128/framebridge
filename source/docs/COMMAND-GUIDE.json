@@ -1,12 +1,12 @@
 {
   "product": "FrameBridge",
-  "version": "0.3.1",
+  "version": "0.3.2~compat.20261027.1",
   "guide_schema": 1,
   "topics": {
     "start": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.1",
+      "version": "0.3.2~compat.20261027.1",
       "guide_schema": 1,
       "topic": "start",
       "title": "Start with FrameBridge",
@@ -22,15 +22,15 @@
         },
         {
           "heading": "Install and connect",
-          "body": "On a supported Debian system, install the downloaded package with the package manager. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal. Advanced setup is optional for selecting central/node roles and public settings.",
+          "body": "Install the .deb built for your exact Debian 13, Ubuntu 24.04/26.04, Linux Mint 22.x or LMDE 7 amd64 profile. These compatibility candidates still require installation and lifecycle validation on each target. Select the artifact from the matching profile folder and keep the distribution system Python. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.",
           "commands": [
-            "sudo apt install ./FrameBridge-0.3.1.deb",
+            "sudo apt install ./framebridge-expanded_0.3.2~compat.20261027.1_amd64.deb",
             "fb connect"
           ]
         },
         {
           "heading": "Updating and removal",
-          "body": "Install an official update through the normal package manager. Normal package removal stops package-owned managed processes and retains the profile and saved encrypted connection material for deliberate reuse; it is not a credential-forgetting operation. Use the separately documented explicit forget action first if that is your intended outcome. Do not assume purge erases user-profile data.",
+          "body": "Install an official update through the normal package manager when that update has been published. Normal removal stops package-owned managed processes and can retain the user profile and encrypted connection material; it is not a credential-forgetting operation. On systemd 255, package removal also revokes the administrative boot-credential grant. After reinstalling, run fb connect interactively to provision that grant again; retained files alone do not restore startup. Use the explicit credentials forget action first when that is your intended outcome. Do not assume purge erases user-profile data.",
           "commands": [
             "sudo dpkg --remove framebridge-original-expanded"
           ]
@@ -64,12 +64,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "ac55eed900b5d1687b784299c5dfa238c7502c8472b1135dfa2d7231352f9daa"
+      "guide_sha256": "ce03094ef55168ab22d393ce1f9193aa0a26bc3524eaaecfc8f48bed1c788cf1"
     },
     "commands": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.1",
+      "version": "0.3.2~compat.20261027.1",
       "guide_schema": 1,
       "topic": "commands",
       "title": "Command reference",
@@ -136,12 +136,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "9bc22a59b75eba4a6a0734320f76b5216001bbe527b2575f9f5dcee2a6abfc99"
+      "guide_sha256": "a221dd430ceac8d1a7ddc859e8d38d9d07b07596000ff6a4e70826b0e7e4e127"
     },
     "connection": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.1",
+      "version": "0.3.2~compat.20261027.1",
       "guide_schema": 1,
       "topic": "connection",
       "title": "Connect and disconnect ChatGPT",
@@ -190,12 +190,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "601d608bf403f0cf3cd531dc42013c1d53cddaf622dd73b8ec2a13aeb9c98fb8"
+      "guide_sha256": "91b8d6d7e531ba84512de58d561b71c92212160ddabc78349c459299cd96751a"
     },
     "lifecycle": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.1",
+      "version": "0.3.2~compat.20261027.1",
       "guide_schema": 1,
       "topic": "lifecycle",
       "title": "Services, connection intent and boot policy",
@@ -256,12 +256,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "e6aca4ba3fc004cc2475ea141a1f645070a5bde306387e89ec904daec2b2f317"
+      "guide_sha256": "df3515c6c874353edcce43e4869021409ad0b7f28f194dd93296911228746cdd"
     },
     "nodes": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.1",
+      "version": "0.3.2~compat.20261027.1",
       "guide_schema": 1,
       "topic": "nodes",
       "title": "Central and node operation",
@@ -310,12 +310,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "440ed8b07ab2d7c89d4383d91342801a36f46dba72692482d419f457bb412186"
+      "guide_sha256": "3f98ed2af8adb3b0cd50967fe98fac90d26c3c2034fc7945593d846b4b6c3910"
     },
     "terminals": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.1",
+      "version": "0.3.2~compat.20261027.1",
       "guide_schema": 1,
       "topic": "terminals",
       "title": "Persistent Bash terminals",
@@ -376,12 +376,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "d58f36e8b96bf4687d99fe009e0061d0e76435ddb30a1601826c9eb941b64e9d"
+      "guide_sha256": "b2fdf20610cf7fdfeecaa822ae5ac4297e55c9a0ba7d5e86c06ba50aca9588a2"
     },
     "screens": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.1",
+      "version": "0.3.2~compat.20261027.1",
       "guide_schema": 1,
       "topic": "screens",
       "title": "Authentic screen observation and input",
@@ -393,7 +393,7 @@
         },
         {
           "heading": "Automatic graphical discovery",
-          "body": "The installer and control console stay text interfaces in both TTY and a desktop terminal. Compatible graphical CUA is discovered automatically; availability depends on the actual display/session and permissions. A loaded module is not proof that real pixel capture or input succeeded. New profiles use adaptive auto mode: without a verified active X11 session the runtime provides FBEXEC, FBTERM and CUA-TTY in text mode, without requiring a graphical login or automatically creating a private desktop. Explicit virtual-desktop settings remain advanced options and are labelled separately from physical-screen evidence.",
+          "body": "The installer and control console stay text interfaces in both TTY and a desktop terminal. Compatible graphical CUA is discovered automatically; availability depends on the actual display/session and permissions. A loaded module is not proof that real pixel capture or input succeeded. New profiles use adaptive auto mode: without a verified active X11 session the runtime provides FBEXEC, FBTERM and CUA-TTY in text mode, without requiring a graphical login or automatically creating a private desktop. Explicit virtual-desktop settings remain advanced options and are labelled separately from physical-screen evidence. Physical-screen capture and input currently require the supported active X11 session. Native Wayland control is not validated; showing an XWayland window does not establish full-desktop capture or input.",
           "commands": [
             "fb status",
             "fb doctor"
@@ -426,12 +426,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "b186eb36570b870490eedf424b30eabb4c130ee2e2c72d658fe09b77549bbc59"
+      "guide_sha256": "1ce747282da1d9d1504790607888af131666758dd28b4a47799ed4c59427436b"
     },
     "diagnostics": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.1",
+      "version": "0.3.2~compat.20261027.1",
       "guide_schema": 1,
       "topic": "diagnostics",
       "title": "Status and diagnosis",
@@ -448,7 +448,7 @@
         },
         {
           "heading": "Doctor",
-          "body": "doctor diagnoses prerequisites and reports findings with suggested next steps. It is not an implicit repair, and it is not a substitute for checking actual live connection state. Inspect the diagnosis and relevant private application logs before considering configuration changes.",
+          "body": "doctor diagnoses prerequisites and reports findings with suggested next steps. It is not an implicit repair, and it is not a substitute for checking actual live connection state. Inspect the diagnosis and relevant private application logs before considering configuration changes. Candidate eligibility checks the exact OS release, amd64 architecture, package profile and CPython ABI before starting native components. Debian 13/LMDE 7 use cp313, Ubuntu 24.04/Mint 22.x use cp312, and Ubuntu 26.04 uses cp314. A matching profile does not establish a tested installation; never repair an ABI mismatch by replacing system Python or weakening package dependencies.",
           "commands": [
             "fb doctor"
           ]
@@ -476,12 +476,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "0e55b9cda6b528926ca2a297d8464908a300122edbc1550b841ab8c1b7673029"
+      "guide_sha256": "1e85490e5b9925afb588bf536b155cf3cbfaef3997d21be94856fd1997372497"
     },
     "security": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.1",
+      "version": "0.3.2~compat.20261027.1",
       "guide_schema": 1,
       "topic": "security",
       "title": "Authorization, distribution and safe operation",
@@ -516,12 +516,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "2be17b3d7cb261f6cb5fbb94bfd027ca34147b8a4ead902f6a53b477fb4c201c"
+      "guide_sha256": "2982ca7b623a972097b5e04c309b682fefd91754d0c4c50fc802420c14c9c68d"
     },
     "compatibility": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.1",
+      "version": "0.3.2~compat.20261027.1",
       "guide_schema": 1,
       "topic": "compatibility",
       "title": "Compatibility with earlier commands",
@@ -564,8 +564,8 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "a6aa6d12e37563866404fa5834bdd7e758f3782a93b59d454316a8c9359b7258"
+      "guide_sha256": "54b70093617e6992de04d41ddd367ffdd9a6bd6c317c99a886d6391277c55f6b"
     }
   },
-  "guide_sha256": "504c010697017b50b26de89f793944072ca214ae92d772e8e282ad44a6645634"
+  "guide_sha256": "b6060e0572a612d8d7d8a988bc9b0bca7aa8db8ef267004e6a1495e9ab5f34a4"
 }

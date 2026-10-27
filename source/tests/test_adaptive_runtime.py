@@ -120,9 +120,13 @@ class AdaptiveCoreTests(unittest.TestCase):
 
     def tearDown(self): self.temp.cleanup()
 
-    def doctor(self,missing):
+    def doctor(self,missing,*,compatibility=None):
         def which(name,path=None): return None if name in missing else '/fixture/bin/'+name
-        with patch.object(runtime,'environment',return_value=dict(self.env)),patch.object(runtime.shutil,'which',side_effect=which),patch('framebridge_expanded.network.inspect',return_value={}):
+        # Graphical-capability tests use an eligible artifact fixture. Source
+        # checkouts do not contain the installed vendor layout or manifest.
+        eligibility = compatibility if compatibility is not None else {
+            'ok': True, 'profile_id': 'debian13-amd64-py313', 'issues': [], 'warnings': []}
+        with patch.object(runtime,'environment',return_value=dict(self.env)),patch.object(runtime.shutil,'which',side_effect=which),patch('framebridge_expanded.network.inspect',return_value={}),patch('framebridge_expanded.compatibility.assess',return_value=eligibility):
             return runtime.doctor(self.state)
 
     def test_optional_gui_dependencies_do_not_block_text_tools(self):
@@ -134,6 +138,14 @@ class AdaptiveCoreTests(unittest.TestCase):
         self.assertTrue(result['capabilities']['cua_tty_module'])
         self.assertFalse(result['capabilities']['graphical_cua'])
         self.assertTrue(result['optional_missing_commands']['graphical_cua'])
+
+    def test_text_mode_does_not_bypass_incompatible_artifact(self):
+        rejected = {'ok': False, 'profile_id': None, 'issues': ['Fixture artifact ABI mismatch'], 'warnings': []}
+        result = self.doctor(set(dc.GRAPHICAL_COMMANDS + dc.VIRTUAL_COMMANDS), compatibility=rejected)
+        self.assertFalse(result['ok'])
+        self.assertIn('Fixture artifact ABI mismatch', result['issues'])
+        self.assertEqual([], result['missing_commands'])
+        self.assertFalse(result['capabilities']['graphical_cua'])
 
     def test_missing_core_command_still_blocks_startup(self):
         result=self.doctor({'bash'})

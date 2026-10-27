@@ -7,7 +7,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest import mock
-from framebridge_expanded import cli
+from framebridge_expanded import cli, __version__
 from framebridge_expanded.config import default_config, save_config
 
 
@@ -67,7 +67,7 @@ class CommunityCliContractTests(unittest.TestCase):
         value=json.loads(text)
         self.assertEqual(code,0)
         self.assertEqual(value["schema_version"],1)
-        self.assertEqual(value["version"],"0.3.1")
+        self.assertEqual(value["version"], __version__)
         self.assertEqual(value["result"]["desired_connection"],"disconnected")
         self.assertFalse(value["result"]["connection"]["verified"])
 

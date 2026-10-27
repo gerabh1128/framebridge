@@ -1,5 +1,7 @@
 """Shared English guide content. Regenerate command docs after editing."""
 
+from . import __version__
+
 GUIDE = {'start': {'title': 'Start with FrameBridge',
            'sections': [{'heading': 'One interface for people and agents',
                          'body': 'FrameBridge provides tools and a shared command-line interface '
@@ -14,20 +16,10 @@ GUIDE = {'start': {'title': 'Start with FrameBridge',
                                  'installed program.',
                          'commands': ['fb help', 'fb status', 'fb --json status']},
                         {'heading': 'Install and connect',
-                         'body': 'On a supported Debian system, install the downloaded package '
-                                 'with the package manager. Normal first connection does not '
-                                 'require a separate setup, doctor or start sequence. Run connect '
-                                 'in a normal interactive terminal. Advanced setup is optional for '
-                                 'selecting central/node roles and public settings.',
-                         'commands': ['sudo apt install ./FrameBridge-0.3.1.deb', 'fb connect']},
+                         'body': 'Install the .deb built for your exact Debian 13, Ubuntu 24.04/26.04, Linux Mint 22.x or LMDE 7 amd64 profile. These compatibility candidates still require installation and lifecycle validation on each target. Select the artifact from the matching profile folder and keep the distribution system Python. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.',
+                         'commands': ["sudo apt install ./framebridge-expanded_" + __version__ + "_amd64.deb", 'fb connect']},
                         {'heading': 'Updating and removal',
-                         'body': 'Install an official update through the normal package manager. '
-                                 'Normal package removal stops package-owned managed processes and '
-                                 'retains the profile and saved encrypted connection material for '
-                                 'deliberate reuse; it is not a credential-forgetting operation. '
-                                 'Use the separately documented explicit forget action first if '
-                                 'that is your intended outcome. Do not assume purge erases '
-                                 'user-profile data.',
+                         'body': 'Install an official update through the normal package manager when that update has been published. Normal removal stops package-owned managed processes and can retain the user profile and encrypted connection material; it is not a credential-forgetting operation. On systemd 255, package removal also revokes the administrative boot-credential grant. After reinstalling, run fb connect interactively to provision that grant again; retained files alone do not restore startup. Use the explicit credentials forget action first when that is your intended outcome. Do not assume purge erases user-profile data.',
                          'commands': ['sudo dpkg --remove framebridge-original-expanded']},
                         {'heading': 'Human authentication',
                          'body': 'The normal connection asks for an optional account label, a '
@@ -310,17 +302,7 @@ GUIDE = {'start': {'title': 'Start with FrameBridge',
                                    'partial invented view as a real screenshot.',
                            'commands': []},
                           {'heading': 'Automatic graphical discovery',
-                           'body': 'The installer and control console stay text interfaces in both '
-                                   'TTY and a desktop terminal. Compatible graphical CUA is '
-                                   'discovered automatically; availability depends on the actual '
-                                   'display/session and permissions. A loaded module is not proof '
-                                   'that real pixel capture or input succeeded. New profiles use '
-                                   'adaptive auto mode: without a verified active X11 session the '
-                                   'runtime provides FBEXEC, FBTERM and CUA-TTY in text mode, '
-                                   'without requiring a graphical login or automatically creating '
-                                   'a private desktop. Explicit virtual-desktop settings remain '
-                                   'advanced options and are labelled separately from '
-                                   'physical-screen evidence.',
+                           'body': 'The installer and control console stay text interfaces in both TTY and a desktop terminal. Compatible graphical CUA is discovered automatically; availability depends on the actual display/session and permissions. A loaded module is not proof that real pixel capture or input succeeded. New profiles use adaptive auto mode: without a verified active X11 session the runtime provides FBEXEC, FBTERM and CUA-TTY in text mode, without requiring a graphical login or automatically creating a private desktop. Explicit virtual-desktop settings remain advanced options and are labelled separately from physical-screen evidence. Physical-screen capture and input currently require the supported active X11 session. Native Wayland control is not validated; showing an XWayland window does not establish full-desktop capture or input.',
                            'commands': ['fb status', 'fb doctor']},
                           {'heading': 'Frame-buffer read access',
                            'body': 'screen-access is a narrow, explicit administrative permission '
@@ -351,11 +333,7 @@ GUIDE = {'start': {'title': 'Start with FrameBridge',
                                             'fb status runtime',
                                             'fb status boot']},
                               {'heading': 'Doctor',
-                               'body': 'doctor diagnoses prerequisites and reports findings with '
-                                       'suggested next steps. It is not an implicit repair, and it '
-                                       'is not a substitute for checking actual live connection '
-                                       'state. Inspect the diagnosis and relevant private '
-                                       'application logs before considering configuration changes.',
+                               'body': 'doctor diagnoses prerequisites and reports findings with suggested next steps. It is not an implicit repair, and it is not a substitute for checking actual live connection state. Inspect the diagnosis and relevant private application logs before considering configuration changes. Candidate eligibility checks the exact OS release, amd64 architecture, package profile and CPython ABI before starting native components. Debian 13/LMDE 7 use cp313, Ubuntu 24.04/Mint 22.x use cp312, and Ubuntu 26.04 uses cp314. A matching profile does not establish a tested installation; never repair an ABI mismatch by replacing system Python or weakening package dependencies.',
                                'commands': ['fb doctor']},
                               {'heading': 'Logs and progress',
                                'body': 'Normal connection presents concise progress and a final '

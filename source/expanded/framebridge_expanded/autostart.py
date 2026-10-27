@@ -1,6 +1,7 @@
 """Explicit user-service startup with host-bound encrypted systemd credentials."""
 from __future__ import annotations
 import argparse
+from contextlib import contextmanager
 import fcntl
 import getpass
 import hashlib
@@ -20,6 +21,112 @@ import time
 from .config import load_config, save_config, private_dir, state_path, default_config, validate
 
 CREDENTIAL = "chatgpt-runtime-key"
+USER_BACKEND = "systemd-user-v1"
+HOST_BACKEND = "systemd-host-helper-v1"
+HELPER = Path("/usr/lib/framebridge-expanded/bin/framebridge-credential-helper")
+
+
+def _helper_present():
+    return HELPER.exists() or HELPER.is_symlink()
+
+
+def _helper_ready():
+    for target in (HELPER, HELPER.parent.parent / "expanded/framebridge_expanded/credential_helper.py"):
+        for path in reversed((target, *target.parents)):
+            try:
+                info = path.lstat()
+            except FileNotFoundError:
+                raise RuntimeError("This system needs the installed FrameBridge protected-credential helper. Install the matching package before connecting.") from None
+            if info.st_uid != 0 or info.st_mode & 0o022 or stat.S_ISLNK(info.st_mode):
+                raise RuntimeError("The installed protected-credential helper is unsafe.")
+            if path == target:
+                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                    raise RuntimeError("The installed protected-credential helper is unsafe.")
+            elif not stat.S_ISDIR(info.st_mode):
+                raise RuntimeError("The installed protected-credential helper is unsafe.")
+
+
+def _credential_backend(record=None):
+    if record is not None:
+        backend = record.get("credential_backend", USER_BACKEND)
+        if backend not in {USER_BACKEND, HOST_BACKEND}:
+            raise RuntimeError("Unsupported protected-credential backend.")
+        return backend
+    version = _command(["systemd-creds", "--version"]).stdout.decode(errors="replace")
+    match = re.match(r"systemd (\d+)", version)
+    if not match or int(match.group(1)) < 255:
+        raise RuntimeError("Protected connections require systemd 255 or later.")
+    if int(match.group(1)) >= 256:
+        return USER_BACKEND
+    _helper_ready()
+    return HOST_BACKEND
+
+
+def _profile_id(state):
+    return hashlib.sha256(str(state_path(state)).encode()).hexdigest()
+
+
+def _encrypt_credential(state, key, backend):
+    if backend == HOST_BACKEND:
+        _helper_ready()
+        args = ["sudo", "-n", "--", str(HELPER), "protect", _profile_id(state)]
+    elif backend == USER_BACKEND:
+        args = ["sudo", "-n", "--", "systemd-creds", "encrypt", "--uid=" + str(os.getuid()), "--with-key=host", "--name=" + CREDENTIAL, "-", "-"]
+    else:
+        raise RuntimeError("Unsupported protected-credential backend.")
+    return _command(args, data=key.encode()).stdout
+
+
+def _revoke_helper(state, digest):
+    if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise RuntimeError("Invalid protected-credential cleanup record.")
+    _helper_ready()
+    _command(["sudo", "-n", "--", str(HELPER), "revoke", _profile_id(state), digest])
+
+
+def _prune_helpers(state, keep=()):
+    values = list(dict.fromkeys(keep))
+    if len(values) > 128 or any(type(v) is not str or not re.fullmatch(r"[0-9a-f]{64}", v) for v in values):
+        raise RuntimeError("Invalid protected-credential cleanup record.")
+    _helper_ready()
+    _command(["sudo", "-n", "--", str(HELPER), "prune", _profile_id(state), ",".join(values) or "-"])
+
+
+@contextmanager
+def _credential_transaction(state, encrypted, backend):
+    transaction = {"committed": False}
+    try:
+        yield transaction
+    finally:
+        if not transaction["committed"] and backend == HOST_BACKEND:
+            try:
+                _revoke_helper(state, hashlib.sha256(encrypted).hexdigest())
+            except Exception:
+                raise RuntimeError("Connection setup did not complete and protected-credential cleanup could not be verified. Ask the administrator to inspect the credential registry before retrying.") from None
+
+
+def _retired_helpers(record):
+    values = record.get("retired_helper_credentials", [])
+    if type(values) is not list or len(values) > 128 or any(type(v) is not str or not re.fullmatch(r"[0-9a-f]{64}", v) for v in values):
+        raise RuntimeError("Invalid protected-credential cleanup record.")
+    return list(dict.fromkeys(values))
+
+
+def _cleanup_retired_helpers(state, directory, record):
+    pending = _retired_helpers(record)
+    if not pending:
+        return
+    for digest in list(pending):
+        try:
+            _revoke_helper(state, digest)
+        except Exception:
+            # The committed current credential remains valid; keep an explicit
+            # cleanup list so disable/uninstall can revoke all older grants.
+            break
+        pending.remove(digest)
+        record["retired_helper_credentials"] = pending
+        _json(directory / "installation.json", record, replace=True)
+
 _STOP = False
 
 
@@ -148,6 +255,8 @@ def status(state):
     from . import runtime, connection_background
     result = {"configured": bool(manifest), "unit": unit.name, "service_active": values.get("ActiveState") == "active", "service_state": values.get("ActiveState", "unavailable"), "enabled": values.get("UnitFileState") == "enabled", "linger": _linger(pwd.getpwuid(os.getuid()).pw_name), "encrypted_credential_present": False, "runtime": _safe_runtime_status(runtime, state), "connection": connection_background.status(state)}
     if manifest and not manifest.get("node"):
+        result["credential_backend"] = _credential_backend(manifest)
+        result["credential_cleanup_pending"] = bool(_retired_helpers(manifest))
         try:
             cipher = _read(directory / "credential.cred")
             result["encrypted_credential_present"] = hashlib.sha256(cipher).hexdigest() == manifest.get("credential_sha256")
@@ -336,11 +445,13 @@ def _configure_connection(state, settings, runtime_key):
             raise RuntimeError("The profile backup changed outside FrameBridge; nothing was replaced.")
     elif any(originals[path] is not None for path in (unit, blob, backup)):
         raise RuntimeError("Existing unowned connection files; nothing was replaced.")
+    pending = _retired_helpers(previous or {})
+    if previous and _credential_backend(previous) == HOST_BACKEND:
+        pending = list(dict.fromkeys([*pending, previous["credential_sha256"]]))
+        if len(pending) > 128:
+            raise RuntimeError("Retired protected credentials must be cleaned before replacing this connection. Disable automatic startup and retry connection setup.")
     _check_unit_directory(unit)
-    version = _command(["systemd-creds", "--version"]).stdout.decode(errors="replace")
-    match = re.match(r"systemd (\d+)", version)
-    if not match or int(match.group(1)) < 256:
-        raise RuntimeError("Protected connections require systemd 256 or later.")
+    backend = _credential_backend()
     _command(["sudo", "-v"], timeout=180)
     user = pwd.getpwuid(os.getuid()).pw_name
     linger_before = _linger(user)
@@ -349,105 +460,116 @@ def _configure_connection(state, settings, runtime_key):
     values = dict(line.split("=", 1) for line in properties.stdout.decode(errors="replace").splitlines() if "=" in line)
     was_enabled = values.get("UnitFileState") == "enabled"
     was_active = values.get("ActiveState") in {"active", "activating", "reloading"}
+    if backend == HOST_BACKEND or _helper_present():
+        keep = _retired_helpers(previous or {})
+        if previous and _credential_backend(previous) == HOST_BACKEND:
+            keep.append(previous["credential_sha256"])
+        _prune_helpers(state, keep)
     try:
-        encrypted = _command(["sudo", "-n", "--", "systemd-creds", "encrypt", "--uid=" + str(os.getuid()), "--with-key=host", "--name=" + CREDENTIAL, "-", "-"], data=runtime_key.encode()).stdout
+        encrypted = _encrypt_credential(state, runtime_key, backend)
     finally:
         runtime_key = ""
-    if len(encrypted) < 80 or len(encrypted) > 131072:
-        raise RuntimeError("Connection protection did not complete.")
-    # Recheck the exact originals after authentication/encryption and before any stop.
-    if any(_optional_read(path) != data for path, data in originals.items()):
-        raise RuntimeError("The profile changed during connection setup; nothing was replaced.")
-    text = unit_text(state, blob).encode()
-    record = dict(previous) if previous else {"schema": 1, "unit": unit.name, "node": False, "linger_before": linger_before, "enabled_units_before": units_before, "headless_before": headless_before, "headless_changed": changed_headless, "config_before_sha256": hashlib.sha256(original_config).hexdigest() if original_config is not None else ""}
-    backup_bytes = originals[backup]
-    if changed_headless and not record.get("headless_changed"):
-        record.update(headless_before=headless_before, headless_changed=True, config_before_sha256=hashlib.sha256(original_config).hexdigest())
-        backup_bytes = original_config
-    elif not previous and changed_headless:
-        backup_bytes = original_config
-    if record.get("headless_changed"):
-        # Disabling changes only the desktop preference, preserving the newly selected connection.
-        restored_profile = dict(config)
-        restored_profile["headless"] = record["headless_before"]
-        backup_bytes = (json.dumps(restored_profile, indent=2, sort_keys=True) + "\n").encode()
-        record["config_before_sha256"] = hashlib.sha256(backup_bytes).hexdigest()
-        record["changed_config_sha256"] = hashlib.sha256(config_bytes).hexdigest()
-    record.update(unit_sha256=hashlib.sha256(text).hexdigest(), credential_sha256=hashlib.sha256(encrypted).hexdigest(), connection_settings_sha256=_connection_public_digest(config))
-    from . import connection_background
-    background_before = connection_background.status(state)
-    changed = {}
-    service_touched = False
-    manual_connection_stopped = False
-    def write(path, data):
-        changed[path] = data
-        _write(path, data, replace=originals.get(path) is not None)
-    try:
-        if previous:
-            service_touched = True
-            _systemctl("stop", unit.name)
-        disconnected = connection_background.disconnect(state)
-        if disconnected.get("ok") is False or disconnected.get("alive"):
-            raise RuntimeError("The previous connection could not be stopped safely; nothing was replaced.")
-        manual_connection_stopped = not previous and background_before.get("alive") is True
-        if connection_background.status(state).get("alive"):
-            raise RuntimeError("The previous connection is still stopping; nothing was replaced.")
-        write(blob, encrypted)
-        write(unit, text)
-        write(config_path, config_bytes)
-        if backup_bytes is not None and backup_bytes != originals[backup]:
-            write(backup, backup_bytes)
-        write(record_path, (json.dumps(record, sort_keys=True, indent=2) + "\n").encode())
-        write(intent, (json.dumps({"schema": 1, "connect": True, "revision": connection_request_revision(state) + 1}, sort_keys=True) + "\n").encode())
-        _command(["sudo", "-n", "--", "loginctl", "enable-linger", user])
-        _systemctl("daemon-reload")
-        service_touched = True
-        if boot_requested(state) is False:
-            _systemctl("start", unit.name)
-        else:
-            _systemctl("enable", "--now", unit.name)
-    except BaseException as error:
-        rollback_failed = False
-        if service_touched or unit in changed:
-            try:
-                rollback_failed = bool(_systemctl("disable", "--now", unit.name, check=False).returncode)
-            except Exception:
-                rollback_failed = True
-        for path, installed in reversed(list(changed.items())):
-            try:
-                current = _optional_read(path)
-                if current == originals[path]:
-                    continue
-                if current != installed:
-                    rollback_failed = True
-                    continue
-                if originals[path] is None:
-                    path.unlink()
-                else:
-                    _write(path, originals[path], replace=True)
-            except Exception:
-                rollback_failed = True
+    with _credential_transaction(state, encrypted, backend) as transaction:
+        if len(encrypted) < 80 or len(encrypted) > 131072:
+            raise RuntimeError("Connection protection did not complete.")
+        # Recheck the exact originals after authentication/encryption and before any stop.
+        if any(_optional_read(path) != data for path, data in originals.items()):
+            raise RuntimeError("The profile changed during connection setup; nothing was replaced.")
+        text = unit_text(state, blob).encode()
+        record = dict(previous) if previous else {"schema": 1, "unit": unit.name, "node": False, "linger_before": linger_before, "enabled_units_before": units_before, "headless_before": headless_before, "headless_changed": changed_headless, "config_before_sha256": hashlib.sha256(original_config).hexdigest() if original_config is not None else ""}
+        backup_bytes = originals[backup]
+        if changed_headless and not record.get("headless_changed"):
+            record.update(headless_before=headless_before, headless_changed=True, config_before_sha256=hashlib.sha256(original_config).hexdigest())
+            backup_bytes = original_config
+        elif not previous and changed_headless:
+            backup_bytes = original_config
+        if record.get("headless_changed"):
+            # Disabling changes only the desktop preference, preserving the newly selected connection.
+            restored_profile = dict(config)
+            restored_profile["headless"] = record["headless_before"]
+            backup_bytes = (json.dumps(restored_profile, indent=2, sort_keys=True) + "\n").encode()
+            record["config_before_sha256"] = hashlib.sha256(backup_bytes).hexdigest()
+            record["changed_config_sha256"] = hashlib.sha256(config_bytes).hexdigest()
+        retired = _retired_helpers(previous or {})
+        if previous and _credential_backend(previous) == HOST_BACKEND:
+            retired.append(previous["credential_sha256"])
+        record.update(unit_sha256=hashlib.sha256(text).hexdigest(), credential_sha256=hashlib.sha256(encrypted).hexdigest(), credential_backend=backend, retired_helper_credentials=list(dict.fromkeys(retired)), connection_settings_sha256=_connection_public_digest(config))
+        from . import connection_background
+        background_before = connection_background.status(state)
+        changed = {}
+        service_touched = False
+        manual_connection_stopped = False
+        def write(path, data):
+            changed[path] = data
+            _write(path, data, replace=originals.get(path) is not None)
         try:
-            if originals[manual_stop] is not None and _optional_read(manual_stop) is None:
-                _write(manual_stop, originals[manual_stop])
-            _systemctl("daemon-reload")
             if previous:
-                result = _systemctl("enable" if was_enabled else "disable", unit.name, check=False)
-                rollback_failed = rollback_failed or bool(result.returncode)
-                if was_active:
-                    restarted = _systemctl("start", unit.name, check=False)
-                    rollback_failed = rollback_failed or bool(restarted.returncode)
-            if not linger_before and _enabled_units() == units_before:
-                restored_linger = _command(["sudo", "-n", "--", "loginctl", "disable-linger", user], check=False)
-                rollback_failed = rollback_failed or bool(restored_linger.returncode)
-        except Exception:
-            rollback_failed = True
-        if rollback_failed:
-            raise RuntimeError("Connection setup did not complete, and restoration could not be fully verified. Inspect fb autostart status before retrying.") from None
-        if manual_connection_stopped:
-            raise RuntimeError("Connection setup did not complete. The previous manually started connection was stopped; reconnect it using its original key.") from None
-        raise
-    return _committed_connection_status(state)
+                service_touched = True
+                _systemctl("stop", unit.name)
+            disconnected = connection_background.disconnect(state)
+            if disconnected.get("ok") is False or disconnected.get("alive"):
+                raise RuntimeError("The previous connection could not be stopped safely; nothing was replaced.")
+            manual_connection_stopped = not previous and background_before.get("alive") is True
+            if connection_background.status(state).get("alive"):
+                raise RuntimeError("The previous connection is still stopping; nothing was replaced.")
+            write(blob, encrypted)
+            write(unit, text)
+            write(config_path, config_bytes)
+            if backup_bytes is not None and backup_bytes != originals[backup]:
+                write(backup, backup_bytes)
+            write(record_path, (json.dumps(record, sort_keys=True, indent=2) + "\n").encode())
+            write(intent, (json.dumps({"schema": 1, "connect": True, "revision": connection_request_revision(state) + 1}, sort_keys=True) + "\n").encode())
+            _command(["sudo", "-n", "--", "loginctl", "enable-linger", user])
+            _systemctl("daemon-reload")
+            service_touched = True
+            if boot_requested(state) is False:
+                _systemctl("start", unit.name)
+            else:
+                _systemctl("enable", "--now", unit.name)
+        except BaseException as error:
+            rollback_failed = False
+            if service_touched or unit in changed:
+                try:
+                    rollback_failed = bool(_systemctl("disable", "--now", unit.name, check=False).returncode)
+                except Exception:
+                    rollback_failed = True
+            for path, installed in reversed(list(changed.items())):
+                try:
+                    current = _optional_read(path)
+                    if current == originals[path]:
+                        continue
+                    if current != installed:
+                        rollback_failed = True
+                        continue
+                    if originals[path] is None:
+                        path.unlink()
+                    else:
+                        _write(path, originals[path], replace=True)
+                except Exception:
+                    rollback_failed = True
+            try:
+                if originals[manual_stop] is not None and _optional_read(manual_stop) is None:
+                    _write(manual_stop, originals[manual_stop])
+                _systemctl("daemon-reload")
+                if previous:
+                    result = _systemctl("enable" if was_enabled else "disable", unit.name, check=False)
+                    rollback_failed = rollback_failed or bool(result.returncode)
+                    if was_active:
+                        restarted = _systemctl("start", unit.name, check=False)
+                        rollback_failed = rollback_failed or bool(restarted.returncode)
+                if not linger_before and _enabled_units() == units_before:
+                    restored_linger = _command(["sudo", "-n", "--", "loginctl", "disable-linger", user], check=False)
+                    rollback_failed = rollback_failed or bool(restored_linger.returncode)
+            except Exception:
+                rollback_failed = True
+            if rollback_failed:
+                raise RuntimeError("Connection setup did not complete, and restoration could not be fully verified. Inspect fb autostart status before retrying.") from None
+            if manual_connection_stopped:
+                raise RuntimeError("Connection setup did not complete. The previous manually started connection was stopped; reconnect it using its original key.") from None
+            raise
+        transaction["committed"] = True
+        _cleanup_retired_helpers(state, directory, record)
+        return _committed_connection_status(state)
 
 
 def _enable(state, *, start_now=True, confirm=True):
@@ -475,11 +597,8 @@ def _enable(state, *, start_now=True, confirm=True):
         else:
             _systemctl("enable", unit.name)
         return status(state)
-    version = _command(["systemd-creds", "--version"]).stdout.decode(errors="replace")
-    match = re.match(r"systemd (\d+)", version)
-    if not match or int(match.group(1)) < 256:
-        raise RuntimeError("Encrypted user credentials require systemd 256 or later.")
     node = config["role"] == "node"
+    backend = None if node else _credential_backend()
     if not node and not config.get("tunnel_id"):
         raise RuntimeError("Save a tunnel with fb connect chatgpt before enabling automatic startup.")
     print("FrameBridge will start automatically when this computer starts.")
@@ -506,64 +625,79 @@ def _enable(state, *, start_now=True, confirm=True):
         if not runtime_key or not runtime_key.isascii() or len(runtime_key) > 16384 or any(ord(ch) < 33 or ord(ch) > 126 for ch in runtime_key):
             raise ValueError("The runtime key must be nonempty and contain no whitespace or control characters.")
         try:
-            encrypted = _command(["sudo", "-n", "--", "systemd-creds", "encrypt", "--uid=" + str(os.getuid()), "--with-key=host", "--name=" + CREDENTIAL, "-", "-"], data=runtime_key.encode()).stdout
+            if backend == HOST_BACKEND or _helper_present():
+                _prune_helpers(state)
+            encrypted = _encrypt_credential(state, runtime_key, backend)
         finally:
             runtime_key = ""
         if len(encrypted) < 80 or len(encrypted) > 131072:
             raise RuntimeError("Credential encryption returned an invalid result.")
-    blob = directory / "credential.cred"
-    text = unit_text(state, blob, node=node).encode()
-    record = {"schema": 1, "unit": unit.name, "unit_sha256": hashlib.sha256(text).hexdigest(), "credential_sha256": hashlib.sha256(encrypted).hexdigest() if encrypted else "", "node": node, "linger_before": linger_before, "enabled_units_before": units_before, "headless_before": original_headless, "headless_changed": changed_headless, "config_before_sha256": hashlib.sha256(original_config).hexdigest()}
-    created = []
-    try:
-        if encrypted:
-            _write(blob, encrypted); created.append(blob)
-        _write(unit, text); created.append(unit)
-        if changed_headless:
-            if _read(state / "config.json") != original_config:
-                raise RuntimeError("The profile changed during configuration; no profile settings were overwritten.")
-            _write(directory / "config-before.json", original_config)
-            created.append(directory / "config-before.json")
-            config["headless"] = "auto"
-            save_config(state, config)
-            record["changed_config_sha256"] = hashlib.sha256(_read(state / "config.json")).hexdigest()
-        _json(directory / "installation.json", record); created.append(directory / "installation.json")
-        print("[3/3] Enabling automatic startup...", flush=True)
-        _command(["sudo", "-n", "--", "loginctl", "enable-linger", user])
-        _systemctl("daemon-reload")
-        if start_now:
-            _systemctl("enable", "--now", unit.name)
-        else:
-            _systemctl("enable", unit.name)
-    except BaseException:
-        if unit in created:
-            _systemctl("disable", "--now", unit.name, check=False)
-        for path in reversed(created):
-            try: path.unlink()
-            except FileNotFoundError: pass
-        if changed_headless and record.get("changed_config_sha256") == hashlib.sha256(_read(state / "config.json")).hexdigest():
-            _write(state / "config.json", original_config, replace=True)
-        _systemctl("daemon-reload", check=False)
-        if not linger_before:
-            try:
-                if _enabled_units() == units_before:
-                    _command(["sudo", "-n", "--", "loginctl", "disable-linger", user], check=False)
-            except Exception:
-                pass
-        raise
-    return status(state)
+    elif _helper_present():
+        _prune_helpers(state)
+    with _credential_transaction(state, encrypted, backend) as transaction:
+        blob = directory / "credential.cred"
+        text = unit_text(state, blob, node=node).encode()
+        record = {"schema": 1, "unit": unit.name, "unit_sha256": hashlib.sha256(text).hexdigest(), "credential_sha256": hashlib.sha256(encrypted).hexdigest() if encrypted else "", "credential_backend": backend or USER_BACKEND, "node": node, "linger_before": linger_before, "enabled_units_before": units_before, "headless_before": original_headless, "headless_changed": changed_headless, "config_before_sha256": hashlib.sha256(original_config).hexdigest()}
+        created = []
+        try:
+            if encrypted:
+                _write(blob, encrypted); created.append(blob)
+            _write(unit, text); created.append(unit)
+            if changed_headless:
+                if _read(state / "config.json") != original_config:
+                    raise RuntimeError("The profile changed during configuration; no profile settings were overwritten.")
+                _write(directory / "config-before.json", original_config)
+                created.append(directory / "config-before.json")
+                config["headless"] = "auto"
+                save_config(state, config)
+                record["changed_config_sha256"] = hashlib.sha256(_read(state / "config.json")).hexdigest()
+            _json(directory / "installation.json", record); created.append(directory / "installation.json")
+            print("[3/3] Enabling automatic startup...", flush=True)
+            _command(["sudo", "-n", "--", "loginctl", "enable-linger", user])
+            _systemctl("daemon-reload")
+            if start_now:
+                _systemctl("enable", "--now", unit.name)
+            else:
+                _systemctl("enable", unit.name)
+        except BaseException:
+            if unit in created:
+                _systemctl("disable", "--now", unit.name, check=False)
+            for path in reversed(created):
+                try: path.unlink()
+                except FileNotFoundError: pass
+            if changed_headless and record.get("changed_config_sha256") == hashlib.sha256(_read(state / "config.json")).hexdigest():
+                _write(state / "config.json", original_config, replace=True)
+            _systemctl("daemon-reload", check=False)
+            if not linger_before:
+                try:
+                    if _enabled_units() == units_before:
+                        _command(["sudo", "-n", "--", "loginctl", "disable-linger", user], check=False)
+                except Exception:
+                    pass
+            raise
+        transaction["committed"] = True
+        return status(state)
 
 
 def _disable(state):
     state, directory, unit = _paths(state)
     record = _manifest(directory)
     if not record:
-        return {"configured": False, "state": "already_disabled"}
+        if _helper_present():
+            # A killed first provisioning process can publish a root grant
+            # before writing any owner manifest.  Explicit disable still
+            # reconciles that profile under ordinary administrative approval.
+            _helper_ready()
+            _command(["sudo", "-v"], timeout=180)
+            _prune_helpers(state)
+            return {"configured": False, "state": "already_disabled", "orphan_credential_cleanup_verified": True}
+        return {"configured": False, "state": "already_disabled", "orphan_credential_cleanup_verified": False}
     if record.get("unit") != unit.name or hashlib.sha256(_read(unit)).hexdigest() != record.get("unit_sha256"):
         raise RuntimeError("The service changed outside FrameBridge; refusing to remove it.")
     blob = directory / "credential.cred"
     if not record.get("node") and hashlib.sha256(_read(blob)).hexdigest() != record.get("credential_sha256"):
         raise RuntimeError("The encrypted credential changed outside FrameBridge; refusing to remove it.")
+    retired = _retired_helpers(record)
     backup = None
     if record.get("headless_changed"):
         backup = _read(directory / "config-before.json")
@@ -576,7 +710,14 @@ def _disable(state):
     restore_linger = not record.get("linger_before") and [name for name in _enabled_units() if name != unit.name] == record.get("enabled_units_before")
     if restore_linger:
         _command(["sudo", "-v"], timeout=180)
+    helper_credentials = _helper_present() or (not record.get("node") and (_credential_backend(record) == HOST_BACKEND or retired))
+    if helper_credentials:
+        _command(["sudo", "-v"], timeout=180)
     _systemctl("disable", "--now", unit.name)
+    if helper_credentials:
+        # Include grants whose receipt was lost to SIGKILL/power loss during a
+        # previous provisioning operation, not only digests in the manifest.
+        _prune_helpers(state)
     unit.unlink()
     if not record.get("node"):
         blob.unlink()
@@ -609,7 +750,11 @@ def _credential(state):
     if hashlib.sha256(cipher).hexdigest() != record.get("credential_sha256"):
         raise RuntimeError("The encrypted runtime credential changed outside FrameBridge.")
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-    result = _command(["systemd-creds", "decrypt", "--user", "--name=" + CREDENTIAL, "-", "-"], data=cipher, timeout=15)
+    if _credential_backend(record) == HOST_BACKEND:
+        _helper_ready()
+        result = _command(["sudo", "-n", "--", str(HELPER), "decrypt", _profile_id(state), record["credential_sha256"]], timeout=15)
+    else:
+        result = _command(["systemd-creds", "decrypt", "--user", "--name=" + CREDENTIAL, "-", "-"], data=cipher, timeout=15)
     try:
         key = result.stdout.decode("ascii")
     except UnicodeDecodeError:

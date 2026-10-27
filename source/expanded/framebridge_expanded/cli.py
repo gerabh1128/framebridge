@@ -13,7 +13,7 @@ import sys
 import shlex
 
 from .config import default_config, load_config, save_config
-from . import tunnel
+from . import tunnel, __version__
 
 _EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+\Z")
 
@@ -317,7 +317,7 @@ _OUTPUT = None
 
 def _structured_result(value):
     """Versioned envelope used only when --json was explicitly requested."""
-    return {"schema_version": 1, "product": "FrameBridge", "version": "0.3.1",
+    return {"schema_version": 1, "product": "FrameBridge", "version": __version__,
             "command": _OUTPUT.get("command") if _OUTPUT else None,
             "ok": not isinstance(value, dict) or value.get("ok") is not False,
             "result": value}
@@ -394,7 +394,7 @@ def _human_status(value, scope=None):
     connection = connection if isinstance(connection, dict) else {}
     boot = value.get("boot", {})
     boot = boot if isinstance(boot, dict) else {}
-    print("FrameBridge 0.3.1")
+    print("FrameBridge " + __version__)
     print("Role: " + str(runtime.get("role", "unavailable")))
     print("Local tools: " + _runtime_label(runtime))
     if runtime.get("role") == "node":

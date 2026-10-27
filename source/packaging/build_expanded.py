@@ -1,20 +1,25 @@
 #!/usr/bin/python3
 """Reproducible Debian package builder; never installs or starts the payload."""
+import argparse
+import ast
 import calendar
 import gzip
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
 
+from build_profiles import CANDIDATE_VERSION, PROFILES, SOURCE_VENDOR, VENDOR_RELATIVE, target_profile, validate_vendor, vendor_versions
+
 BASE = Path(__file__).resolve().parents[1]
 ROOT = BASE.parent
-VERSION = "0.3.1"
+VERSION = CANDIDATE_VERSION
 PUBLIC_FILENAME = "FrameBridge-0.3.1.deb"
 GPL_SHA256 = "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
-EPOCH = calendar.timegm((2026, 10, 26, 0, 0, 0))
+EPOCH = calendar.timegm((2026, 10, 27, 0, 0, 0))
 PACKAGE = "framebridge-original-expanded"
 RELEASE = BASE / "release"
 STAGE = BASE / "build/package-root"
@@ -92,7 +97,7 @@ def install_legal_material(docs):
         shutil.copy2(ROOT / "blog" / name, docs / "blog" / name)
     shutil.copy2(ROOT / "RELEASE-NOTES.md", docs / "RELEASE-NOTES.md")
     (docs / "copyright").write_text(
-        "FrameBridge Original Expanded — Community Release 0.3.1\n\n"
+        "FrameBridge Original Expanded — compatibility candidate " + VERSION + "\n\n"
         "Original FrameBridge material: GNU GPL version 3 only (GPL-3.0-only).\n"
         "The complete license is included in LICENSE. COPYRIGHT.md and LICENSING.md\n"
         "identify attribution, scope and third-party exceptions.\n\n"
@@ -105,8 +110,8 @@ def install_legal_material(docs):
         "The assembled notices and license texts are included under\n"
         "[licensing/third-party](licensing/third-party/THIRD-PARTY-NOTICES.md).\n"
         "Original vendored notices are preserved with their components.\n")
-    lines = ["# Source availability for FrameBridge 0.3.1", "",
-             "Project source archive: FrameBridge-0.3.1-source.tar.gz.", "",
+    lines = ["# Source availability for FrameBridge " + VERSION, "",
+             "Candidate source must be retained with its build identity; no public archive is asserted.", "",
              "The release source set also includes these separate assets:", ""]
     for item in DEPENDENCY_SOURCE_ASSETS:
         lines.extend(["- " + item["filename"],
@@ -122,32 +127,70 @@ def install_legal_material(docs):
                   "signature status are external release records, not builder claims.", ""])
     (docs / "SOURCE-AVAILABILITY.md").write_text("\n".join(lines))
     (docs / "COMMUNITY-RELEASE-STATUS.json").write_text(json.dumps({
-        "schema_version": 1, "version": VERSION, "status": "COMMUNITY_RELEASE_BUILD",
+        "schema_version": 1, "version": VERSION, "status": "COMPATIBILITY_CANDIDATE_BUILD",
         "certified_as_RC7": False,
         "public_readiness": "EXTERNAL_RELEASE_RECORD",
         "signature_status": "EXTERNAL_RELEASE_RECORD",
         "vm_lifecycle_validation": "NOT_ASSERTED_BY_BUILDER",
-        "source_archive": "FrameBridge-0.3.1-source.tar.gz",
+        "source_archive": "CANDIDATE_SOURCE_REQUIRED_BEFORE_PUBLICATION",
         "dependency_source_archives": DEPENDENCY_SOURCE_ASSETS
     }, indent=2) + "\n")
 
-def main():
+def main(argv=None):
+    global VERSION, PUBLIC_FILENAME, RELEASE, STAGE, PREFIX
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--target", required=True, choices=sorted(PROFILES))
+    parser.add_argument("--version", default=CANDIDATE_VERSION)
+    parser.add_argument("--vendor-dir", type=Path, help="Reviewed target-ABI Fleet Hub vendor tree; never installed globally")
+    parser.add_argument("--check-vendor", action="store_true", help="Validate inputs without staging or building a package")
+    args = parser.parse_args(argv)
+    if not re.fullmatch(r"[0-9][0-9A-Za-z.+:~\-]*", args.version) or args.version == "0.3.1":
+        parser.error("A distinct valid Debian candidate version is required")
+    subprocess.run(["dpkg", "--validate-version", args.version], check=True)
+    VERSION = args.version
+    version_assignments = [node for node in ast.parse((BASE / "expanded/framebridge_expanded/__init__.py").read_text()).body
+                           if isinstance(node, ast.Assign) and any(isinstance(item, ast.Name) and item.id == "__version__" for item in node.targets)]
+    if len(version_assignments) != 1 or ast.literal_eval(version_assignments[0].value) != VERSION:
+        raise RuntimeError("Candidate package version differs from application __version__")
+    profile = target_profile(args.target)
+    profile["package_version"] = VERSION
+    original_vendor = BASE / SOURCE_VENDOR
+    vendor = args.vendor_dir.resolve() if args.vendor_dir else original_vendor
+    if args.vendor_dir is None and profile["python_abi"] != "cp313":
+        parser.error("This target requires --vendor-dir with reviewed " + profile["python_abi"] + " wheels")
+    vendor_evidence = validate_vendor(vendor, profile, vendor_versions(original_vendor))
+    profile["vendor"] = vendor_evidence
+    PUBLIC_FILENAME = "FrameBridge-" + VERSION + "-" + args.target + ".deb"
+    RELEASE = BASE / "release" / args.target
+    STAGE = BASE / "build" / args.target / "package-root"
+    PREFIX = STAGE / "usr/lib/framebridge-expanded"
     legal_preflight()
     baseline = json.loads((BASE / "evidence/BASELINE.json").read_text())
     for relative, expected in baseline["source_hashes"].items():
-        assert sha(BASE / "sources" / relative) == expected, "Original source changed: " + relative
+        if sha(BASE / "sources" / relative) != expected:
+            raise RuntimeError("Original source changed: " + relative)
+    if args.check_vendor:
+        print(json.dumps(profile, sort_keys=True))
+        return
     if STAGE.exists():
         shutil.rmtree(STAGE)
     PREFIX.mkdir(parents=True)
-    RELEASE.mkdir(exist_ok=True)
+    RELEASE.mkdir(parents=True, exist_ok=True)
     for name, dest in [("original-asus", "asus"), ("original-geranas", "geranas"), ("original-gerameg", "gerameg")]:
         source = BASE / "sources" / name
-        assert source.is_dir(), "Required public source snapshot missing: " + name
+        if not source.is_dir():
+            raise RuntimeError("Required public source snapshot missing: " + name)
         shutil.copytree(source, PREFIX / "original" / dest, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    staged_vendor = PREFIX / VENDOR_RELATIVE
+    shutil.rmtree(staged_vendor)
+    shutil.copytree(vendor, staged_vendor, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "bin", "FB-ABI-PREPARED.json"))
+    if validate_vendor(staged_vendor, profile, vendor_versions(original_vendor)) != vendor_evidence:
+        raise RuntimeError("Staged vendor tree differs from reviewed input")
+    (PREFIX / "release-profile.json").write_text(json.dumps(profile, indent=2, sort_keys=True) + "\n")
     for source in ("portable", "expanded", "docs"):
         shutil.copytree(BASE / source, PREFIX / source, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     (PREFIX / "bin").mkdir()
-    for name in ("framebridge", "framebridge-original", "framebridge-native-expanded", "framebridge-screen-access"):
+    for name in ("framebridge", "framebridge-original", "framebridge-native-expanded", "framebridge-screen-access", "framebridge-credential-helper"):
         shutil.copy2(BASE / "packaging" / name, PREFIX / "bin" / name)
         (PREFIX / "bin" / name).chmod(0o755)
     rules = STAGE / "usr/lib/udev/rules.d"
@@ -193,7 +236,7 @@ def main():
         "Maintainer: FrameBridge <framebridge@localhost>\n"
         "Homepage: https://framebridge.betancourt.one/\n"
         "Installed-Size: " + str((installed + 1023) // 1024) + "\n"
-        "Depends: python3 (>= 3.13), python3 (<< 3.14), libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, xvfb, openbox, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core\n"
+        "Depends: python3 (>= " + profile["python_minor"] + "), python3 (<< 3." + str(int(profile["python_minor"].split(".")[1]) + 1) + "), libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, xvfb, openbox, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core\n"
         "Description: FrameBridge with standalone, central and node modes\n"
         " Original execution and desktop programs, a real persistent terminal,\n"
         " authenticated node enrollment, and a manual ChatGPT tunnel wizard.\n"
@@ -230,12 +273,13 @@ def main():
         os.utime(path, (EPOCH, EPOCH), follow_symlinks=False)
     manifest = [{"path": str(p.relative_to(STAGE)), "sha256": sha(p), "bytes": p.stat().st_size}
                 for p in sorted(STAGE.rglob("*")) if p.is_file() and not p.is_symlink()]
+    (RELEASE / "RELEASE-PROFILE.json").write_text(json.dumps(profile, indent=2, sort_keys=True) + "\n")
     (RELEASE / "PACKAGE-MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n")
     output = RELEASE / ("framebridge-expanded_" + VERSION + "_amd64.deb")
     env = dict(os.environ, SOURCE_DATE_EPOCH=str(EPOCH))
     subprocess.run(["dpkg-deb", "--root-owner-group", "-Zxz", "-z6", "--build", str(STAGE), str(output)], check=True, env=env)
     shutil.copy2(output, RELEASE / PUBLIC_FILENAME)
-    print(json.dumps({"package": str(output), "bytes": output.stat().st_size, "sha256": sha(output), "payload_entries": len(manifest), "public_filename": PUBLIC_FILENAME, "status": "COMMUNITY_RELEASE_BUILD"}))
+    print(json.dumps({"package": str(output), "bytes": output.stat().st_size, "sha256": sha(output), "payload_entries": len(manifest), "profile_id": args.target, "validation_status": "candidate", "public_filename": PUBLIC_FILENAME, "status": "COMPATIBILITY_CANDIDATE_BUILD"}))
 
 if __name__ == "__main__":
     main()

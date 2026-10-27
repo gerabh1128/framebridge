@@ -1,6 +1,6 @@
 # FrameBridge — command guide
 
-Version: 0.3.1 | Guide schema: 1
+Version: 0.3.2~compat.20261027.1 | Guide schema: 1
 
 This reference is generated from the shared CLI/MCP guide. Use the matching installed version.
 
@@ -33,16 +33,16 @@ fb --json status
 
 ### Install and connect
 
-On a supported Debian system, install the downloaded package with the package manager. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal. Advanced setup is optional for selecting central/node roles and public settings.
+Install the .deb built for your exact Debian 13, Ubuntu 24.04/26.04, Linux Mint 22.x or LMDE 7 amd64 profile. These compatibility candidates still require installation and lifecycle validation on each target. Select the artifact from the matching profile folder and keep the distribution system Python. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.
 
 ~~~sh
-sudo apt install ./FrameBridge-0.3.1.deb
+sudo apt install ./framebridge-expanded_0.3.2~compat.20261027.1_amd64.deb
 fb connect
 ~~~
 
 ### Updating and removal
 
-Install an official update through the normal package manager. Normal package removal stops package-owned managed processes and retains the profile and saved encrypted connection material for deliberate reuse; it is not a credential-forgetting operation. Use the separately documented explicit forget action first if that is your intended outcome. Do not assume purge erases user-profile data.
+Install an official update through the normal package manager when that update has been published. Normal removal stops package-owned managed processes and can retain the user profile and encrypted connection material; it is not a credential-forgetting operation. On systemd 255, package removal also revokes the administrative boot-credential grant. After reinstalling, run fb connect interactively to provision that grant again; retained files alone do not restore startup. Use the explicit credentials forget action first when that is your intended outcome. Do not assume purge erases user-profile data.
 
 ~~~sh
 sudo dpkg --remove framebridge-original-expanded
@@ -303,7 +303,7 @@ A CLI tty transcript describes a terminal and explicitly does not claim authenti
 
 ### Automatic graphical discovery
 
-The installer and control console stay text interfaces in both TTY and a desktop terminal. Compatible graphical CUA is discovered automatically; availability depends on the actual display/session and permissions. A loaded module is not proof that real pixel capture or input succeeded. New profiles use adaptive auto mode: without a verified active X11 session the runtime provides FBEXEC, FBTERM and CUA-TTY in text mode, without requiring a graphical login or automatically creating a private desktop. Explicit virtual-desktop settings remain advanced options and are labelled separately from physical-screen evidence.
+The installer and control console stay text interfaces in both TTY and a desktop terminal. Compatible graphical CUA is discovered automatically; availability depends on the actual display/session and permissions. A loaded module is not proof that real pixel capture or input succeeded. New profiles use adaptive auto mode: without a verified active X11 session the runtime provides FBEXEC, FBTERM and CUA-TTY in text mode, without requiring a graphical login or automatically creating a private desktop. Explicit virtual-desktop settings remain advanced options and are labelled separately from physical-screen evidence. Physical-screen capture and input currently require the supported active X11 session. Native Wayland control is not validated; showing an XWayland window does not establish full-desktop capture or input.
 
 ~~~sh
 fb status
@@ -340,7 +340,7 @@ fb status boot
 
 ### Doctor
 
-doctor diagnoses prerequisites and reports findings with suggested next steps. It is not an implicit repair, and it is not a substitute for checking actual live connection state. Inspect the diagnosis and relevant private application logs before considering configuration changes.
+doctor diagnoses prerequisites and reports findings with suggested next steps. It is not an implicit repair, and it is not a substitute for checking actual live connection state. Inspect the diagnosis and relevant private application logs before considering configuration changes. Candidate eligibility checks the exact OS release, amd64 architecture, package profile and CPython ABI before starting native components. Debian 13/LMDE 7 use cp313, Ubuntu 24.04/Mint 22.x use cp312, and Ubuntu 26.04 uses cp314. A matching profile does not establish a tested installation; never repair an ABI mismatch by replacing system Python or weakening package dependencies.
 
 ~~~sh
 fb doctor

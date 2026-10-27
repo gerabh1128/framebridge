@@ -9,6 +9,9 @@ import stat
 import subprocess
 import sys
 
+# This module also runs as an isolated standalone package-removal script.
+SYSTEM_PYTHONS = frozenset({"/usr/bin/python3", "/usr/bin/python3.12",
+                            "/usr/bin/python3.13", "/usr/bin/python3.14"})
 MODULE_ROOT = "/usr/lib/framebridge-expanded/expanded"
 UNIT_NAME = re.compile(r"framebridge-autostart-[0-9a-f]{16}\.service\Z")
 
@@ -35,7 +38,7 @@ def managed_unit(path, uid):
         if len(starts) != 1:
             return False
         args = shlex.split(starts[0])
-        if len(args) != 7 or args[0] not in {"/usr/bin/python3", "/usr/bin/python3.13"}:
+        if len(args) != 7 or args[0] not in SYSTEM_PYTHONS:
             return False
         if args[1:6] != ["-B", "-m", "framebridge_expanded.autostart", "_run", "--state"]:
             return False
@@ -105,6 +108,45 @@ def cleanup_user(home=None, *, run=None, bus_available=None):
     return len(units)
 
 
+CREDENTIAL_HELPER = Path("/usr/lib/framebridge-expanded/bin/framebridge-credential-helper")
+CREDENTIAL_HELPER_MODULE = Path(MODULE_ROOT) / "framebridge_expanded/credential_helper.py"
+
+
+def _trusted_root_file(path):
+    """Trust only fixed package paths with root-owned, non-writable ancestors."""
+    for current in (path, *path.parents):
+        info = current.lstat()
+        if info.st_uid != 0 or info.st_mode & 0o022:
+            return False
+        if current == path:
+            if not stat.S_ISREG(info.st_mode):
+                return False
+        elif not stat.S_ISDIR(info.st_mode):
+            return False
+    return True
+
+
+def purge_credential_helpers(*, run=None):
+    """Revoke only the installed helper's managed metadata during root removal."""
+    if os.getuid() != 0:
+        raise RuntimeError("Credential-helper cleanup requires package-manager root context.")
+    # Old packages did not ship this helper. Never select code from user state.
+    if not os.path.lexists(CREDENTIAL_HELPER):
+        if os.path.lexists(CREDENTIAL_HELPER_MODULE):
+            raise RuntimeError("Installed credential helper is incomplete; package removal was paused.")
+        return
+    try:
+        if not _trusted_root_file(CREDENTIAL_HELPER) or not _trusted_root_file(CREDENTIAL_HELPER_MODULE):
+            raise RuntimeError("Installed credential helper has unsafe ownership or permissions.")
+        result = (run or subprocess.run)([str(CREDENTIAL_HELPER), "purge-all"],
+                                         env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
+                                         capture_output=True, timeout=30)
+        if result.returncode:
+            raise RuntimeError("Credential-helper cleanup failed; package removal was paused.")
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("Credential-helper cleanup failed; package removal was paused.") from exc
+
+
 def cleanup_all_users(*, run=None, accounts=None):
     if os.getuid() != 0:
         raise RuntimeError("Package service cleanup requires the normal package manager's root context.")
@@ -125,6 +167,7 @@ def cleanup_all_users(*, run=None, accounts=None):
             failed = True
     if failed:
         raise RuntimeError("Some FrameBridge services could not be stopped; package removal was paused.")
+    purge_credential_helpers(run=run)
 
 
 def main(argv=None):

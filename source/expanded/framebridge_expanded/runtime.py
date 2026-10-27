@@ -159,10 +159,10 @@ def doctor(state):
         missing.extend(graphical_missing)
     elif config.get("headless") in ("yes", True):
         missing.extend(graphical_missing + virtual_missing)
-    os_release = platform.freedesktop_os_release()
-    compatible = (sys.version_info[:2] == (3, 13) and platform.machine() == "x86_64"
-                  and os_release.get("ID") == "debian" and os_release.get("VERSION_ID") == "13")
-    issues = []
+    from .compatibility import assess, display_support
+    compatibility = assess(PREFIX)
+    compatible = compatibility["ok"]
+    issues = list(compatibility["issues"])
     if config["role"] == "central" and config.get("broker_listen_host", "127.0.0.1") not in ("127.0.0.1", "::1", "localhost"):
         if not config.get("tls_cert") or not config.get("tls_key"):
             issues.append("A central listener outside loopback requires a TLS certificate and private-key reference.")
@@ -173,7 +173,10 @@ def doctor(state):
     display_context = describe(env)
     if config.get("headless") in ("no", False) and display_context.get("kind") != "physical-x11":
         issues.append("No verified active physical X11 session. Log in graphically or explicitly choose a virtual headless display.")
-    return {"ok": compatible and not missing and not issues, "compatible_debian_13_amd64": compatible,
+    return {"ok": compatible and not missing and not issues,
+            "compatible_debian_13_amd64": compatible and compatibility["profile_id"] == "debian13-amd64-py313",
+            "platform_compatibility": compatibility,
+            "display_support": display_support(env, display_context),
             "python": platform.python_version(), "missing_commands": missing,
             "display": {"physical-x11": "existing physical X11", "virtual-x11": "explicit private virtual display", "text": "text tools"}.get(display_context.get("kind"), "unavailable"),
             "display_context": display_context,
