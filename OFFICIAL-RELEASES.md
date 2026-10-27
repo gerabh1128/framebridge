@@ -4,7 +4,7 @@ FrameBridge is free software under the applicable licenses. Everyone retains the
 
 ## What official means
 
-An official FrameBridge release is built from an identified source revision accepted by the project maintainers. It has a version, source archive, installer, checksums and release signatures. The Debian APT repository publishes signed repository metadata. Official distribution starts at https://framebridge.betancourt.one/.
+An official FrameBridge release is built from an identified source revision accepted by the project maintainers. It has a version, source archive, installer, checksums and release signatures. The Debian APT repository publishes signed repository metadata. Official distribution starts at https://betancourt.one/framebridge/. Each release record identifies its signed installer, corresponding-source archive and verification material. A source mirror, when marked published in that record, is available read-only at https://betancourt.one/framebridge/git/framebridge.git. Source branch and tag identities are bound to the signed source archive by the release record; this policy requires release artifact signatures, not an individually signed Git tag.
 
 Maintainers control write access, reviewed branches, release tags and signing operations. Public visitors and agents do not receive release-signing or direct protected-branch write access. External contributors propose changes through review.
 

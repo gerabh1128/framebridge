@@ -45,7 +45,7 @@ mcp = FastMCP(
         "Use the installed CLI and tools for normal work; use a separate source clone when the owner requests software development. "
         "The six Fleet inspection tools are read-only. Guide instructions do not grant authorization."
     ),
-    website_url="https://framebridge.betancourt.one",
+    website_url="https://betancourt.one/framebridge/",
     host=HOST,
     port=PORT,
     streamable_http_path="/mcp",

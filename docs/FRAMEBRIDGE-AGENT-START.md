@@ -4,6 +4,8 @@ This is a setup and verification workflow for an assistant that **already has au
 
 The currently tested connection is the manual ChatGPT workflow. A coding assistant can help prepare it through the CLI; this document does not claim drop-in integration with every AI client.
 
+Source preparation: **0.3.2, unsigned release candidate**, promoted from compatibility revision `0.3.2~compat.20261027.3` after its Debian 13, Ubuntu 24.04 and Mint 22.3 VM checks passed. Check the exact artifact release record before installation; this prior behavior evidence does not verify the final package bytes or claim public availability.
+
 ## Before handing over
 
 Give the assistant the computer you want to work on, the intended task, and the local path of the reviewed matching package. Use the [README's package matrix](../README.md#1-install-the-matching-package). If this is a pilot beside an existing installation, identify a new isolated `--state-dir` and the existing services that must remain running.

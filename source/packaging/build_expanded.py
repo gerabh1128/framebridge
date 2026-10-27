@@ -285,7 +285,7 @@ def main(argv=None):
     (control / "control").write_text(
         "Package: " + PACKAGE + "\nVersion: " + VERSION + "\nSection: utils\nPriority: optional\nArchitecture: amd64\n"
         "Maintainer: FrameBridge <framebridge@localhost>\n"
-        "Homepage: https://framebridge.betancourt.one/\n"
+        "Homepage: https://betancourt.one/framebridge/\n"
         "Installed-Size: " + str((installed + 1023) // 1024) + "\n"
         "Depends: " + relationships["Depends"] + "\n"
         "Suggests: " + relationships["Suggests"] + "\n"
