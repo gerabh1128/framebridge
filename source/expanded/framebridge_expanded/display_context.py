@@ -7,6 +7,11 @@ from .real_screen.screen_capture import CaptureError, foreground, _x11_context
 BINDING = "FRAMEBRIDGE_DISPLAY_BINDING"
 GRAPHICAL_COMMANDS = ("wmctrl", "xdotool", "xwininfo", "xclip")
 VIRTUAL_COMMANDS = ("Xvfb", "openbox", "xauth")
+VIRTUAL_INSTALL_COMMAND = "sudo apt install xvfb openbox xauth"
+
+
+def missing_virtual_commands(env):
+    return [name for name in VIRTUAL_COMMANDS if not shutil.which(name, path=env.get("PATH"))]
 
 
 def missing_graphical_commands(env):

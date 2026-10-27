@@ -86,7 +86,10 @@ class HostCredentialAutostartTests(unittest.TestCase):
     def test_node_255_startup_does_not_need_a_credential_backend(self):
         config.save_config(self.state, config.default_config(role="node"))
         self.helper.side_effect = RuntimeError("missing helper")
-        autostart._enable(self.state, confirm=False, start_now=False)
+        # The absent-helper case must not depend on another package being
+        # installed on the machine running this source-checkout test.
+        with mock.patch.object(autostart, "_helper_present", return_value=False):
+            autostart._enable(self.state, confirm=False, start_now=False)
         self.helper.assert_not_called(); self.prompt.assert_not_called()
         self.assertFalse(self.operations("protect"))
         self.assertFalse(any(args[:2] == ["systemd-creds", "--version"] for args, _ in self.calls))

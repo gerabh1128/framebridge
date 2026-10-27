@@ -81,7 +81,10 @@ class UninstallTests(unittest.TestCase):
     def test_all_users_drops_privileges_and_includes_service_accounts(self):
         accounts = [SimpleNamespace(pw_name="testservice", pw_uid=104, pw_dir="/var/lib/testservice"), SimpleNamespace(pw_name="testperson", pw_uid=1000, pw_dir="/home/testperson"), SimpleNamespace(pw_name="nobody", pw_uid=65534, pw_dir="/nonexistent")]
         run = mock.Mock(return_value=SimpleNamespace(returncode=0))
-        with mock.patch.object(uninstall.os, "getuid", return_value=0):uninstall.cleanup_all_users(run=run, accounts=accounts)
+        with mock.patch.object(uninstall.os, "getuid", return_value=0), \
+             mock.patch.object(uninstall, "purge_credential_helpers") as purge:
+            uninstall.cleanup_all_users(run=run, accounts=accounts)
+        purge.assert_called_once_with(run=run)
         self.assertEqual(run.call_count, 2)
         for call, name in zip(run.call_args_list, ["testservice", "testperson"]):
             args = call.args[0]

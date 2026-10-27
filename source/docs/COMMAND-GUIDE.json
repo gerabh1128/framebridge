@@ -1,12 +1,12 @@
 {
   "product": "FrameBridge",
-  "version": "0.3.2~compat.20261027.1",
+  "version": "0.3.2~compat.20261027.2",
   "guide_schema": 1,
   "topics": {
     "start": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.1",
+      "version": "0.3.2~compat.20261027.2",
       "guide_schema": 1,
       "topic": "start",
       "title": "Start with FrameBridge",
@@ -24,7 +24,7 @@
           "heading": "Install and connect",
           "body": "Install the .deb built for your exact Debian 13, Ubuntu 24.04/26.04, Linux Mint 22.x or LMDE 7 amd64 profile. These compatibility candidates still require installation and lifecycle validation on each target. Select the artifact from the matching profile folder and keep the distribution system Python. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.",
           "commands": [
-            "sudo apt install ./framebridge-expanded_0.3.2~compat.20261027.1_amd64.deb",
+            "sudo apt install ./framebridge-expanded_0.3.2~compat.20261027.2_amd64.deb",
             "fb connect"
           ]
         },
@@ -64,12 +64,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "d6ef35f7879fa290843fbfcadf403270ec0e70e403b0230b3469659492385928"
+      "guide_sha256": "4a85d9721ac3f758837a57126484b6cca56a598088f90365de2796f0b8d13766"
     },
     "commands": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.1",
+      "version": "0.3.2~compat.20261027.2",
       "guide_schema": 1,
       "topic": "commands",
       "title": "Command reference",
@@ -136,12 +136,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "a221dd430ceac8d1a7ddc859e8d38d9d07b07596000ff6a4e70826b0e7e4e127"
+      "guide_sha256": "e8680e094c647dc991d7bc9e4800d3978502dad81cf101f10d072be88dc4e9a1"
     },
     "connection": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.1",
+      "version": "0.3.2~compat.20261027.2",
       "guide_schema": 1,
       "topic": "connection",
       "title": "Connect and disconnect ChatGPT",
@@ -190,12 +190,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "91b8d6d7e531ba84512de58d561b71c92212160ddabc78349c459299cd96751a"
+      "guide_sha256": "0c8c16baf4d28e9b37154dad049193aeae252813b18eba3159cf437918eb3416"
     },
     "lifecycle": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.1",
+      "version": "0.3.2~compat.20261027.2",
       "guide_schema": 1,
       "topic": "lifecycle",
       "title": "Services, connection intent and boot policy",
@@ -256,12 +256,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "df3515c6c874353edcce43e4869021409ad0b7f28f194dd93296911228746cdd"
+      "guide_sha256": "0e3d6c96084e40b07d7373f3f7dbe22aa7659e59ec7cff57383026918dd0948c"
     },
     "nodes": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.1",
+      "version": "0.3.2~compat.20261027.2",
       "guide_schema": 1,
       "topic": "nodes",
       "title": "Central and node operation",
@@ -310,12 +310,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "3f98ed2af8adb3b0cd50967fe98fac90d26c3c2034fc7945593d846b4b6c3910"
+      "guide_sha256": "a0a317d230abb52bd673bb82453c0c17d73d31e30b1766e4247ef80ada02aa2a"
     },
     "terminals": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.1",
+      "version": "0.3.2~compat.20261027.2",
       "guide_schema": 1,
       "topic": "terminals",
       "title": "Persistent Bash terminals",
@@ -376,12 +376,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "b2fdf20610cf7fdfeecaa822ae5ac4297e55c9a0ba7d5e86c06ba50aca9588a2"
+      "guide_sha256": "e9ab7535894f07a7aa309d0f4f02d36d37c65143006f8bc67b9f12a1e00f0f5a"
     },
     "screens": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.1",
+      "version": "0.3.2~compat.20261027.2",
       "guide_schema": 1,
       "topic": "screens",
       "title": "Authentic screen observation and input",
@@ -393,7 +393,7 @@
         },
         {
           "heading": "Automatic graphical discovery",
-          "body": "The installer and control console stay text interfaces in both TTY and a desktop terminal. Compatible graphical CUA is discovered automatically; availability depends on the actual display/session and permissions. A loaded module is not proof that real pixel capture or input succeeded. New profiles use adaptive auto mode: without a verified active X11 session the runtime provides FBEXEC, FBTERM and CUA-TTY in text mode, without requiring a graphical login or automatically creating a private desktop. Explicit virtual-desktop settings remain advanced options and are labelled separately from physical-screen evidence. Physical-screen capture and input currently require the supported active X11 session. Native Wayland control is not validated; showing an XWayland window does not establish full-desktop capture or input.",
+          "body": "The installer and control console stay text interfaces in both TTY and a desktop terminal. Compatible graphical CUA is discovered automatically; availability depends on the actual display/session and permissions. A loaded module is not proof that real pixel capture or input succeeded. New profiles use adaptive auto mode: without a verified active X11 session the runtime provides FBEXEC, FBTERM and CUA-TTY in text mode, without requiring a graphical login or automatically creating a private desktop. Explicit virtual-desktop settings remain advanced options and are labelled separately from physical-screen evidence. Xvfb and Openbox are optional package suggestions and are not installed for the normal connection. Only when you choose a private virtual desktop, install its tools explicitly with sudo apt install xvfb openbox xauth and rerun fb doctor. Installing Openbox can register it as the generic window-manager alternative; use your distribution settings to retain your preferred manager when needed. Physical-screen capture and input currently require the supported active X11 session. Native Wayland control is not validated; showing an XWayland window does not establish full-desktop capture or input.",
           "commands": [
             "fb status",
             "fb doctor"
@@ -426,12 +426,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "1ce747282da1d9d1504790607888af131666758dd28b4a47799ed4c59427436b"
+      "guide_sha256": "3d37bc0fac316fa50275f1a9f38f15e87aef435593c694aebaacf4666734e1fd"
     },
     "diagnostics": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.1",
+      "version": "0.3.2~compat.20261027.2",
       "guide_schema": 1,
       "topic": "diagnostics",
       "title": "Status and diagnosis",
@@ -476,12 +476,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "1e85490e5b9925afb588bf536b155cf3cbfaef3997d21be94856fd1997372497"
+      "guide_sha256": "9cdab418287a3fcf283258782d117813bb45d23183101e5b7ee8eeb162cd38b4"
     },
     "security": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.1",
+      "version": "0.3.2~compat.20261027.2",
       "guide_schema": 1,
       "topic": "security",
       "title": "Authorization, distribution and safe operation",
@@ -516,12 +516,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "2982ca7b623a972097b5e04c309b682fefd91754d0c4c50fc802420c14c9c68d"
+      "guide_sha256": "64ecf0b4e25dec7faffae90ef3d48ce732f5ec2c7fb815815a625ae124230c9e"
     },
     "compatibility": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.1",
+      "version": "0.3.2~compat.20261027.2",
       "guide_schema": 1,
       "topic": "compatibility",
       "title": "Compatibility with earlier commands",
@@ -564,8 +564,8 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "54b70093617e6992de04d41ddd367ffdd9a6bd6c317c99a886d6391277c55f6b"
+      "guide_sha256": "f622466edc45196d42390129d8a32424e1b0e64b7751688790061b1e8b5941d2"
     }
   },
-  "guide_sha256": "ab3cce8d01d63a34fa2634738a9e0b37c89f5e1f51ba88d2b33abf9a872ad7ab"
+  "guide_sha256": "f83c632796c7cdb3489683b1c4584f0fedec11f4aeb9321430f1a709888d6965"
 }

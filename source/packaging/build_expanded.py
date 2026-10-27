@@ -169,6 +169,14 @@ def maintainer_prerm(version):
     )
 
 
+def package_relationships(profile):
+    """Keep the opt-in virtual window manager out of automatic APT installs."""
+    return {
+        "Depends": "python3 (>= " + profile["python_minor"] + "), python3 (<< 3." + str(int(profile["python_minor"].split(".")[1]) + 1) + "), libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core",
+        "Suggests": "xvfb, openbox",
+    }
+
+
 def main(argv=None):
     global VERSION, PUBLIC_FILENAME, RELEASE, STAGE, PREFIX
     parser = argparse.ArgumentParser(description=__doc__)
@@ -253,6 +261,15 @@ def main(argv=None):
     for file in sorted((BASE / "docs").glob("*")):
         if file.is_file():
             shutil.copy2(file, docs / file.name)
+    # Ship the same owner/agent entry points as the reviewed source repository.
+    user_guides = {"README.md": ROOT / "README.md",
+                   "FRAMEBRIDGE-AGENT-START.md": ROOT / "docs/FRAMEBRIDGE-AGENT-START.md"}
+    for name, source in user_guides.items():
+        if not source.is_file() or source.is_symlink():
+            raise RuntimeError("Required user guide is missing or not a regular file: " + str(source))
+        for destination in (PREFIX / "docs", docs):
+            destination.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination / name)
     readme = (BASE / "docs/DEBIAN-TUTORIAL.md").read_bytes()
     (docs / "README.Debian.gz").write_bytes(gzip.compress(readme, mtime=EPOCH))
     install_legal_material(docs)
@@ -264,12 +281,14 @@ def main(argv=None):
     control = STAGE / "DEBIAN"
     control.mkdir()
     installed = sum(p.stat().st_size for p in STAGE.rglob("*") if p.is_file() and not p.is_symlink())
+    relationships = package_relationships(profile)
     (control / "control").write_text(
         "Package: " + PACKAGE + "\nVersion: " + VERSION + "\nSection: utils\nPriority: optional\nArchitecture: amd64\n"
         "Maintainer: FrameBridge <framebridge@localhost>\n"
         "Homepage: https://framebridge.betancourt.one/\n"
         "Installed-Size: " + str((installed + 1023) // 1024) + "\n"
-        "Depends: python3 (>= " + profile["python_minor"] + "), python3 (<< 3." + str(int(profile["python_minor"].split(".")[1]) + 1) + "), libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, xvfb, openbox, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core\n"
+        "Depends: " + relationships["Depends"] + "\n"
+        "Suggests: " + relationships["Suggests"] + "\n"
         "Description: FrameBridge with standalone, central and node modes\n"
         " Original execution and desktop programs, a real persistent terminal,\n"
         " authenticated node enrollment, and a manual ChatGPT tunnel wizard.\n"

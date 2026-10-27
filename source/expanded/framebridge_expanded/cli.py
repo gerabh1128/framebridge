@@ -441,6 +441,12 @@ def _doctor_command(args, state):
             print("Missing command: " + str(item))
         for item in value.get("issues", []):
             print("Issue: " + str(item))
+        virtual_missing = value.get("optional_missing_commands", {}).get("private_desktop", [])
+        if virtual_missing:
+            print("Optional private desktop tools missing: " + ", ".join(virtual_missing))
+            hint = value.get("optional_install_commands", {}).get("private_desktop")
+            if hint:
+                print("Install only for an explicit virtual desktop: " + hint)
         print("This checks prerequisites; use fb status to inspect the current connection.")
     return _result_code(value)
 

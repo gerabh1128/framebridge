@@ -1,6 +1,6 @@
 # FrameBridge — command guide
 
-Version: 0.3.2~compat.20261027.1 | Guide schema: 1
+Version: 0.3.2~compat.20261027.2 | Guide schema: 1
 
 This reference is generated from the shared CLI/MCP guide. Use the matching installed version.
 
@@ -36,7 +36,7 @@ fb --json status
 Install the .deb built for your exact Debian 13, Ubuntu 24.04/26.04, Linux Mint 22.x or LMDE 7 amd64 profile. These compatibility candidates still require installation and lifecycle validation on each target. Select the artifact from the matching profile folder and keep the distribution system Python. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.
 
 ~~~sh
-sudo apt install ./framebridge-expanded_0.3.2~compat.20261027.1_amd64.deb
+sudo apt install ./framebridge-expanded_0.3.2~compat.20261027.2_amd64.deb
 fb connect
 ~~~
 
@@ -303,7 +303,7 @@ A CLI tty transcript describes a terminal and explicitly does not claim authenti
 
 ### Automatic graphical discovery
 
-The installer and control console stay text interfaces in both TTY and a desktop terminal. Compatible graphical CUA is discovered automatically; availability depends on the actual display/session and permissions. A loaded module is not proof that real pixel capture or input succeeded. New profiles use adaptive auto mode: without a verified active X11 session the runtime provides FBEXEC, FBTERM and CUA-TTY in text mode, without requiring a graphical login or automatically creating a private desktop. Explicit virtual-desktop settings remain advanced options and are labelled separately from physical-screen evidence. Physical-screen capture and input currently require the supported active X11 session. Native Wayland control is not validated; showing an XWayland window does not establish full-desktop capture or input.
+The installer and control console stay text interfaces in both TTY and a desktop terminal. Compatible graphical CUA is discovered automatically; availability depends on the actual display/session and permissions. A loaded module is not proof that real pixel capture or input succeeded. New profiles use adaptive auto mode: without a verified active X11 session the runtime provides FBEXEC, FBTERM and CUA-TTY in text mode, without requiring a graphical login or automatically creating a private desktop. Explicit virtual-desktop settings remain advanced options and are labelled separately from physical-screen evidence. Xvfb and Openbox are optional package suggestions and are not installed for the normal connection. Only when you choose a private virtual desktop, install its tools explicitly with sudo apt install xvfb openbox xauth and rerun fb doctor. Installing Openbox can register it as the generic window-manager alternative; use your distribution settings to retain your preferred manager when needed. Physical-screen capture and input currently require the supported active X11 session. Native Wayland control is not validated; showing an XWayland window does not establish full-desktop capture or input.
 
 ~~~sh
 fb status

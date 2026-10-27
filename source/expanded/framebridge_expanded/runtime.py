@@ -151,9 +151,9 @@ def doctor(state):
     commands = ["bash", "tmux", "tee", "flock", "awk", "sha256sum", "timeout",
                 "dbus-run-session", "ip", "lsblk", "systemctl", "systemd-run", "sudo", "uptime"]
     missing = [x for x in commands if not shutil.which(x, path=env.get("PATH"))]
-    from .display_context import missing_graphical_commands, VIRTUAL_COMMANDS
+    from .display_context import missing_graphical_commands, missing_virtual_commands, VIRTUAL_INSTALL_COMMAND
     graphical_missing = missing_graphical_commands(env)
-    virtual_missing = [x for x in VIRTUAL_COMMANDS if not shutil.which(x, path=env.get("PATH"))]
+    virtual_missing = missing_virtual_commands(env)
     console_missing = [x for x in ("gnome-terminal", "xterm") if not shutil.which(x, path=env.get("PATH"))]
     if config.get("headless") in ("no", False):
         missing.extend(graphical_missing)
@@ -182,8 +182,10 @@ def doctor(state):
             "display_context": display_context,
             "capabilities": {"fbexec": not missing, "fbterm": not missing, "cua_tty_module": True,
                              "graphical_cua": display_context.get("kind") in ("physical-x11", "virtual-x11") and not graphical_missing,
+                             "private_desktop": compatible and not missing and not graphical_missing and not virtual_missing,
                              "mode": "graphical" if display_context.get("kind") in ("physical-x11", "virtual-x11") else "text"},
             "optional_missing_commands": {"graphical_cua": graphical_missing, "private_desktop": virtual_missing, "graphical_terminal": console_missing},
+            "optional_install_commands": {"private_desktop": VIRTUAL_INSTALL_COMMAND if virtual_missing else None},
             "network": inspect_network(),
             "role": config["role"], "issues": issues}
 
@@ -372,6 +374,10 @@ def _manager(state):
             from .display_context import bind_text
             bind_text(env, state, reason="PHYSICAL_X11_UNAVAILABLE_TEXT_TOOLS_ACTIVE")
         if private_display:
+            from .display_context import missing_virtual_commands, VIRTUAL_INSTALL_COMMAND
+            missing_virtual = missing_virtual_commands(env)
+            if missing_virtual:
+                raise RuntimeError("Private virtual desktop tools are missing: " + ", ".join(missing_virtual) + ". Install them explicitly: " + VIRTUAL_INSTALL_COMMAND)
             display = next((n for n in range(140, 240) if not Path("/tmp/.X11-unix/X" + str(n)).exists() and not Path("/tmp/.X" + str(n) + "-lock").exists()), None)
             if display is None:
                 raise RuntimeError("No private X11 display number is available.")
@@ -424,7 +430,11 @@ def start(state):
         return current
     checks = doctor(state)
     if not checks["ok"]:
-        return {"ok": False, "error": "Preflight failed. Run framebridge doctor.", "doctor": checks}
+        error = "Preflight failed. Run framebridge doctor."
+        hint = checks.get("optional_install_commands", {}).get("private_desktop")
+        if config.get("headless") in ("yes", True) and hint:
+            error = "Private virtual desktop tools are missing. Install them explicitly: " + hint + ". Then run framebridge doctor."
+        return {"ok": False, "error": error, "doctor": checks}
     for name in ("logs", "run"):
         private_dir(state / name)
     for name in ("ready.json", "last-error.json", "worker.json"):
