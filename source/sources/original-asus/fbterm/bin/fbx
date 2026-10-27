@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+umask 077
+
+ROOT="${FBTERM_ROOT:-$HOME/.local/share/framebridge/fbterm}"
+LIB="$ROOT/library"
+JOBS="$ROOT/jobs"
+
+valid() {
+    [[ "$1" =~ ^[A-Za-z0-9._-]+$ ]]
+}
+
+secret_guard() {
+    grep -Eqi \
+      'BEGIN .*PRIVATE KEY|rclone\.conf|client_secret|access_token|refresh_token|password[[:space:]]*=|token[[:space:]]*=|cookie[[:space:]]*=' \
+      "$1"
+}
+
+case "${1:-}" in
+  list)
+    mkdir -p "$LIB"
+    find "$LIB" -maxdepth 1 -type f -name '*.sh' -printf '%f\n' |
+      sed 's/\.sh$//' | sort
+    ;;
+
+  adopt)
+    job="${2:-}"
+    name="${3:-}"
+
+    valid "$job" && valid "$name" || {
+        echo 'FBX_ERROR=INVALID_NAME'
+        exit 64
+    }
+
+    src="$JOBS/$job/command.bash"
+    dst="$LIB/$name.sh"
+
+    [ -f "$src" ] || {
+        echo 'FBX_ERROR=JOB_COMMAND_NOT_FOUND'
+        exit 66
+    }
+
+    [ ! -e "$dst" ] || {
+        echo 'FBX_ERROR=LIBRARY_NAME_EXISTS'
+        exit 73
+    }
+
+    cp -p "$src" "$dst"
+    chmod 600 "$dst"
+
+    sha256sum "$dst" | awk '{print $1}' > "$LIB/$name.sha256"
+    printf '%s\n' "$job" > "$LIB/$name.source-job"
+
+    echo "FBX_ADOPT=PASS NAME=$name JOB=$job SHA256=$(cat "$LIB/$name.sha256")"
+    ;;
+
+  hash)
+    name="${2:-}"
+    valid "$name" || exit 64
+    file="$LIB/$name.sh"
+    [ -f "$file" ] || exit 66
+    sha256sum "$file"
+    ;;
+
+  show|run)
+    action="$1"
+    name="${2:-}"
+
+    valid "$name" || {
+        echo 'FBX_ERROR=INVALID_NAME'
+        exit 64
+    }
+
+    file="$LIB/$name.sh"
+    hashfile="$LIB/$name.sha256"
+
+    [ -f "$file" ] && [ -f "$hashfile" ] || {
+        echo 'FBX_ERROR=LIBRARY_ITEM_NOT_FOUND'
+        exit 66
+    }
+
+    expected="$(cat "$hashfile")"
+    actual="$(sha256sum "$file" | awk '{print $1}')"
+
+    [ "$actual" = "$expected" ] || {
+        echo 'FBX_ERROR=HASH_MISMATCH'
+        exit 74
+    }
+
+    if secret_guard "$file"; then
+        echo 'FBX_ERROR=POSSIBLE_SECRET_REFUSE_DISPLAY'
+        exit 77
+    fi
+
+    echo
+    echo "========== FBX SCRIPT: $name =========="
+    echo "SHA256=$actual"
+    echo
+    cat "$file"
+    echo
+    echo "========== END FBX SCRIPT =========="
+    echo
+
+    [ "$action" = show ] && exit 0
+
+    bash --noprofile --norc "$file"
+    rc=$?
+
+    echo
+    echo "========== FBX RESULT: $name EXIT=$rc =========="
+    exit "$rc"
+    ;;
+
+  status)
+    echo "FBX_ROOT=$ROOT"
+    echo "FBX_LIBRARY=$LIB"
+    echo "FBX_ITEMS=$(find "$LIB" -maxdepth 1 -type f -name '*.sh' | wc -l)"
+    ;;
+
+  *)
+    echo 'USAGE: fbx {status|list|adopt JOB NAME|show NAME|run NAME|hash NAME}'
+    exit 64
+    ;;
+esac

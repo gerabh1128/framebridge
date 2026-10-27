@@ -1,0 +1,40 @@
+{
+  "version": "0.3.1",
+  "state": "preparing",
+  "channel": "Community release",
+  "release_date": "2026-10-26",
+  "distribution": "Debian 13 (trixie)",
+  "architecture": "amd64",
+  "package_name": "framebridge-original-expanded",
+  "package_filename": "FrameBridge-0.3.1.deb",
+  "package_url": "/downloads/FrameBridge-0.3.1.deb",
+  "package_signature_url": "/downloads/FrameBridge-0.3.1.deb.asc",
+  "checksums_url": "/downloads/SHA256SUMS",
+  "checksums_signature_url": "/downloads/SHA256SUMS.asc",
+  "source_archive_url": "",
+  "sha256": "",
+  "size_bytes": null,
+  "signing_key_url": "/debian/framebridge-archive-keyring.asc",
+  "signing_fingerprint": "",
+  "apt_base": "https://framebridge.betancourt.one/debian",
+  "git_url": "/git/framebridge/framebridge",
+  "git_clone_url": "https://framebridge.betancourt.one/git/framebridge/framebridge.git",
+  "site_url": "https://framebridge.betancourt.one",
+  "license": "GPL-3.0-only",
+  "dependency_sources": [
+    {
+      "label": "Bundled Python and Rust dependency sources",
+      "filename": "FrameBridge-0.3.1-Community-Preview1-dependency-sources.tar.gz",
+      "url": "/downloads/FrameBridge-0.3.1-Community-Preview1-dependency-sources.tar.gz",
+      "sha256": "64540a85bd65eac3f394d8c0a967cacbc00e112676d57d644dcd1bb691c1926a",
+      "size_bytes": 82606998
+    },
+    {
+      "label": "Tunnel client dependency sources",
+      "filename": "FrameBridge-0.3.1-tunnel-client-dependency-sources.tar.gz",
+      "url": "/downloads/FrameBridge-0.3.1-tunnel-client-dependency-sources.tar.gz",
+      "sha256": "6445d4f0e773aba833fe5c610fbae54102b92de2ce636438f769f21e890c2bd9",
+      "size_bytes": 26941745
+    }
+  ]
+}

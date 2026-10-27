@@ -1,0 +1,39 @@
+{
+  "applies_to": "R2 legal payload alongside the unchanged Preview1 dependency source archive",
+  "delivery_condition": "Distribute these legal supplements with the unchanged source bundle, matching installer and complete project source. They are outside the sealed archive; its hash and member counts do not change.",
+  "schema_version": 1,
+  "sealed_archive": {
+    "bytes": 82606998,
+    "filename": "FrameBridge-0.3.1-Community-Preview1-dependency-sources.tar.gz",
+    "sha256": "64540a85bd65eac3f394d8c0a967cacbc00e112676d57d644dcd1bb691c1926a"
+  },
+  "supplements": [
+    {
+      "bytes": 16727,
+      "component": "certifi / MPL-2.0",
+      "license_branch": "MPL-2.0 full text retained",
+      "path": "licenses/MPL-2.0.txt",
+      "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+      "source_url": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/MPL-2.0.txt"
+    },
+    {
+      "bytes": 1023,
+      "component": "wit-bindgen-rt 0.39.0",
+      "declared_expression": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+      "documented_distribution_route": "MIT",
+      "http_status": 200,
+      "path": "licenses/wit-bindgen-rt-0.39.0-LICENSE-MIT.txt",
+      "reason": "Complete the standalone MIT notice omitted from the exact registry crate; retain the source crate and its original alternative expression. Attach this supplement when distributing the full sealed source bundle, even though this is a WASI target dependency.",
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+      "source_url": "https://raw.githubusercontent.com/bytecodealliance/wit-bindgen/f2393e6e98fa5f9236cac580db8a3fc9de6a4b70/LICENSE-MIT",
+      "tls_verified": true,
+      "upstream_commit": "f2393e6e98fa5f9236cac580db8a3fc9de6a4b70"
+    }
+  ],
+  "text_counts": {
+    "full_mpl_separate_supplement": 1,
+    "r2_wit_mit_separate_supplement": 1,
+    "sealed_archive_unique_upstream_texts": 135,
+    "total_payload_texts_after_r2": 137
+  }
+}

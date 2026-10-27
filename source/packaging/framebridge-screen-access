@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /usr/bin/python3 -I -S /usr/lib/framebridge-expanded/expanded/framebridge_expanded/screen_access.py "$@"

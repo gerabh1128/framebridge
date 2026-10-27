@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+umask 077
+
+export HISTFILE=/dev/null
+set +o history 2>/dev/null || true
+
+printf '\n'
+printf '========================================\n'
+printf ' FrameBridge Terminal R1\n'
+printf ' PTY persistente / comandos controlados\n'
+printf '========================================\n'
+printf '\n'
+
+export FRAMEBRIDGE_FBTERM_ROOT="$HOME/.local/share/framebridge/fbterm"
+if [ -n "$FRAMEBRIDGE_FBTERM_ROOT_OVERRIDE" ]; then
+    export FRAMEBRIDGE_FBTERM_ROOT="$FRAMEBRIDGE_FBTERM_ROOT_OVERRIDE"
+fi
+export PROMPT_COMMAND='"$FRAMEBRIDGE_FBTERM_ROOT/bin/fbterm-prompt-ready"'
+
+exec bash --noprofile --norc

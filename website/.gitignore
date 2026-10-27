@@ -1,0 +1,4 @@
+dist/
+qa/
+release.json
+__pycache__/

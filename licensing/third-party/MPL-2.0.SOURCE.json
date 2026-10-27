@@ -1,0 +1,12 @@
+{
+  "license_spdx": "MPL-2.0",
+  "filename": "MPL-2.0.txt",
+  "url": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/MPL-2.0.txt",
+  "final_url": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/MPL-2.0.txt",
+  "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+  "bytes": 16727,
+  "tls_verified": true,
+  "http_status": 200,
+  "retrieved_utc": "2026-10-26T01:02:57.240974+00:00",
+  "scope": "Full license text supplement delivered separately; sealed dependency source archive was not recreated or changed."
+}

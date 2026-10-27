@@ -1,0 +1,390 @@
+[
+  {
+    "module": "github.com/bahlo/generic-list-go",
+    "terms_markers": [
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/beorn7/perks",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/buger/jsonparser",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/cespare/xxhash/v2",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/felixge/httpsnoop",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/go-logr/logr",
+    "terms_markers": [
+      "Apache-2.0"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/go-logr/stdr",
+    "terms_markers": [
+      "Apache-2.0"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/google/jsonschema-go",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/google/uuid",
+    "terms_markers": [
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/grafana/regexp",
+    "terms_markers": [
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/invopop/jsonschema",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/jpillora/backoff",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/mailru/easyjson",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/modelcontextprotocol/go-sdk",
+    "terms_markers": [
+      "Apache-2.0",
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/munnerz/goautoneg",
+    "terms_markers": [
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/panjf2000/ants/v2",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/prometheus/client_golang",
+    "terms_markers": [
+      "Apache-2.0",
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 3
+  },
+  {
+    "module": "github.com/prometheus/client_model",
+    "terms_markers": [
+      "Apache-2.0"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 2
+  },
+  {
+    "module": "github.com/prometheus/common",
+    "terms_markers": [
+      "Apache-2.0"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 2
+  },
+  {
+    "module": "github.com/prometheus/otlptranslator",
+    "terms_markers": [
+      "Apache-2.0"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/prometheus/procfs",
+    "terms_markers": [
+      "Apache-2.0"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 2
+  },
+  {
+    "module": "github.com/segmentio/asm",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/segmentio/encoding",
+    "terms_markers": [
+      "Apache-2.0",
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 2
+  },
+  {
+    "module": "github.com/spf13/cobra",
+    "terms_markers": [
+      "Apache-2.0"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/spf13/pflag",
+    "terms_markers": [
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/wk8/go-ordered-map/v2",
+    "terms_markers": [
+      "Apache-2.0"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "github.com/yosida95/uritemplate/v3",
+    "terms_markers": [
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.opentelemetry.io/auto/sdk",
+    "terms_markers": [
+      "Apache-2.0"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+    "terms_markers": [
+      "Apache-2.0",
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.opentelemetry.io/otel",
+    "terms_markers": [
+      "Apache-2.0",
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.opentelemetry.io/otel/exporters/prometheus",
+    "terms_markers": [
+      "Apache-2.0",
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.opentelemetry.io/otel/metric",
+    "terms_markers": [
+      "Apache-2.0",
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.opentelemetry.io/otel/sdk",
+    "terms_markers": [
+      "Apache-2.0",
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.opentelemetry.io/otel/sdk/metric",
+    "terms_markers": [
+      "Apache-2.0",
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.opentelemetry.io/otel/trace",
+    "terms_markers": [
+      "Apache-2.0",
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.uber.org/dig",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.uber.org/fx",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.uber.org/multierr",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.uber.org/zap",
+    "terms_markers": [
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "go.yaml.in/yaml/v2",
+    "terms_markers": [
+      "Apache-2.0",
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 3
+  },
+  {
+    "module": "golang.org/x/net",
+    "terms_markers": [
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 2
+  },
+  {
+    "module": "golang.org/x/oauth2",
+    "terms_markers": [
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 1
+  },
+  {
+    "module": "golang.org/x/sync",
+    "terms_markers": [
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 2
+  },
+  {
+    "module": "golang.org/x/sys",
+    "terms_markers": [
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 2
+  },
+  {
+    "module": "golang.org/x/time",
+    "terms_markers": [
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 2
+  },
+  {
+    "module": "google.golang.org/protobuf",
+    "terms_markers": [
+      "BSD-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 2
+  },
+  {
+    "module": "gopkg.in/yaml.v3",
+    "terms_markers": [
+      "Apache-2.0",
+      "MIT-style"
+    ],
+    "license_text_found": true,
+    "legal_file_count": 2
+  }
+]

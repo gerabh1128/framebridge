@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set +e
+umask 077
+ROOT="$FRAMEBRIDGE_FBTERM_ROOT"
+[ -n "$ROOT" ] || ROOT="$HOME/.local/share/framebridge/fbterm"
+READY="$ROOT/prompt.ready"
+TMP="$ROOT/.prompt.ready.$$"
+mkdir -p "$ROOT" 2>/dev/null || true
+printf '%s\n' "$(date +%s%N)" > "$TMP"
+mv -f "$TMP" "$READY"

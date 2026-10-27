@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set +e
+umask 077
+CFG="/home/framebridge/FrameBridge-MCP-Private/config.env"
+HEALTH_FILE="/run/framebridge-mcp-private/health.url"
+CRED_ID="framebridge-control-plane-api-key"
+[ -r "$CFG" ] || exit 20
+[ -n "$CREDENTIALS_DIRECTORY" ] || exit 21
+CRED_FILE="$CREDENTIALS_DIRECTORY/$CRED_ID"
+[ -s "$CRED_FILE" ] || exit 22
+set -a
+. "$CFG"
+set +a
+[ -n "$FRAMEBRIDGE_TUNNEL_ID" ] || exit 23
+[ -n "$FRAMEBRIDGE_MCP_URL" ] || exit 23
+[ -n "$FRAMEBRIDGE_TUNNEL_BIN" ] || exit 23
+rm -f "$HEALTH_FILE"
+exec "$FRAMEBRIDGE_TUNNEL_BIN" run   --control-plane.tunnel-id "$FRAMEBRIDGE_TUNNEL_ID"   --control-plane.api-key "file:$CRED_FILE"   --mcp.server-url "channel=main,url=$FRAMEBRIDGE_MCP_URL"   --health.listen-addr 127.0.0.1:0   --health.url-file "$HEALTH_FILE"   --log.level info   --log.format struct-text
