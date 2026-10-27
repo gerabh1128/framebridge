@@ -17,9 +17,11 @@ import pwd
 import re
 import resource
 import secrets
+import select
 import stat
 import subprocess
 import sys
+import time
 
 ROOT = Path("/var/lib/framebridge-expanded/credentials")
 SUDOERS = Path("/etc/sudoers.d")
@@ -32,6 +34,7 @@ USER = re.compile(r"[A-Za-z_][A-Za-z0-9_-]{0,63}\$?\Z")
 ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C", "LC_ALL": "C"}
 MAX_KEY = 16384
 MAX_CIPHER = 131072
+INPUT_TIMEOUT = 5
 
 
 def _fail():
@@ -98,6 +101,24 @@ def _sync(directory):
         os.fsync(fd)
     finally:
         os.close(fd)
+
+
+def _read_key():
+    # The frontend has already collected the key before launching this helper.
+    # A caller holding stdin open must not retain the shared registry lock.
+    deadline = time.monotonic() + INPUT_TIMEOUT
+    fd = sys.stdin.fileno()
+    value = bytearray()
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or not select.select([fd], [], [], remaining)[0]:
+            _fail()
+        chunk = os.read(fd, MAX_KEY + 1 - len(value))
+        if not chunk:
+            return bytes(value)
+        value.extend(chunk)
+        if len(value) > MAX_KEY:
+            _fail()
 
 
 def _prepare_root():
@@ -453,7 +474,7 @@ def main(argv=None):
                 # sudo already selected this exact NOLOG policy. Consume its
                 # encryption permission before accepting any key bytes.
                 unauthorize(owner, args[1], "host", required=True)
-                key = sys.stdin.buffer.read(MAX_KEY + 1)
+                key = _read_key()
                 result = protect(owner, args[1], key)
                 key = b""
             elif operation == "decrypt":

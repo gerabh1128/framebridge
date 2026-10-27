@@ -27,6 +27,7 @@ spec.loader.exec_module(helper)
 helper.ROOT = Path(sys.argv[2])
 helper._installation = lambda: None
 helper._prepare_root = lambda: None
+helper._cleanup_temporaries = lambda: None
 helper._caller = lambda: SimpleNamespace(pw_uid=12345, pw_name="synthetic", pw_dir="/synthetic-only")
 helper.decrypt = lambda *args: b"X" * 16384
 # The only file is our own temporary lock; simulate its expected root metadata.
@@ -37,7 +38,52 @@ raise SystemExit(helper.main(["decrypt", "a" * 64, "b" * 64]))
 """
 
 
+PROTECT_CHILD = CHILD.replace(
+    'raise SystemExit(helper.main(["decrypt", "a" * 64, "b" * 64]))',
+    '\n'.join([
+        'helper.INPUT_TIMEOUT = 0.1',
+        'helper.unauthorize = lambda *args, **kwargs: None',
+        'helper.protect = lambda *args: b"SYNTHETIC-CIPHER-ONLY" * 8',
+        'raise SystemExit(helper.main(["protect", "a" * 64]))',
+    ]),
+)
+
+
 class CredentialHelperPipeTests(unittest.TestCase):
+    def test_open_stdin_without_eof_times_out_and_releases_registry_lock(self):
+        with tempfile.TemporaryDirectory(prefix="framebridge-input-canary-") as directory:
+            child = None
+            lock_fd = None
+            try:
+                started = time.monotonic()
+                child = subprocess.Popen([sys.executable, "-I", "-S", "-c", PROTECT_CHILD,
+                                          str(Path(credential_helper.__file__).resolve()), directory],
+                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE, close_fds=True)
+                self.assertEqual(1, child.wait(timeout=1), "Protect must reject an input stream without EOF")
+                self.assertLess(time.monotonic() - started, 1, "Synthetic input timeout exceeded its bound")
+                # Do not close stdin or communicate(): both would supply EOF and
+                # could hide an unbounded read or a leaked registry lock.
+                self.assertFalse(child.stdin.closed)
+                lock_fd = os.open(Path(directory) / ".lock", os.O_RDWR)
+                try:
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    self.fail("Protect retained the registry lock after its input deadline")
+                finally:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                self.assertEqual(b"", child.stdout.read())
+                self.assertIn(b"protected credential operation failed", child.stderr.read())
+            finally:
+                if child is not None:
+                    if child.poll() is None:
+                        child.kill()
+                        child.wait(timeout=3)
+                    for stream in (child.stdin, child.stdout, child.stderr):
+                        stream.close()
+                if lock_fd is not None:
+                    os.close(lock_fd)
+
     @unittest.skipUnless(hasattr(fcntl, "F_SETPIPE_SZ"), "Linux pipe-size controls required")
     def test_stalled_stdout_reader_does_not_hold_global_registry_lock(self):
         with tempfile.TemporaryDirectory(prefix="framebridge-pipe-canary-") as directory:

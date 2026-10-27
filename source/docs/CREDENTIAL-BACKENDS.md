@@ -25,7 +25,9 @@ owner/profile-specific commands tagged `NOLOG_INPUT`, `NOLOG_OUTPUT` and
 `NOSETENV`. The frontend then queries the effective policy for the exact command
 using command-specific `sudo -n -ll` in the C locale. It requires one effective
 matching root rule, the exact command/arguments and explicit disabled I/O logging
-and environment overrides before sending any key. Generic Defaults and absence
+and environment overrides before sending any key. Helper input is limited to
+16384 bytes plus EOF with a five-second absolute deadline, so an open input pipe
+cannot hold the shared registry lock indefinitely. Generic Defaults and absence
 of logging flags are not accepted as evidence. Unknown formats fail closed.
 
 On systemd 255, setup writes host-encrypted ciphertext and principal metadata under

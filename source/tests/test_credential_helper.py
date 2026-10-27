@@ -216,11 +216,19 @@ class CredentialHelperTests(unittest.TestCase):
     def test_broken_receipt_pipe_rolls_back_published_protect_grant(self):
         helper.authorize(self.owner, PROFILE, "host")
         stdout = mock.Mock(); stdout.buffer.write.side_effect = BrokenPipeError("synthetic closed pipe")
-        with mock.patch.object(helper, "_installation"), mock.patch.object(helper, "_caller", return_value=self.owner), mock.patch.object(helper, "_prepare_root"), mock.patch.object(helper.resource, "setrlimit"), mock.patch.object(helper.os, "umask"), mock.patch("sys.stdin", SimpleNamespace(buffer=io.BytesIO(KEY))), mock.patch("sys.stdout", stdout), mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+        with mock.patch.object(helper, "_installation"), mock.patch.object(helper, "_caller", return_value=self.owner), mock.patch.object(helper, "_prepare_root"), mock.patch.object(helper, "_read_key", return_value=KEY), mock.patch.object(helper.resource, "setrlimit"), mock.patch.object(helper.os, "umask"), mock.patch("sys.stdout", stdout), mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
             self.assertEqual(1, helper.main(["protect", PROFILE]))
             self.assertNotIn(KEY.decode(), stderr.getvalue())
         self.assertEqual([".lock"], [p.name for p in self.registry.iterdir()])
         self.assertEqual([], list(self.policies.iterdir()))
+
+    def test_open_stdin_has_a_deadline_and_excess_input_is_bounded(self):
+        with mock.patch("sys.stdin", SimpleNamespace(fileno=lambda: 17)), mock.patch.object(helper.select, "select", return_value=([], [], [])), mock.patch.object(helper.os, "read") as read:
+            with self.assertRaises(RuntimeError): helper._read_key()
+            read.assert_not_called()
+        with mock.patch("sys.stdin", SimpleNamespace(fileno=lambda: 17)), mock.patch.object(helper.select, "select", return_value=([17], [], [])), mock.patch.object(helper.os, "read", return_value=b"x" * (helper.MAX_KEY + 1)) as read:
+            with self.assertRaises(RuntimeError): helper._read_key()
+            read.assert_called_once_with(17, helper.MAX_KEY + 1)
 
     def test_ids_reject_paths_flags_and_extra_arguments(self):
         for value in ("../secret", "--uid=0", "A" * 64, "a" * 63, PROFILE + "\n"):
