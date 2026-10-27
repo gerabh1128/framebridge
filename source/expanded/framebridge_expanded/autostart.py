@@ -67,14 +67,54 @@ def _profile_id(state):
 
 
 def _encrypt_credential(state, key, backend):
+    _helper_ready()
     if backend == HOST_BACKEND:
-        _helper_ready()
-        args = ["sudo", "-n", "--", str(HELPER), "protect", _profile_id(state)]
+        kind = "host"
+        command = [str(HELPER), "protect", _profile_id(state)]
     elif backend == USER_BACKEND:
-        args = ["sudo", "-n", "--", "systemd-creds", "encrypt", "--uid=" + str(os.getuid()), "--with-key=host", "--name=" + CREDENTIAL, "-", "-"]
+        kind = "user"
+        command = ["/usr/bin/systemd-creds", "encrypt", "--uid=" + str(os.getuid()), "--with-key=host", "--name=" + CREDENTIAL, "-", "-"]
     else:
         raise RuntimeError("Unsupported protected-credential backend.")
-    return _command(args, data=key.encode()).stdout
+    # Bootstrap is administratively authorized and carries no runtime key.
+    # A command-specific effective-policy check precedes ALL secret input.
+    _command(["sudo", "-n", "--", str(HELPER), "authorize", _profile_id(state), kind])
+    try:
+        _require_no_sudo_io_logging(command)
+        return _command(["sudo", "-n", "--", *command], data=key.encode()).stdout
+    finally:
+        # Host protect consumes its grant before reading input. A missing
+        # cancel grant after that successful consume is harmless. Native user
+        # encryption cannot consume the grant itself, so cancellation is strict.
+        _command(["sudo", "-n", "--", str(HELPER), "unauthorize", _profile_id(state), kind], check=kind == "user")
+
+
+def _require_no_sudo_io_logging(command):
+    environment = dict(os.environ, LANG="C", LC_ALL="C")
+    result = _command(["sudo", "-n", "-ll", "--", *command], env=environment)
+    error = "The effective sudo policy must explicitly disable input/output logging for this exact credential command. No runtime key was sent."
+    if result.returncode or len(result.stdout) > 131072:
+        raise RuntimeError(error)
+    try:
+        text = result.stdout.decode("utf-8")
+    except UnicodeDecodeError:
+        raise RuntimeError(error) from None
+    # sudo 1.9's command-specific verbose list reports the effective matching
+    # rule. Unknown/ambiguous formats (including other policy plugins) fail
+    # closed; absence of log_* in generic Defaults is never accepted as proof.
+    if text.count("Sudoers entry:") != 1 or len(re.findall(r"^\s*Matched:", text, re.M)) != 1:
+        raise RuntimeError(error)
+    options = re.search(r"^\s*Options:\s*(.*?)^\s*Commands:\s*$", text, re.M | re.S)
+    matched = re.search(r"^\s*Matched:\s*(.*?)\s*\Z", text, re.M | re.S)
+    run_as = re.findall(r"^\s*RunAsUsers:\s*(.*?)\s*$", text, re.M)
+    if not options or not matched or run_as != ["root"]:
+        raise RuntimeError(error)
+    flags = {value.strip() for value in options[1].replace("\n", " ").split(",")}
+    logs = {"log_input", "log_output", "log_stdin", "log_stdout", "log_stderr", "log_ttyin", "log_ttyout"}
+    if not {"!log_input", "!log_output", "!setenv"}.issubset(flags) or logs.intersection(flags):
+        raise RuntimeError(error)
+    if " ".join(matched[1].split()) != " ".join(command):
+        raise RuntimeError(error)
 
 
 def _revoke_helper(state, digest):
@@ -176,8 +216,8 @@ def _json(path, value, replace=False):
     _write(path, (json.dumps(value, sort_keys=True, indent=2) + "\n").encode(), replace)
 
 
-def _command(args, *, data=None, timeout=35, check=True):
-    result = subprocess.run(args, input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+def _command(args, *, data=None, timeout=35, check=True, env=None):
+    result = subprocess.run(args, input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, env=env)
     if check and result.returncode:
         raise RuntimeError("Autostart command failed: " + Path(args[0]).name + ". No command output was exported.")
     return result
@@ -752,7 +792,9 @@ def _credential(state):
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     if _credential_backend(record) == HOST_BACKEND:
         _helper_ready()
-        result = _command(["sudo", "-n", "--", str(HELPER), "decrypt", _profile_id(state), record["credential_sha256"]], timeout=15)
+        command = [str(HELPER), "decrypt", _profile_id(state), record["credential_sha256"]]
+        _require_no_sudo_io_logging(command)
+        result = _command(["sudo", "-n", "--", *command], timeout=15)
     else:
         result = _command(["systemd-creds", "decrypt", "--user", "--name=" + CREDENTIAL, "-", "-"], data=cipher, timeout=15)
     try:

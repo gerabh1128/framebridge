@@ -1,3 +1,5 @@
+> Development candidate: **0.3.2~compat.20261027.1** for Debian, Ubuntu and Linux Mint on amd64. See [candidate scope and validation](docs/LINUX-COMPATIBILITY-CANDIDATE.md). Build profiles are not proof of live production compatibility. The official signed 0.3.1 release described below remains a separate artifact.
+
 # FrameBridge
 
 **Bring your ChatGPT conversations to Linux computers you control.**

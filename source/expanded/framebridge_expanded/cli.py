@@ -430,7 +430,12 @@ def _doctor_command(args, state):
         _show(value)
     else:
         print("Diagnostics: " + ("passed" if value.get("ok") else "needs attention"))
-        print("Debian 13 amd64: " + ("compatible" if value.get("compatible_debian_13_amd64") else "not verified compatible"))
+        compatibility = value.get("platform_compatibility") or {}
+        print("Platform: " + ("compatible" if compatibility.get("ok") else "not verified compatible"))
+        if compatibility.get("profile_id"):
+            print("Build profile: " + str(compatibility["profile_id"]))
+        for issue in compatibility.get("issues", []):
+            print("Platform issue: " + str(issue))
         print("Desktop: " + str(value.get("display", "unavailable")))
         for item in value.get("missing_commands", []):
             print("Missing command: " + str(item))

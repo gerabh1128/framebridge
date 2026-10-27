@@ -44,6 +44,9 @@ class HostCredentialAutostartTests(unittest.TestCase):
         self.calls.append((args, kwargs))
         output = b""
         if args[:2] == ["systemd-creds", "--version"]: output = b"systemd 255\n"
+        elif "-ll" in args:
+            command = " ".join(args[args.index("--") + 1:])
+            output = ("Sudoers entry: /etc/sudoers.d/synthetic-test\n RunAsUsers: root\n Options: !authenticate, !log_input, !log_output, !setenv\n Commands:\n  " + command + "\n Matched: " + command + "\n").encode()
         elif "protect" in args or "encrypt" in args:
             self.generation += 1
             output = ("SYNTHETIC-HOST-CIPHER-%03d-" % self.generation).encode() * 8
@@ -55,7 +58,7 @@ class HostCredentialAutostartTests(unittest.TestCase):
         return subprocess.CompletedProcess(args, 0, b"", b"")
 
     def operations(self, name):
-        return [(args, options) for args, options in self.calls if name in args]
+        return [(args, options) for args, options in self.calls if name in args and "-ll" not in args]
 
     def test_255_setup_uses_helper_stdin_and_preserves_user_unit(self):
         autostart.configure_connection(self.state, self.settings, KEY)
@@ -232,6 +235,52 @@ class HostCredentialAutostartTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Unsupported"):
             autostart._credential(self.state)
         self.assertEqual([], self.calls)
+
+    def test_unsafe_or_ambiguous_policy_never_receives_secret_input(self):
+        for backend in (autostart.HOST_BACKEND, autostart.USER_BACKEND):
+            for kind in ("logging", "missing", "ambiguous", "different-command", "query-failed", "specific-stream-logging"):
+                self.calls.clear()
+                def policy(args, **kwargs):
+                    result = self.fake_command(args, **kwargs)
+                    if "-ll" not in args:
+                        return result
+                    text = result.stdout.decode()
+                    if kind == "logging": text = text.replace("!log_input", "log_input")
+                    elif kind == "missing": text = text.replace("!log_output, ", "")
+                    elif kind == "ambiguous": text += "Matched: /usr/bin/another\n"
+                    elif kind == "different-command": text = text.replace(" Matched: ", " Matched: /different ")
+                    elif kind == "specific-stream-logging": text = text.replace("!setenv", "!setenv, log_stdin")
+                    return subprocess.CompletedProcess(args, 1 if kind == "query-failed" else 0, text.encode(), b"")
+                self.command.side_effect = policy
+                with self.subTest(backend=backend, kind=kind), self.assertRaises(RuntimeError):
+                    autostart._encrypt_credential(self.state, KEY, backend)
+                self.assertFalse(any(options.get("data") == KEY.encode() for _, options in self.calls))
+                self.assertTrue(self.operations("authorize"))
+                self.assertTrue(self.operations("unauthorize"))
+
+    def test_policy_query_exception_precedes_secret_and_cancels_authorization(self):
+        def unavailable(args, **kwargs):
+            if "-ll" in args:
+                raise RuntimeError("synthetic policy lookup failure")
+            return self.fake_command(args, **kwargs)
+        self.command.side_effect = unavailable
+        with self.assertRaises(RuntimeError):
+            autostart._encrypt_credential(self.state, KEY, autostart.HOST_BACKEND)
+        self.assertFalse(any(options.get("data") == KEY.encode() for _, options in self.calls))
+        self.assertTrue(self.operations("unauthorize"))
+
+    def test_decrypt_checks_effective_nolog_policy_before_running_privileged_command(self):
+        autostart.configure_connection(self.state, self.settings, KEY)
+        self.calls.clear()
+        def logging(args, **kwargs):
+            result = self.fake_command(args, **kwargs)
+            if "-ll" in args:
+                return subprocess.CompletedProcess(args, 0, result.stdout.replace(b"!log_output", b"log_output"), b"")
+            return result
+        self.command.side_effect = logging
+        with self.assertRaisesRegex(RuntimeError, "explicitly disable"):
+            autostart._credential(self.state)
+        self.assertFalse(self.operations("decrypt"))
 
 
 if __name__ == "__main__":

@@ -5,6 +5,8 @@ The existing systemd 256+ backend uses owner-scoped encrypted credentials and
 field retain that behavior. The systemd 255 backend preserves the same user
 service and uses a separately installed, privileged credential helper. Node
 startup without a ChatGPT connection does not need a runtime connection key.
+New or rotated keys on both backends use an administrative, secret-free sudo
+policy bootstrap so that key input cannot enter sudo I/O logs.
 
 ## Installation and authorization
 
@@ -17,12 +19,26 @@ The launcher executes the fixed system interpreter with `-I -S`; the helper uses
 only the standard library and absolute systemd-creds/visudo paths. Merely
 installing the package does not enable a connection or install a sudoers grant.
 
-On systemd 255, connection setup requires ordinary administrative sudo
-authorization. It writes host-encrypted ciphertext and principal metadata under
+Connection setup first requires ordinary administrative sudo authorization.
+The helper's `authorize` operation accepts no key and installs only literal,
+owner/profile-specific commands tagged `NOLOG_INPUT`, `NOLOG_OUTPUT` and
+`NOSETENV`. The frontend then queries the effective policy for the exact command
+using command-specific `sudo -n -ll` in the C locale. It requires one effective
+matching root rule, the exact command/arguments and explicit disabled I/O logging
+and environment overrides before sending any key. Generic Defaults and absence
+of logging flags are not accepted as evidence. Unknown formats fail closed.
+
+On systemd 255, setup writes host-encrypted ciphertext and principal metadata under
 `/var/lib/framebridge-expanded/credentials`, owned by root with private access.
 It also installs one validated file in `/etc/sudoers.d` per credential version.
 That file permits exactly the recorded owner's literal helper `decrypt` command
-and fixed profile/cipher digest arguments, with `NOSETENV`. It does not permit
+and fixed profile/cipher digest arguments, with `NOSETENV` and disabled I/O
+logging. The same effective-policy check precedes runtime sudo decryption.
+The one-use encryption bootstrap is consumed before the helper reads key input.
+On systemd 256+, the bootstrap permits only the existing native encrypt command
+with UID derived from the sudo caller and the fixed credential name; the
+frontend revokes that temporary permission in `finally`. Owner-scoped ciphertext
+and unprivileged `systemd-creds decrypt --user` remain unchanged. It does not permit
 arbitrary systemd-creds commands, paths, shell execution, account selection,
 provisioning, revocation or unrestricted root execution without authentication.
 This narrow permission is necessary for unattended reconnection after reboot.
@@ -50,11 +66,16 @@ all versions for its owner/profile, including when no manifest was committed.
 This reconciliation also runs after an upgrade to the systemd 256+ backend.
 Uninstall uses administrative `purge-all` after the user workers have stopped.
 Recognized root-owned staging files from interrupted publication are recovered.
+Prune and purge also remove authorization bootstrap files left by interruption.
 
 Administrative interface (run the installed launcher, never a user checkout):
 
 * `protect PROFILE_SHA256`: read a bounded printable synthetic/runtime key from
-  stdin and return only encrypted ciphertext on stdout.
+  stdin and return only encrypted ciphertext on stdout. Requires and consumes
+  its matching host authorization before reading input.
+* `authorize PROFILE_SHA256 host|user`: secret-free administrative bootstrap for
+  literal NOLOG encryption and cleanup commands, bound to the actual caller UID.
+* `unauthorize PROFILE_SHA256 host|user`: remove a bootstrap authorization.
 * `decrypt PROFILE_SHA256 CIPHER_SHA256`: return the registered owner's key on a
   pipe; this is the only operation granted passwordless sudo.
 * `revoke PROFILE_SHA256 CIPHER_SHA256`: idempotently revoke one owner version.
@@ -75,6 +96,10 @@ not supply an account-generation identity here. Administrators must revoke or
 purge the grants before deleting/recycling an account, and before changing its
 identity/home in a way that would prevent ordinary owner cleanup. A randomized
 credential name is not proof of an account's generation.
+
+The effective-policy parser is validated against sudo 1.9's command-specific
+verbose listing. A different sudo implementation or ambiguous policy output
+fails before key input and needs its own compatibility work and evidence.
 
 The helper backend is not a Wayland capture/input backend and does not remove
 Python ABI, architecture, libc, PAM, user-systemd, cgroup, sudo or X11 capability

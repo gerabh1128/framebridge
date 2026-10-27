@@ -61,7 +61,7 @@ class CredentialHelperTests(unittest.TestCase):
         self.assertEqual(0o600, stat.S_IMODE(record.stat().st_mode))
         self.assertEqual(0o440, stat.S_IMODE(policy.stat().st_mode))
         text = policy.read_text()
-        self.assertIn("testowner ALL=(root) NOSETENV: NOPASSWD:", text)
+        self.assertIn("testowner ALL=(root) NOLOG_INPUT: NOLOG_OUTPUT: NOSETENV: NOPASSWD:", text)
         self.assertTrue(text.endswith(" decrypt " + PROFILE + " " + digest + "\n"))
         self.assertNotIn("*", text)
         self.assertNotIn("systemd-creds", text)
@@ -135,6 +135,29 @@ class CredentialHelperTests(unittest.TestCase):
         self.assertEqual([], list(self.registry.iterdir()))
         self.assertEqual([], list(self.policies.iterdir()))
 
+    def test_bootstrap_has_only_literal_nolog_commands_and_host_grant_is_one_use(self):
+        for kind in ("host", "user"):
+            helper.authorize(self.owner, PROFILE, kind)
+            path, expected = helper._authorization(self.owner, PROFILE, kind)
+            self.assertEqual(expected, path.read_bytes())
+            self.assertIn(b"NOLOG_INPUT: NOLOG_OUTPUT: NOSETENV: NOPASSWD:", expected)
+            self.assertNotIn(b"*", expected)
+            self.assertNotIn(KEY, expected)
+            if kind == "user":
+                self.assertIn(b"encrypt --uid=1234 --with-key=host --name=chatgpt-runtime-key - -", expected)
+            helper.unauthorize(self.owner, PROFILE, kind, required=True)
+            with self.assertRaises(RuntimeError):
+                helper.unauthorize(self.owner, PROFILE, kind, required=True)
+
+    def test_prune_and_purge_remove_interrupted_authorizations(self):
+        helper.authorize(self.owner, PROFILE, "host")
+        helper.authorize(self.owner, PROFILE, "user")
+        helper.prune(self.owner, PROFILE, set())
+        self.assertEqual([], list(self.policies.iterdir()))
+        helper.authorize(self.owner, PROFILE, "user")
+        helper.purge_all()
+        self.assertEqual([], list(self.policies.iterdir()))
+
     def test_purge_prevalidates_all_policies_before_deleting_any(self):
         _, first = self.protect(); _, second = self.protect()
         record, policy = helper._paths(self.owner.pw_uid, PROFILE, second)
@@ -191,6 +214,7 @@ class CredentialHelperTests(unittest.TestCase):
         self.assertEqual(KEY, helper.decrypt(self.owner, PROFILE, digest))
 
     def test_broken_receipt_pipe_rolls_back_published_protect_grant(self):
+        helper.authorize(self.owner, PROFILE, "host")
         stdout = mock.Mock(); stdout.buffer.write.side_effect = BrokenPipeError("synthetic closed pipe")
         with mock.patch.object(helper, "_installation"), mock.patch.object(helper, "_caller", return_value=self.owner), mock.patch.object(helper, "_prepare_root"), mock.patch.object(helper.resource, "setrlimit"), mock.patch.object(helper.os, "umask"), mock.patch("sys.stdin", SimpleNamespace(buffer=io.BytesIO(KEY))), mock.patch("sys.stdout", stdout), mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
             self.assertEqual(1, helper.main(["protect", PROFILE]))

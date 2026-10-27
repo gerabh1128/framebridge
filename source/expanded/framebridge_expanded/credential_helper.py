@@ -152,7 +152,8 @@ def _install(path, data, *, policy=False):
 def _cleanup_temporaries():
     # Recover only this installer's root-owned, fixed-format staging files.
     patterns = ((ROOT, r"\.[1-9][0-9]*-[0-9a-f]{64}-[0-9a-f]{64}\.json\.[0-9a-f]{24}", False),
-                (SUDOERS, r"\.framebridge-credential-[1-9][0-9]*-[0-9a-f]{64}-[0-9a-f]{64}\.[0-9a-f]{24}", True))
+                (SUDOERS, r"\.framebridge-credential-[1-9][0-9]*-[0-9a-f]{64}-[0-9a-f]{64}\.[0-9a-f]{24}", True),
+                (SUDOERS, r"\.framebridge-credential-authorize-[1-9][0-9]*-[0-9a-f]{64}-(?:host|user)\.[0-9a-f]{24}", True))
     for directory, pattern, policy in patterns:
         removed = False
         for path in directory.iterdir():
@@ -193,8 +194,44 @@ def _paths(uid, profile, digest):
 
 def _policy(owner, profile, digest):
     # All fields are allowlisted tokens; no glob, free path, flags or shell.
-    return (owner.pw_name + " ALL=(root) NOSETENV: NOPASSWD: " + str(LAUNCHER)
+    return (owner.pw_name + " ALL=(root) NOLOG_INPUT: NOLOG_OUTPUT: NOSETENV: NOPASSWD: " + str(LAUNCHER)
             + " decrypt " + profile + " " + digest + "\n").encode("ascii")
+
+
+def _authorization(owner, profile, kind):
+    _ids(profile)
+    if kind not in {"host", "user"}:
+        _fail()
+    path = SUDOERS / ("framebridge-credential-authorize-" + str(owner.pw_uid) + "-" + profile + "-" + kind)
+    if kind == "host":
+        command = str(LAUNCHER) + " protect " + profile
+    else:
+        command = CREDS + " encrypt --uid=" + str(owner.pw_uid) + " --with-key=host --name=chatgpt-runtime-key - -"
+    prefix = owner.pw_name + " ALL=(root) NOLOG_INPUT: NOLOG_OUTPUT: NOSETENV: NOPASSWD: "
+    cancel = str(LAUNCHER) + " unauthorize " + profile + " " + kind
+    return path, (prefix + command + "\n" + prefix + cancel + "\n").encode("ascii")
+
+
+def authorize(owner, profile, kind):
+    """Administrative, no secret input: exact no-I/O-log permission only."""
+    path, expected = _authorization(owner, profile, kind)
+    if path.exists() or path.is_symlink():
+        if _read(path, 4096, policy=True) != expected:
+            _fail()
+        return
+    _install(path, expected, policy=True)
+
+
+def unauthorize(owner, profile, kind, *, required=False):
+    path, expected = _authorization(owner, profile, kind)
+    if not path.exists() and not path.is_symlink():
+        if required:
+            _fail()
+        return
+    if _read(path, 4096, policy=True) != expected:
+        _fail()
+    path.unlink()
+    _sync(SUDOERS)
 
 
 def _record(owner, profile, digest, *, require_policy=True):
@@ -286,6 +323,13 @@ def _keep_digests(value):
 def prune(owner, profile, keep):
     """Administrative crash recovery: remove only this owner's profile grants."""
     _ids(profile)
+    authorizations = []
+    for kind in ("host", "user"):
+        path, expected = _authorization(owner, profile, kind)
+        if path.exists() or path.is_symlink():
+            if _read(path, 4096, policy=True) != expected:
+                _fail()
+            authorizations.append(path)
     digests = set()
     prefix = str(owner.pw_uid) + "-" + profile + "-"
     for path in ROOT.glob(prefix + "*"):
@@ -304,6 +348,10 @@ def prune(owner, profile, keep):
     # Prevalidation above completes before any grant or encrypted record moves.
     for digest in sorted(digests - keep):
         revoke(owner, profile, digest)
+    for path in authorizations:
+        path.unlink()
+    if authorizations:
+        _sync(SUDOERS)
 
 
 def purge_all():
@@ -331,6 +379,18 @@ def purge_all():
         entries.append((record_path, policy_path))
     policies = []
     for policy_path in sorted(SUDOERS.glob("framebridge-credential-*")):
+        auth = re.fullmatch(r"framebridge-credential-authorize-([1-9][0-9]*)-([0-9a-f]{64})-(host|user)", policy_path.name)
+        if auth:
+            uid, profile, kind = auth.groups()
+            data = _read(policy_path, 4096, policy=True)
+            username = data.split(b" ", 1)[0].decode("ascii")
+            if not USER.fullmatch(username):
+                _fail()
+            owner = type("Owner", (), {"pw_uid": int(uid), "pw_name": username})()
+            if data != _authorization(owner, profile, kind)[1]:
+                _fail()
+            policies.append(policy_path)
+            continue
         match = re.fullmatch(r"framebridge-credential-([1-9][0-9]*)-([0-9a-f]{64})-([0-9a-f]{64})", policy_path.name)
         if not match:
             _fail()
@@ -371,13 +431,17 @@ def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
     try:
         _installation()
-        if not args or args[0] not in {"protect", "decrypt", "revoke", "prune", "purge-all"}:
+        if not args or args[0] not in {"protect", "decrypt", "revoke", "prune", "authorize", "unauthorize", "purge-all"}:
             _fail()
         operation = args[0]
-        if len(args) != {"protect": 2, "decrypt": 3, "revoke": 3, "prune": 3, "purge-all": 1}[operation]:
+        if len(args) != {"protect": 2, "decrypt": 3, "revoke": 3, "prune": 3, "authorize": 3, "unauthorize": 3, "purge-all": 1}[operation]:
             _fail()
         owner = _caller() if operation != "purge-all" else None
-        if operation == "prune":
+        if operation in {"authorize", "unauthorize"}:
+            _ids(args[1])
+            if args[2] not in {"host", "user"}:
+                _fail()
+        elif operation == "prune":
             _ids(args[1]); keep = _keep_digests(args[2])
         elif operation != "purge-all":
             _ids(*args[1:])
@@ -386,6 +450,9 @@ def main(argv=None):
         with _registry_lock():
             _cleanup_temporaries()
             if operation == "protect":
+                # sudo already selected this exact NOLOG policy. Consume its
+                # encryption permission before accepting any key bytes.
+                unauthorize(owner, args[1], "host", required=True)
                 key = sys.stdin.buffer.read(MAX_KEY + 1)
                 result = protect(owner, args[1], key)
                 key = b""
@@ -395,6 +462,10 @@ def main(argv=None):
                 revoke(owner, args[1], args[2])
             elif operation == "prune":
                 prune(owner, args[1], keep)
+            elif operation == "authorize":
+                authorize(owner, args[1], args[2])
+            elif operation == "unauthorize":
+                unauthorize(owner, args[1], args[2])
             else:
                 purge_all()
         # stdout belongs to an unprivileged caller and can block indefinitely.

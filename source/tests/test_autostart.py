@@ -34,6 +34,7 @@ class AutostartTests(unittest.TestCase):
         mock.patch.object(autostart, "_systemctl", side_effect=self.fake_systemctl).start()
         mock.patch.object(autostart, "_linger", return_value=False).start()
         mock.patch.object(autostart, "_enabled_units", return_value=[]).start()
+        mock.patch.object(autostart, "_helper_ready").start()
         mock.patch.object(autostart.os, "geteuid", return_value=1000).start()
         mock.patch.object(autostart.resource, "setrlimit").start()
         self.inputs = mock.patch("builtins.input", side_effect=["y"]).start()
@@ -43,9 +44,13 @@ class AutostartTests(unittest.TestCase):
 
     def fake_command(self, args, **kwargs):
         self.calls.append((args, kwargs))
+        if "-ll" in args:
+            command = " ".join(args[args.index("--") + 1:])
+            output = "Sudoers entry: /etc/sudoers.d/synthetic-test\n RunAsUsers: root\n Options: !authenticate, !log_input, !log_output, !setenv\n Commands:\n  " + command + "\n Matched: " + command + "\n"
+            return subprocess.CompletedProcess(args, 0, output.encode(), b"")
         if args[:2] == ["systemd-creds", "--version"]:
             return subprocess.CompletedProcess(args, 0, b"systemd 257\n", b"")
-        if "encrypt" in args:
+        if "encrypt" in args and "-ll" not in args:
             return subprocess.CompletedProcess(args, 0, b"CIPHERTEXT-ONLY-" * 20, b"")
         return subprocess.CompletedProcess(args, 0, b"", b"")
 
@@ -59,7 +64,7 @@ class AutostartTests(unittest.TestCase):
         state, directory, unit = autostart._paths(self.state)
         self.assertNotEqual(before, (self.state / "config.json").read_bytes())
         self.assertEqual("auto", config.load_config(self.state)["headless"])
-        encryption = [(a, kw) for a, kw in self.calls if "encrypt" in a]
+        encryption = [(a, kw) for a, kw in self.calls if "encrypt" in a and "-ll" not in a]
         self.assertEqual(1, len(encryption))
         args, options = encryption[0]
         self.assertEqual(MARKER.encode(), options["data"])
@@ -111,7 +116,7 @@ class AutostartTests(unittest.TestCase):
 
     def test_encryption_failure_never_creates_unit_or_disables_an_existing_service(self):
         def failing(args, **kwargs):
-            if "encrypt" in args:
+            if "encrypt" in args and "-ll" not in args:
                 raise RuntimeError("Credential encryption failed.")
             return self.fake_command(args, **kwargs)
         self.command.side_effect = failing
@@ -187,7 +192,7 @@ class AutostartTests(unittest.TestCase):
         self._durable_connect()
         self.inputs.assert_not_called()
         self.key_prompt.assert_not_called()
-        encryptions = [(args, kw) for args, kw in self.calls if "encrypt" in args]
+        encryptions = [(args, kw) for args, kw in self.calls if "encrypt" in args and "-ll" not in args]
         self.assertEqual(1, len(encryptions))
         self.assertEqual(MARKER.encode(), encryptions[0][1]["data"])
         self.assertNotIn(MARKER, " ".join(encryptions[0][0]))
@@ -220,7 +225,7 @@ class AutostartTests(unittest.TestCase):
     def test_durable_encryption_failure_leaves_current_profile_and_service_alone(self):
         original = (self.state / "config.json").read_bytes()
         def failed(args, **kwargs):
-            if "encrypt" in args:
+            if "encrypt" in args and "-ll" not in args:
                 raise RuntimeError("Protection failed.")
             return self.fake_command(args, **kwargs)
         self.command.side_effect = failed
@@ -238,7 +243,7 @@ class AutostartTests(unittest.TestCase):
         events = []
         original_command = self.fake_command
         def command(args, **kwargs):
-            if "encrypt" in args:
+            if "encrypt" in args and "-ll" not in args:
                 events.append("encrypt")
                 return subprocess.CompletedProcess(args, 0, b"REPLACEMENT-CIPHERTEXT-" * 20, b"")
             return original_command(args, **kwargs)
