@@ -4,7 +4,7 @@
 
 Run a task on your own machine, return to the same Bash terminal, inspect an X11 desktop, or select an enrolled computer. ChatGPT remains hosted; FrameBridge runs the tools on your Linux computers.
 
-> **Development candidate: `0.3.2~compat.20261027.2`.** This revision is being validated. It is not a signed public release. The separately signed 0.3.1 release remains a different artifact. Read the [candidate scope and validation record](docs/LINUX-COMPATIBILITY-CANDIDATE.md) before choosing a package.
+> **Development candidate: `0.3.2~compat.20261027.3`.** This revision is being validated. It is not a signed public release. The separately signed 0.3.1 release remains a different artifact. Read the [candidate scope and validation record](docs/LINUX-COMPATIBILITY-CANDIDATE.md) before choosing a package.
 
 ## Start here
 
@@ -26,14 +26,14 @@ The compatibility candidate has separate native Python builds; it is not one int
 | Ubuntu 24.04 | amd64 / x86_64 | 3.12 | `ubuntu24.04-amd64-py312` |
 | Linux Mint 22.x | amd64 / x86_64 | 3.12 | `mint22-amd64-py312` |
 
-The preceding `.1` candidate passed VM tests on these systems, including Cinnamon on Mint 22.3, and a Debian production pilot. This `.2` revision needs its own validation. Ubuntu 26.04 and LMDE 7 builds remain experimental; other distributions, older releases and CPU architectures are outside this candidate's scope.
+The preceding `.1` candidate passed VM tests on these systems, including Cinnamon on Mint 22.3, and a Debian production pilot. This `.3` revision needs its own validation. Ubuntu 26.04 and LMDE 7 builds remain experimental; other distributions, older releases and CPU architectures are outside this candidate's scope.
 
 Verify official releases with the independently trusted project key as described in [Official releases](OFFICIAL-RELEASES.md). A candidate's recorded SHA-256 identifies its reviewed file; it is not a release signature. Candidate packages are for reviewed pilots.
 
 For example, with the **Mint** candidate downloaded into the current directory:
 
 ~~~bash
-sudo apt install ./FrameBridge-0.3.2~compat.20261027.2-mint22-amd64-py312.deb
+sudo apt install ./FrameBridge-0.3.2~compat.20261027.3-mint22-amd64-py312.deb
 ~~~
 
 Use the corresponding profile filename on Debian or Ubuntu. Review APT's proposed changes for the actual computer. Installation places the software on disk; it does not establish a ChatGPT connection or replace the system Python.

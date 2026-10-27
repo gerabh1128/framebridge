@@ -333,7 +333,8 @@ def main() -> None:
                      streamable_http_path="/mcp")
     hub = FleetHub(discover_nodes, node_read)
     register_fleet_read_tools(server, hub)
-    server.run(transport="streamable-http")
+    from .http_server import run_streamable_mcp
+    run_streamable_mcp(server)
 
 
 if __name__ == "__main__":

@@ -838,4 +838,5 @@ from framebridge_expanded.tty_mcp import register_tools as register_tty_tools
 register_tty_tools(mcp, framebridge_exec)
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    from framebridge_expanded.http_server import run_streamable_mcp
+    run_streamable_mcp(mcp)

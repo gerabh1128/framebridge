@@ -11,7 +11,7 @@ from pathlib import Path
 import re
 
 
-CANDIDATE_VERSION = "0.3.2~compat.20261027.2"
+CANDIDATE_VERSION = "0.3.2~compat.20261027.3"
 VENDOR_RELATIVE = Path("original/geranas/FrameBridge-Fleet-Hub/vendor")
 SOURCE_VENDOR = Path("sources/original-geranas/FrameBridge-Fleet-Hub/vendor")
 GLIBC_BASELINE = (2, 34)

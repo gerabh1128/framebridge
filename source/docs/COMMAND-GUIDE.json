@@ -1,12 +1,12 @@
 {
   "product": "FrameBridge",
-  "version": "0.3.2~compat.20261027.2",
+  "version": "0.3.2~compat.20261027.3",
   "guide_schema": 1,
   "topics": {
     "start": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.2",
+      "version": "0.3.2~compat.20261027.3",
       "guide_schema": 1,
       "topic": "start",
       "title": "Start with FrameBridge",
@@ -24,7 +24,7 @@
           "heading": "Install and connect",
           "body": "Install the .deb built for your exact Debian 13, Ubuntu 24.04/26.04, Linux Mint 22.x or LMDE 7 amd64 profile. These compatibility candidates still require installation and lifecycle validation on each target. Select the artifact from the matching profile folder and keep the distribution system Python. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.",
           "commands": [
-            "sudo apt install ./framebridge-expanded_0.3.2~compat.20261027.2_amd64.deb",
+            "sudo apt install ./framebridge-expanded_0.3.2~compat.20261027.3_amd64.deb",
             "fb connect"
           ]
         },
@@ -64,12 +64,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "4a85d9721ac3f758837a57126484b6cca56a598088f90365de2796f0b8d13766"
+      "guide_sha256": "b5be618bfb62d102ebec222370882da129c37e92044ebe86cd9203def5c0b272"
     },
     "commands": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.2",
+      "version": "0.3.2~compat.20261027.3",
       "guide_schema": 1,
       "topic": "commands",
       "title": "Command reference",
@@ -136,12 +136,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "e8680e094c647dc991d7bc9e4800d3978502dad81cf101f10d072be88dc4e9a1"
+      "guide_sha256": "043a13ee822b03113ca877351986ee4d25628fc31bf623a9f23134c1980545c0"
     },
     "connection": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.2",
+      "version": "0.3.2~compat.20261027.3",
       "guide_schema": 1,
       "topic": "connection",
       "title": "Connect and disconnect ChatGPT",
@@ -190,12 +190,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "0c8c16baf4d28e9b37154dad049193aeae252813b18eba3159cf437918eb3416"
+      "guide_sha256": "3a6218c30256375c32bc80b34609f75b8465e901a2c7012389e6b5cdff995af3"
     },
     "lifecycle": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.2",
+      "version": "0.3.2~compat.20261027.3",
       "guide_schema": 1,
       "topic": "lifecycle",
       "title": "Services, connection intent and boot policy",
@@ -256,12 +256,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "0e3d6c96084e40b07d7373f3f7dbe22aa7659e59ec7cff57383026918dd0948c"
+      "guide_sha256": "a7dd26f8acc2ffbadb47f01a9fe24b1b547853f576b7b8805e01ab9d40087cd4"
     },
     "nodes": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.2",
+      "version": "0.3.2~compat.20261027.3",
       "guide_schema": 1,
       "topic": "nodes",
       "title": "Central and node operation",
@@ -310,12 +310,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "a0a317d230abb52bd673bb82453c0c17d73d31e30b1766e4247ef80ada02aa2a"
+      "guide_sha256": "a535fb417b3dff1c6ad022a83576ea9e001a2f2f78e99a2ca0d146747fe1300c"
     },
     "terminals": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.2",
+      "version": "0.3.2~compat.20261027.3",
       "guide_schema": 1,
       "topic": "terminals",
       "title": "Persistent Bash terminals",
@@ -376,12 +376,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "e9ab7535894f07a7aa309d0f4f02d36d37c65143006f8bc67b9f12a1e00f0f5a"
+      "guide_sha256": "d6854b43a419e32ba16a3707d1481607d0073017daa971597bbeeee885e22f8c"
     },
     "screens": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.2",
+      "version": "0.3.2~compat.20261027.3",
       "guide_schema": 1,
       "topic": "screens",
       "title": "Authentic screen observation and input",
@@ -426,12 +426,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "3d37bc0fac316fa50275f1a9f38f15e87aef435593c694aebaacf4666734e1fd"
+      "guide_sha256": "0b43cec434d78c75e277487cd28346c689e6f8111e0d99daf67e03904380651b"
     },
     "diagnostics": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.2",
+      "version": "0.3.2~compat.20261027.3",
       "guide_schema": 1,
       "topic": "diagnostics",
       "title": "Status and diagnosis",
@@ -476,12 +476,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "9cdab418287a3fcf283258782d117813bb45d23183101e5b7ee8eeb162cd38b4"
+      "guide_sha256": "67ddeb5dc3314452f3378099b5427bed6e3a426547c322294b29f8935302bc5e"
     },
     "security": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.2",
+      "version": "0.3.2~compat.20261027.3",
       "guide_schema": 1,
       "topic": "security",
       "title": "Authorization, distribution and safe operation",
@@ -516,12 +516,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "64ecf0b4e25dec7faffae90ef3d48ce732f5ec2c7fb815815a625ae124230c9e"
+      "guide_sha256": "995ee955506bd5ac91b27363c6833d2f6872555d7b6fbb03471b5af18bbf9661"
     },
     "compatibility": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2~compat.20261027.2",
+      "version": "0.3.2~compat.20261027.3",
       "guide_schema": 1,
       "topic": "compatibility",
       "title": "Compatibility with earlier commands",
@@ -564,8 +564,8 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "f622466edc45196d42390129d8a32424e1b0e64b7751688790061b1e8b5941d2"
+      "guide_sha256": "1a31c25cf96ca3f02f74984eba740dade767816537e3fac9edee9d7cebf86717"
     }
   },
-  "guide_sha256": "f83c632796c7cdb3489683b1c4584f0fedec11f4aeb9321430f1a709888d6965"
+  "guide_sha256": "05db1724919b95443b00670ef3365512c0ac30bbd15462819c3a2236e7df7a25"
 }
