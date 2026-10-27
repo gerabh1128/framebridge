@@ -10,6 +10,7 @@ import os
 import re
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 
 from build_profiles import CANDIDATE_VERSION, PROFILES, SOURCE_VENDOR, VENDOR_RELATIVE, target_profile, validate_vendor, vendor_versions
@@ -136,6 +137,38 @@ def install_legal_material(docs):
         "dependency_source_archives": DEPENDENCY_SOURCE_ASSETS
     }, indent=2) + "\n")
 
+def maintainer_prerm(version):
+    """Revoke helper grants before a downgrade removes the helper's code.
+
+    Equal-version reinstalls and forward upgrades retain managed credentials.
+    The fixed installed cleanup module validates the helper's root ownership,
+    permissions and ancestors before running its bounded purge-all command.
+    """
+    if not re.fullmatch(r"[0-9][0-9A-Za-z.+:~\-]*", version):
+        raise ValueError("Invalid Debian package version for maintainer script")
+    helper_cleanup = (
+        'import runpy; runpy.run_path('
+        '"/usr/lib/framebridge-expanded/expanded/framebridge_expanded/uninstall.py")'
+        '["purge_credential_helpers"]()'
+    )
+    return (
+        "#!/bin/sh\nset -eu\n"
+        'case "$1" in\n'
+        "  remove|deconfigure)\n"
+        "    /usr/bin/python3 -I -S /usr/lib/framebridge-expanded/expanded/framebridge_expanded/uninstall.py --all-users\n"
+        "    if [ -e /etc/framebridge-expanded/screen-access.json ] || [ -L /etc/framebridge-expanded/screen-access.json ]; then\n"
+        "      /usr/lib/framebridge-expanded/bin/framebridge-screen-access disable\n"
+        "    fi\n"
+        "    ;;\n"
+        "  upgrade)\n"
+        '    /usr/bin/dpkg --validate-version "$2"\n'
+        '    if /usr/bin/dpkg --compare-versions "$2" lt ' + shlex.quote(version) + "; then\n"
+        "      /usr/bin/python3 -I -S -c " + shlex.quote(helper_cleanup) + "\n"
+        "    fi\n"
+        "    ;;\nesac\n"
+    )
+
+
 def main(argv=None):
     global VERSION, PUBLIC_FILENAME, RELEASE, STAGE, PREFIX
     parser = argparse.ArgumentParser(description=__doc__)
@@ -246,15 +279,7 @@ def main(argv=None):
         " Optional virtual displays are explicitly identified as virtual.\n"
         " No phone or Owner Device pairing. Services start after connection setup.\n"
         " Installing the package alone does not activate a connection.\n")
-    (control / "prerm").write_text(
-        "#!/bin/sh\nset -eu\n"
-        "case \"$1\" in\n"
-        "  remove|deconfigure)\n"
-        "    /usr/bin/python3 -I -S /usr/lib/framebridge-expanded/expanded/framebridge_expanded/uninstall.py --all-users\n"
-        "    if [ -e /etc/framebridge-expanded/screen-access.json ] || [ -L /etc/framebridge-expanded/screen-access.json ]; then\n"
-        "      /usr/lib/framebridge-expanded/bin/framebridge-screen-access disable\n"
-        "    fi\n"
-        "    ;;\nesac\n")
+    (control / "prerm").write_text(maintainer_prerm(VERSION))
     (control / "prerm").chmod(0o755)
     rows = []
     for path in sorted(STAGE.rglob("*")):

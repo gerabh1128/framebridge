@@ -30,7 +30,7 @@
         },
         {
           "heading": "Updating and removal",
-          "body": "Install an official update through the normal package manager when that update has been published. Normal removal stops package-owned managed processes and can retain the user profile and encrypted connection material; it is not a credential-forgetting operation. On systemd 255, package removal also revokes the administrative boot-credential grant. After reinstalling, run fb connect interactively to provision that grant again; retained files alone do not restore startup. Use the explicit credentials forget action first when that is your intended outcome. Do not assume purge erases user-profile data.",
+          "body": "Install an official update through the normal package manager when that update has been published. Normal removal stops package-owned managed processes and can retain the user profile and encrypted connection material; it is not a credential-forgetting operation. On systemd 255, package removal also revokes the administrative boot-credential grant. After reinstalling, run fb connect interactively to provision that grant again; retained files alone do not restore startup. Use the explicit credentials forget action first when that is your intended outcome. Do not assume purge erases user-profile data. An explicit downgrade also revokes administrative helper grants before the older package files replace the helper. Helper-backed profiles require a new interactive connect with a compatible package before managed startup can be restored.",
           "commands": [
             "sudo dpkg --remove framebridge-original-expanded"
           ]
@@ -64,7 +64,7 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "ce03094ef55168ab22d393ce1f9193aa0a26bc3524eaaecfc8f48bed1c788cf1"
+      "guide_sha256": "d6ef35f7879fa290843fbfcadf403270ec0e70e403b0230b3469659492385928"
     },
     "commands": {
       "ok": true,
@@ -567,5 +567,5 @@
       "guide_sha256": "54b70093617e6992de04d41ddd367ffdd9a6bd6c317c99a886d6391277c55f6b"
     }
   },
-  "guide_sha256": "b6060e0572a612d8d7d8a988bc9b0bca7aa8db8ef267004e6a1495e9ab5f34a4"
+  "guide_sha256": "ab3cce8d01d63a34fa2634738a9e0b37c89f5e1f51ba88d2b33abf9a872ad7ab"
 }

@@ -42,7 +42,7 @@ fb connect
 
 ### Updating and removal
 
-Install an official update through the normal package manager when that update has been published. Normal removal stops package-owned managed processes and can retain the user profile and encrypted connection material; it is not a credential-forgetting operation. On systemd 255, package removal also revokes the administrative boot-credential grant. After reinstalling, run fb connect interactively to provision that grant again; retained files alone do not restore startup. Use the explicit credentials forget action first when that is your intended outcome. Do not assume purge erases user-profile data.
+Install an official update through the normal package manager when that update has been published. Normal removal stops package-owned managed processes and can retain the user profile and encrypted connection material; it is not a credential-forgetting operation. On systemd 255, package removal also revokes the administrative boot-credential grant. After reinstalling, run fb connect interactively to provision that grant again; retained files alone do not restore startup. Use the explicit credentials forget action first when that is your intended outcome. Do not assume purge erases user-profile data. An explicit downgrade also revokes administrative helper grants before the older package files replace the helper. Helper-backed profiles require a new interactive connect with a compatible package before managed startup can be restored.
 
 ~~~sh
 sudo dpkg --remove framebridge-original-expanded
