@@ -1,12 +1,12 @@
 {
   "product": "FrameBridge",
-  "version": "0.3.2",
+  "version": "0.3.2+private.20261028.1",
   "guide_schema": 1,
   "topics": {
     "start": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2",
+      "version": "0.3.2+private.20261028.1",
       "guide_schema": 1,
       "topic": "start",
       "title": "Start with FrameBridge",
@@ -24,7 +24,7 @@
           "heading": "Install and connect",
           "body": "Install the .deb built for your exact Debian 13, Ubuntu 24.04/26.04, Linux Mint 22.x or LMDE 7 amd64 profile. These compatibility candidates still require installation and lifecycle validation on each target. Select the artifact from the matching profile folder and keep the distribution system Python. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.",
           "commands": [
-            "sudo apt install ./framebridge-expanded_0.3.2_amd64.deb",
+            "sudo apt install ./framebridge-expanded_0.3.2+private.20261028.1_amd64.deb",
             "fb connect"
           ]
         },
@@ -64,12 +64,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "cc94c2c9a7799f8f2fa9c1dc52bc5d3f5205878f6157f1592d1a8ed320897782"
+      "guide_sha256": "633545a91cf4c434264832392e80fc50f04395dc3cd4f06465d8f115edeaa325"
     },
     "commands": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2",
+      "version": "0.3.2+private.20261028.1",
       "guide_schema": 1,
       "topic": "commands",
       "title": "Command reference",
@@ -136,12 +136,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "572acea43014c97c5b488b35b415a7664724fb081f382c285db825153cf872b2"
+      "guide_sha256": "3519625fe43305646fe3aa3d3c55abebeb6bb719343ded4e9f88d786046ac818"
     },
     "connection": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2",
+      "version": "0.3.2+private.20261028.1",
       "guide_schema": 1,
       "topic": "connection",
       "title": "Connect and disconnect ChatGPT",
@@ -190,12 +190,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "8dda65a1d4664c7ea887eda254beb211e35bc0c0c6636fdb4574b0297dac0e8e"
+      "guide_sha256": "c50703d120533d821183a9907cfe7025d8d06fa86c6027f03d32776604865ec3"
     },
     "lifecycle": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2",
+      "version": "0.3.2+private.20261028.1",
       "guide_schema": 1,
       "topic": "lifecycle",
       "title": "Services, connection intent and boot policy",
@@ -256,12 +256,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "fb34c85f83fd244a914709c7bcb3bc201f2d5c11120954cbb73492dbe5b5ed10"
+      "guide_sha256": "14c12dfa8c9d70c59ea80bf4fe44028c8c4c9b45a98957d0b70c6d964d228e16"
     },
     "nodes": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2",
+      "version": "0.3.2+private.20261028.1",
       "guide_schema": 1,
       "topic": "nodes",
       "title": "Central and node operation",
@@ -310,12 +310,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "81c7738bf57a7dc63625d222351150cd7334a6155a8b35d090cf4a7ef9dc47fb"
+      "guide_sha256": "179070ececdf8451b6e53785cbf453ecca96cad56e3d7c28898113a6bad8c356"
     },
     "terminals": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2",
+      "version": "0.3.2+private.20261028.1",
       "guide_schema": 1,
       "topic": "terminals",
       "title": "Persistent Bash terminals",
@@ -376,12 +376,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "13ce244963b120fc0a7683b0f5588f035f42bc6fae9b7d86867d74dad06cfcb4"
+      "guide_sha256": "2e2530cab757882cf1ce7feb1a360e1d76cbc84602f2fc76cf55922188b2f48a"
     },
     "screens": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2",
+      "version": "0.3.2+private.20261028.1",
       "guide_schema": 1,
       "topic": "screens",
       "title": "Authentic screen observation and input",
@@ -426,12 +426,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "eb738294825f386915a18cc658387dbc7287ecbf98c6e116cb1cf3822c63f3ce"
+      "guide_sha256": "38e14c50a774b3d4b59d5a20e6afcc1dba568b1188083bf8f36593e4d88ca644"
     },
     "diagnostics": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2",
+      "version": "0.3.2+private.20261028.1",
       "guide_schema": 1,
       "topic": "diagnostics",
       "title": "Status and diagnosis",
@@ -476,12 +476,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "c1eff5c79730716afdffebf3fbf33e6a15c5af8b1576729e6fdc00f8e64b5574"
+      "guide_sha256": "05e4e8a9ed3df91686434c00f2221ea8ac1c392b9a5ed002c8fde014fecad18a"
     },
     "security": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2",
+      "version": "0.3.2+private.20261028.1",
       "guide_schema": 1,
       "topic": "security",
       "title": "Authorization, distribution and safe operation",
@@ -516,12 +516,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "aa018b6b89a00878fd76ea6e9bd7e6201c9306ac58161d27a31f60118efb6d60"
+      "guide_sha256": "2c1b1aa4f052c2d62fcc22a0c8a55dc75295465969d51d1171957c9654ad2a2a"
     },
     "compatibility": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.2",
+      "version": "0.3.2+private.20261028.1",
       "guide_schema": 1,
       "topic": "compatibility",
       "title": "Compatibility with earlier commands",
@@ -564,8 +564,8 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "28964bb19f9dee60d17712d7785f90a90c7c72cc7ff3c0f14fa75e74e57221fa"
+      "guide_sha256": "ea21425ad830c56bcb9328b2a7600e61cad86adaaf7e03531f9250b4e42c24e3"
     }
   },
-  "guide_sha256": "5beeecfa511cd5d97ea43908735eb4d2216a9947030b90199b7e14643ba344d8"
+  "guide_sha256": "688782d53c19df9de8ba686abc90ff97ad7140a5bf0ca6897d4314147ab5c434"
 }
