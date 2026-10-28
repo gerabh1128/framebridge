@@ -51,7 +51,7 @@ def main():
             if not u.path.startswith('/'):failures.append('Non-root relative URL '+value);continue
             target=resolve(u.path)
             if not target.exists():
-                if u.path=='/assets/framebridge-preview.mp4':pending.append('Preview video asset pending')
+                if u.path=='/assets/framebridge-preview-0.3.1-original-r4.mp4':pending.append('Preview video asset pending')
                 else:failures.append('Missing local target '+value+' referenced by '+str(p.relative_to(DIST)))
             elif u.path in q.assets:http_paths.add(u.path)
             if u.fragment and target.is_file() and target.suffix=='.html':
@@ -78,33 +78,43 @@ def main():
     with tempfile.TemporaryDirectory(prefix='framebridge-web-qa-') as td:
         temp=Path(td);web=temp/'web';web.mkdir()
         shutil.copyfile(BASE/'build_site.py',web/'build_site.py')
+        shutil.copyfile(BASE/'release_catalog.py',web/'release_catalog.py')
         shutil.copytree(BASE/'src',web/'src')
         (web/'assets').mkdir()
         for p in (BASE/'assets').iterdir():
-            if p.is_file() and p.suffix!='.mp4':shutil.copyfile(p,web/'assets'/p.name)
-        fixture=dict(meta,state='ready',sha256='a'*64,signing_fingerprint='A'*40,size_bytes=1,source_archive_url='/downloads/SYNTHETIC-SOURCE.tar.gz')
+            if p.is_file():shutil.copyfile(p,web/'assets'/p.name)
+        fixture=json.loads(json.dumps(meta));fixture.update(state='ready',signing_fingerprint='2B1F01BC806C0B33CB6CEDDE52859CEBC91B8808',checksums_url='/downloads/TEST-SHA256SUMS',checksums_signature_url='/downloads/TEST-SHA256SUMS.asc')
+        fixture['source']=dict(filename='TEST-SOURCE.tar.gz',url='/downloads/TEST-SOURCE.tar.gz',signature_url='/downloads/TEST-SOURCE.tar.gz.asc',sha256='a'*64,size_bytes=1)
+        for i,profile in enumerate(fixture['profiles']):
+            filename='TEST-profile-'+str(i)+'.deb'
+            profile.update(filename=filename,url='/downloads/'+filename,signature_url='/downloads/'+filename+'.asc',sha256='a'*64,size_bytes=1)
+        for dependency in fixture['dependency_sources']:
+            dependency.setdefault('signature_url',dependency['url']+'.asc')
         (web/'release.json').write_text(json.dumps(fixture))
         result=subprocess.run(['/usr/bin/python3','-I','-S',str(web/'build_site.py')],capture_output=True,text=True,timeout=10)
         if result.returncode:failures.append('Synthetic-ready rendering failed: '+result.stderr[-600:])
         else:
             q=Inspect();q.feed((web/'dist/download/index.html').read_text())
             blocks=[x for x in q.code if '\n' in x]
-            if len(blocks)!=3:failures.append('Expected manual verification, APT setup and after-install command blocks')
             for text in blocks:
                 result=subprocess.run(['/bin/bash','-n'],input=text,text=True,capture_output=True,timeout=3)
                 if result.returncode:failures.append('Rendered install block shell syntax: '+result.stderr.strip())
-            manual=next((x for x in blocks if 'gpgv --keyring' in x),'')
-            if not manual or 'sha256sum --check' not in manual or 'expected="' not in manual:failures.append('Manual flow missing required verification')
-            apt=next((x for x in blocks if 'sources.list.d' in x),'')
-            if 'signed-by=' not in apt or 'apt-key' in apt:failures.append('APT trust not scoped with Signed-By')
-    status={'host':'GERAMEG','website_source':str(BASE),'web_root':str(DIST),'language':'English','buildless':True,'html_pages_checked':len(pages),'loopback_http_paths_checked':http_count,'static_failures':failures,'pending_assets':sorted(set(pending)),'infra_routes_expected':sorted(infra),'external_links':sorted(external),'no_external_runtime_dependencies':True,'copy_controls_progressive':True,'ready_branch_rendered_with_synthetic_fixture':True,'install_blocks_syntax_checked_not_executed':True,'release_state':meta.get('state'),'package_sha256_present':bool(meta.get('sha256')),'signing_fingerprint_present':bool(meta.get('signing_fingerprint')),'video_present':(DIST/'assets/framebridge-preview.mp4').is_file(),'visual_browser_QA_performed':False,'visual_browser_QA_limit':'No browser or user desktop was operated by this subtask. Root may inspect the staged site via the authorized GERAMEG surface.','production_network_or_services_changed':False,'site_ready_for_private_staging':not failures,'public_release_ready':not failures and not pending and meta.get('state')=='ready','homepage_sha256':hashlib.sha256((DIST/'index.html').read_bytes()).hexdigest()}
+            apt_blocks=[x for x in blocks if 'sources.list.d/framebridge.sources' in x]
+            if len(apt_blocks)!=3:failures.append('Expected three independent APT profile setup blocks')
+            for apt in apt_blocks:
+                if 'Signed-By:' not in apt or 'primary_count' not in apt or 'apt-key' in apt:
+                    failures.append('APT key trust must be pinned and scoped with Signed-By')
+            for suite in ['trixie','noble','mint22']:
+                if not any('Suites: '+suite in block for block in apt_blocks):
+                    failures.append('Missing APT suite '+suite)
+    status={'host':'GERAMEG','website_source':str(BASE),'web_root':str(DIST),'language':'English','buildless':True,'html_pages_checked':len(pages),'loopback_http_paths_checked':http_count,'static_failures':failures,'pending_assets':sorted(set(pending)),'infra_routes_expected':sorted(infra),'external_links':sorted(external),'no_external_runtime_dependencies':True,'copy_controls_progressive':True,'ready_branch_rendered_with_synthetic_fixture':True,'install_blocks_syntax_checked_not_executed':True,'release_state':meta.get('state'),'package_sha256_present':all(p.get('sha256') for p in meta.get('profiles',[])),'signing_fingerprint_present':bool(meta.get('signing_fingerprint')),'video_present':(DIST/'assets/framebridge-preview-0.3.1-original-r4.mp4').is_file(),'visual_browser_QA_performed':False,'visual_browser_QA_limit':'No browser or user desktop was operated by this subtask. Root may inspect the staged site via the authorized GERAMEG surface.','production_network_or_services_changed':False,'site_ready_for_private_staging':not failures,'public_release_ready':not failures and not pending and meta.get('state')=='ready','homepage_sha256':hashlib.sha256((DIST/'index.html').read_bytes()).hexdigest()}
     visual=BASE/'qa/VISUAL-REVIEW.json'
     if visual.exists():
         status['visual_browser_QA_performed']=True
         status['visual_browser_QA_limit']=json.loads(visual.read_text())['limitations']
         status['visual_browser_QA_report']=str(visual)
-    status.update(support_page='/support/',support_funding_channel_configured=bool(meta.get('support_payment_url')),support_payment_form_present='<form' in (DIST/'support/index.html').read_text(),license_identifier=meta.get('license'),dependency_source_archives=len(meta.get('dependency_sources',[])))
-    video=DIST/'assets/framebridge-preview.mp4'
+    status.update(support_page='/support/',support_funding_channel_configured='https://www.paypal.com/donate/' in (DIST/'support/index.html').read_text(),support_payment_form_present='<form' in (DIST/'support/index.html').read_text(),license_identifier=meta.get('license'),dependency_source_archives=len(meta.get('dependency_sources',[])))
+    video=DIST/'assets/framebridge-preview-0.3.1-original-r4.mp4'
     if video.exists():
         status['video_sha256']=hashlib.sha256(video.read_bytes()).hexdigest()
     guide=json.loads((DIST/'assets/command-guide.json').read_text())

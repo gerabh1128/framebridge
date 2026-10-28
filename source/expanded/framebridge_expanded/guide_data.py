@@ -4,19 +4,10 @@ from . import __version__
 
 GUIDE = {'start': {'title': 'Start with FrameBridge',
            'sections': [{'heading': 'One interface for people and agents',
-                         'body': 'FrameBridge provides tools and a shared command-line interface '
-                                 'for human operators and authorized agents. fb is the short name '
-                                 'for framebridge; both run the same program. The tools run on '
-                                 'your Linux computers. The ChatGPT model remains hosted. Read '
-                                 'this guide for the installed version before operating; confirm '
-                                 'the receiver, target and available capabilities. Use the '
-                                 'installed CLI and tools for normal work. Edit software only when '
-                                 'the owner explicitly requests development, using a separate '
-                                 'source clone and reviewable changes rather than rewriting the '
-                                 'installed program.',
+                         'body': 'FrameBridge provides network administration tools and a shared command-line interface for a home Linux network with one human administrator and authorized agents. Desktop access is an auxiliary tool. fb is the short name for framebridge; both run the same program. The tools run on your Linux computers. The ChatGPT model remains hosted. Read this guide for the installed version before operating; confirm the receiver, target and available capabilities. Use the installed CLI and tools for normal work. Edit software only when the owner explicitly requests development, using a separate source clone and reviewable changes rather than rewriting the installed program.',
                          'commands': ['fb help', 'fb status', 'fb --json status']},
                         {'heading': 'Install and connect',
-                         'body': 'Install the .deb built for your exact Debian 13, Ubuntu 24.04/26.04, Linux Mint 22.x or LMDE 7 amd64 profile. These compatibility candidates still require installation and lifecycle validation on each target. Select the artifact from the matching profile folder and keep the distribution system Python. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.',
+                         'body': 'Install the package built for your exact Debian 13, Ubuntu 24.04 or Linux Mint 22.x amd64 profile. These are the three release profiles; other distributions and architectures are outside this release. Keep the distribution system Python: 3.13 on Debian 13, 3.12 on Ubuntu 24.04 and Mint 22.x. Use the matching signed APT suite: trixie, noble or mint22. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.',
                          'commands': ["sudo apt install ./framebridge-expanded_" + __version__ + "_amd64.deb", 'fb connect']},
                         {'heading': 'Updating and removal',
                          'body': 'Install an official update through the normal package manager when that update has been published. Normal removal stops package-owned managed processes and can retain the user profile and encrypted connection material; it is not a credential-forgetting operation. On systemd 255, package removal also revokes the administrative boot-credential grant. After reinstalling, run fb connect interactively to provision that grant again; retained files alone do not restore startup. Use the explicit credentials forget action first when that is your intended outcome. Do not assume purge erases user-profile data. An explicit downgrade also revokes administrative helper grants before the older package files replace the helper. Helper-backed profiles require a new interactive connect with a compatible package before managed startup can be restored.',

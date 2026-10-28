@@ -1,6 +1,6 @@
 # FrameBridge — Debian, Ubuntu and Linux Mint installation and first use
 
-Version: 0.3.2+private.20261028.2 | Guide schema: 1
+Version: 0.3.3 | Guide schema: 1
 
 This reference is generated from the shared CLI/MCP guide. Use the matching installed version.
 
@@ -23,7 +23,7 @@ This reference is generated from the shared CLI/MCP guide. Use the matching inst
 
 ### One interface for people and agents
 
-FrameBridge provides tools and a shared command-line interface for human operators and authorized agents. fb is the short name for framebridge; both run the same program. The tools run on your Linux computers. The ChatGPT model remains hosted. Read this guide for the installed version before operating; confirm the receiver, target and available capabilities. Use the installed CLI and tools for normal work. Edit software only when the owner explicitly requests development, using a separate source clone and reviewable changes rather than rewriting the installed program.
+FrameBridge provides network administration tools and a shared command-line interface for a home Linux network with one human administrator and authorized agents. Desktop access is an auxiliary tool. fb is the short name for framebridge; both run the same program. The tools run on your Linux computers. The ChatGPT model remains hosted. Read this guide for the installed version before operating; confirm the receiver, target and available capabilities. Use the installed CLI and tools for normal work. Edit software only when the owner explicitly requests development, using a separate source clone and reviewable changes rather than rewriting the installed program.
 
 ~~~sh
 fb help
@@ -33,10 +33,10 @@ fb --json status
 
 ### Install and connect
 
-Install the .deb built for your exact Debian 13, Ubuntu 24.04/26.04, Linux Mint 22.x or LMDE 7 amd64 profile. These compatibility candidates still require installation and lifecycle validation on each target. Select the artifact from the matching profile folder and keep the distribution system Python. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.
+Install the package built for your exact Debian 13, Ubuntu 24.04 or Linux Mint 22.x amd64 profile. These are the three release profiles; other distributions and architectures are outside this release. Keep the distribution system Python: 3.13 on Debian 13, 3.12 on Ubuntu 24.04 and Mint 22.x. Use the matching signed APT suite: trixie, noble or mint22. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.
 
 ~~~sh
-sudo apt install ./framebridge-expanded_0.3.2+private.20261028.2_amd64.deb
+sudo apt install ./framebridge-expanded_0.3.3_amd64.deb
 fb connect
 ~~~
 
