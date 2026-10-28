@@ -5,7 +5,9 @@ import json
 import os
 from pathlib import Path
 import sys
+import subprocess
 from . import display_context as display
+from . import x11_text
 
 META = ("input_may_have_been_sent", "do_not_replay", "performed", "display_context")
 
@@ -17,12 +19,15 @@ def _input_primitive(argv):
                           "getwindowgeometry", "getwindowname", "getwindowpid",
                           "search", "version", "help"}
 
-def install_cua_guard(cua, *, env=None, checker=None):
+def install_cua_guard(cua, *, env=None, checker=None, text_sender=None):
     env = os.environ if env is None else env
     checker = display.check if checker is None else checker
     original_run = cua._run
     original_handle = cua.handle_cua_message
-    state = {"active": False, "input_started": False, "failed_code": ""}
+    original_context = getattr(cua, "_action_context", None)
+    text_sender = x11_text.bounded_type_text if text_sender is None else text_sender
+    state = {"active": False, "input_started": False, "failed_code": "", "action_context": None,
+             "type_keys": False}
 
     def verify():
         try:
@@ -31,11 +36,60 @@ def install_cua_guard(cua, *, env=None, checker=None):
             state["failed_code"] = str(exc)
             raise cua.CuaTransportError(str(exc), str(exc)) from None
 
+    if original_context is not None:
+        def guarded_context(message):
+            context = original_context(message)
+            if (not isinstance(message, dict) or str(message.get("action", "")).strip().upper() != "TYPE"
+                    or str(message.get("type_mode", "KEYS")).upper().strip() != "KEYS"):
+                return context
+            # Bind the original authorization/window/geometry gate, including
+            # when the caller omitted an explicit expected window identifier.
+            try:
+                bound = (int(context["before_id"]),
+                         (int(context["width"]), int(context["height"])))
+                if bound[0] <= 0 or min(bound[1]) <= 0:
+                    raise ValueError()
+                state["action_context"] = bound
+            except (KeyError, TypeError, ValueError):
+                state["failed_code"] = "TYPE_PRIMITIVE_UNSUPPORTED"
+                raise cua.CuaTransportError("TYPE_PRIMITIVE_UNSUPPORTED", "TYPE_PRIMITIVE_UNSUPPORTED") from None
+            return context
+        cua._action_context = guarded_context
+
+    def before_input():
+        verify()
+        state["input_started"] = True
+
+    def text_primitive(argv, timeout):
+        args = list(argv)
+        context = state.get("action_context")
+        if (len(args) != 7 or args[:6] != ["xdotool", "type", "--clearmodifiers", "--delay", "10", "--"]
+                or type(args[6]) is not str or context is None or not state.get("active")):
+            state["failed_code"] = "TYPE_PRIMITIVE_UNSUPPORTED"
+            raise cua.CuaTransportError("TYPE_PRIMITIVE_UNSUPPORTED", "TYPE_PRIMITIVE_UNSUPPORTED")
+        try:
+            text_sender(args[6], expected_window=context[0], expected_geometry=context[1],
+                        before_input=before_input, timeout=timeout)
+        except x11_text.TextError as error:
+            state["failed_code"] = str(error)
+            raise cua.CuaTransportError(str(error), str(error)) from None
+        except cua.CuaTransportError:
+            raise
+        except Exception:
+            state["failed_code"] = "TYPE_NATIVE_FAILURE"
+            raise cua.CuaTransportError("TYPE_NATIVE_FAILURE", "TYPE_NATIVE_FAILURE") from None
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
     def guard_run(run, track_input):
         def guarded(argv, timeout=15):
             # The captured pointer helper calls its base runner after an internal
             # query. Guard that final runner too, immediately before subprocess.
             verify()
+            args = list(argv)
+            if (track_input and len(args) >= 2 and Path(str(args[0])).name == "xdotool"
+                    and (str(args[1]).lower() == "type" or
+                         (state["type_keys"] and any(str(arg).lower() == "type" for arg in args[1:])))):
+                return text_primitive(args, timeout)
             if track_input and _input_primitive(argv):
                 state["input_started"] = True
             return run(argv, timeout=timeout)
@@ -47,7 +101,10 @@ def install_cua_guard(cua, *, env=None, checker=None):
     guarded_run = guard_run(original_run, primitive_run is None)
 
     def guarded_handle(message):
-        state.update(active=True, input_started=False, failed_code="")
+        state.update(active=True, input_started=False, failed_code="", action_context=None)
+        state["type_keys"] = (isinstance(message, dict)
+                              and str(message.get("action", "")).strip().upper() == "TYPE"
+                              and str(message.get("type_mode", "KEYS")).upper().strip() == "KEYS")
         verify()
         result = original_handle(message)
         verify()

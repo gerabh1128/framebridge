@@ -63,7 +63,7 @@ class NativeDispatchTests(unittest.TestCase):
 
     def test_postflight_failure_after_input_retains_uncertain_outcome(self):
         calls = []
-        cua = self.fake(calls, lambda engine: engine._run(["xdotool", "type", "x"]))
+        cua = self.fake(calls, lambda engine: engine._run(["xdotool", "key", "x"]))
         state = nh.install_cua_guard(cua, env={}, checker=self.checker(3))
         with self.assertRaises(CuaError):
             cua.handle_cua_message({})
