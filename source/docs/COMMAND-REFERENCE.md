@@ -1,6 +1,6 @@
 # FrameBridge — command guide
 
-Version: 0.3.2+private.20261028.1 | Guide schema: 1
+Version: 0.3.2+private.20261028.2 | Guide schema: 1
 
 This reference is generated from the shared CLI/MCP guide. Use the matching installed version.
 
@@ -36,7 +36,7 @@ fb --json status
 Install the .deb built for your exact Debian 13, Ubuntu 24.04/26.04, Linux Mint 22.x or LMDE 7 amd64 profile. These compatibility candidates still require installation and lifecycle validation on each target. Select the artifact from the matching profile folder and keep the distribution system Python. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.
 
 ~~~sh
-sudo apt install ./framebridge-expanded_0.3.2+private.20261028.1_amd64.deb
+sudo apt install ./framebridge-expanded_0.3.2+private.20261028.2_amd64.deb
 fb connect
 ~~~
 
@@ -309,6 +309,10 @@ The installer and control console stay text interfaces in both TTY and a desktop
 fb status
 fb doctor
 ~~~
+
+### Guarded X11 text compatibility
+
+Graphical TYPE in KEYS mode uses the guarded native X11 backend on x86-64 LP64 systems with libxdo 3.20160805.1. This private candidate accepts active keyboard group 0 only, with no held or latched modifiers and only conventional Caps Lock and Num Lock locked bits. The whole string and generated key actions are checked before any input. Unsupported groups, characters, actions or keyboard states fail closed. The backend does not change the keyboard group or map and does not use the clipboard. Display session, fixed target window, geometry and keyboard context are checked while sending. If input may have started and an error follows, inspect the target and do not automatically replay the text.
 
 ### Frame-buffer read access
 
