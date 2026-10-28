@@ -29,6 +29,7 @@ def arguments():
     p.add_argument('--node', default=os.environ.get('FRAMEBRIDGE_NODE', socket.gethostname()))
     p.add_argument('--socket')
     p.add_argument('--session')
+    p.add_argument('--jobs-root', type=Path)
     p.add_argument('--apply', action='store_true', help='Set up without attaching a client')
     p.add_argument('--probe', action='store_true', help='Read current pane metadata only')
     p.add_argument('--reflow', action='store_true', help='Resize existing panes without taking focus')
@@ -68,10 +69,14 @@ class Console:
             if len(matches)!=1:
                 raise RuntimeError('Console session identity is ambiguous')
             self.session_target=matches[0]
-            windows=self.tmux('list-windows','-t',self.session_target,'-F','#{window_id}').splitlines()
-            if len(windows)!=1:
-                raise RuntimeError('Use a dedicated console session containing exactly one window')
-            self.window=windows[0]
+            windows=[line.split('|',1) for line in self.tmux(
+                'list-windows','-t',self.session_target,'-F','#{window_id}|#{window_name}').splitlines()]
+            if not windows or any(len(row)!=2 or not re.fullmatch(r'@[0-9]+',row[0]) for row in windows):
+                raise RuntimeError('Console window identity is invalid')
+            selected=windows if len(windows)==1 else [row for row in windows if row[1]=='Console']
+            if len(selected)!=1:
+                raise RuntimeError('The dedicated Console window is absent or ambiguous')
+            self.window=selected[0][0]
             return True
         return False
 
@@ -87,7 +92,10 @@ class Console:
         return rows
 
     def monitor_command(self):
-        return shlex.join(['/usr/bin/python3', str(HERE / 'framebridge_console.py'), '--monitor', '--node', self.a.node])
+        command=['/usr/bin/python3', str(HERE / 'framebridge_console.py'), '--monitor', '--node', self.a.node]
+        if getattr(self.a,'jobs_root',None) is not None:
+            command.extend(['--jobs-root',str(self.a.jobs_root)])
+        return shlex.join(command)
 
     def locate(self, rows):
         shell = next((p for p in rows if p['role']=='shell'), None)
@@ -164,7 +172,7 @@ class Console:
                 cmd=Path('/proc',str(monitor['pid']),'cmdline').read_bytes()
             except OSError:
                 cmd=b''
-            if self.a.refresh_monitor or monitor['dead'] or b'framebridge_console.py' not in cmd:
+            if self.a.refresh_monitor or monitor['dead'] or str(HERE/'framebridge_console.py').encode() not in cmd:
                 self.tmux('respawn-pane','-k','-t',monitor['id'],self.monitor_command())
         for role,pane in [('shell',shell),('monitor',monitor)]:
             self.tmux('set-option','-p','-t',pane['id'],'@framebridge_role',role)
@@ -190,9 +198,12 @@ class Console:
         # Reattachment must preserve the user's zoom and pane focus.
         if not previous_zoom:
             self.layout(shell,monitor)
-        command=shlex.join(['/usr/bin/python3',str(HERE/'framebridge_console.py'),'--node',self.a.node,
-                            '--socket',self.a.socket,'--session',self.a.session,
-                            '--layout',getattr(self.a,'layout','auto'),'--reflow'])
+        reflow=['/usr/bin/python3',str(HERE/'framebridge_console.py'),'--node',self.a.node,
+                '--socket',self.a.socket,'--session',self.a.session,
+                '--layout',getattr(self.a,'layout','auto'),'--reflow']
+        if getattr(self.a,'jobs_root',None) is not None:
+            reflow.extend(['--jobs-root',str(self.a.jobs_root)])
+        command=shlex.join(reflow)
         self.tmux('set-hook','-t',self.session_target,'client-resized[90]','run-shell -b '+shlex.quote(command))
         self.tmux('set-hook','-t',self.session_target,'client-attached[90]','run-shell -b '+shlex.quote(command))
         self.tmux('select-window','-t',self.window)
@@ -205,10 +216,13 @@ class Console:
             raise RuntimeError('Bash identity changed unexpectedly')
 
 
-def supervise(node):
+def supervise(node, jobs_root=None):
+    command=['/usr/bin/python3','-u',str(HERE/'fbterm_dashboard.py'),'--node',node]
+    if jobs_root is not None:
+        command.extend(['--root',str(jobs_root)])
     while True:
         try:
-            result=subprocess.run(['/usr/bin/python3','-u',str(HERE/'fbterm_dashboard.py'),'--node',node])
+            result=subprocess.run(command)
             print('\r\nFBTERM monitor stopped (exit '+str(result.returncode)+'). Restarting in 2 seconds.',flush=True)
             print('Ctrl+B o switches to the shell.',flush=True)
             time.sleep(2)
@@ -220,7 +234,7 @@ def supervise(node):
 def main():
     args=arguments()
     if args.monitor:
-        supervise(args.node)
+        supervise(args.node, args.jobs_root)
         return 0
     console=Console(args)
     if args.probe:

@@ -49,8 +49,10 @@ def context(state, node="LOCAL", *, create=False):
     label = _node(state, node)
     key = hashlib.sha256(str(state).encode()).hexdigest()[:20]
     runtime = _private_runtime(Path("/run/user") / str(os.getuid()))
-    root = runtime / "framebridge-expanded-console"
-    profile = root / key
+    from .console_desktop import legacy_context
+    legacy = legacy_context(state, label, runtime)
+    root = legacy["socket"].parent if legacy else runtime / "framebridge-expanded-console"
+    profile = root if legacy else root / key
     if create:
         private_dir(state)
         for path in (root, profile):
@@ -63,7 +65,7 @@ def context(state, node="LOCAL", *, create=False):
     return {
         "state": state, "node": label, "runtime": runtime,
         "socket": profile / "console.sock",
-        "session": "FB-" + label + "-" + key[:10],
+        "session": legacy["session"] if legacy else "FB-" + label + "-" + key[:10],
         "jobs_root": state / "home/.local/share/framebridge/fbterm",
     }
 
@@ -75,10 +77,20 @@ def _active_graphical_display(env=None):
     env = os.environ if env is None else env
     display = env.get("DISPLAY", "")
     sid = env.get("XDG_SESSION_ID", "")
-    if (re.fullmatch(r":[0-9]+(?:\.[0-9]+)?", display) is None
-            or re.fullmatch(r"[A-Za-z0-9_-]{1,80}", sid) is None):
+    if re.fullmatch(r":[0-9]+(?:\.[0-9]+)?", display) is None:
         return False
     try:
+        # Desktop launchers started through the user bus may omit XDG_SESSION_ID.
+        # Ask logind for this user's display session and validate every field below.
+        if not sid:
+            session = subprocess.run([
+                "loginctl", "show-user", str(os.getuid()), "--property=Display", "--value",
+            ], capture_output=True, text=True, timeout=5)
+            if session.returncode:
+                return False
+            sid = session.stdout.strip()
+        if re.fullmatch(r"[A-Za-z0-9_-]{1,80}", sid) is None:
+            return False
         result = subprocess.run([
             "loginctl", "show-session", sid, "--no-pager",
             "-p", "User", "-p", "Type", "-p", "Active", "-p", "Remote",
@@ -142,7 +154,7 @@ def status(state, node="LOCAL"):
     try:
         result = subprocess.run([
             "/usr/bin/tmux", "-S", str(sock), "list-panes",
-            "-t", "=" + ctx["session"],
+            "-t", "=" + ctx["session"] + ":Console",
             "-F", "#{pane_id}|#{pane_pid}|#{pane_current_command}|#{pane_width}|#{pane_height}|#{@framebridge_role}",
         ], capture_output=True, text=True, timeout=5)
     except (OSError, subprocess.SubprocessError):
@@ -230,7 +242,8 @@ def run(state, node="LOCAL", *, inside=False, mode="auto"):
     try:
         result = subprocess.run([
             sys.executable, str(ui), "--node", ctx["node"],
-            "--socket", str(ctx["socket"]), "--session", ctx["session"] ,
+            "--socket", str(ctx["socket"]), "--session", ctx["session"],
+            "--jobs-root", str(ctx["jobs_root"]),
             "--layout", "horizontal" if inside else "vertical", "--apply",
         ], env=env, capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.SubprocessError):

@@ -33,6 +33,26 @@ class ConsoleTests(unittest.TestCase):
              mock.patch.object(Path, "read_text", return_value="tty7\n"):
             self.assertTrue(console._active_graphical_display({"DISPLAY": ":0", "XDG_SESSION_ID": "19"}))
 
+    def test_desktop_launcher_without_session_environment_uses_verified_own_display(self):
+        with mock.patch.object(console.subprocess, "run", side_effect=[
+                SimpleNamespace(returncode=0, stdout="19\n"), self.desktop()]) as run, \
+             mock.patch.object(Path, "read_text", return_value="tty7\n"):
+            self.assertTrue(console._active_graphical_display({"DISPLAY": ":0"}))
+        self.assertEqual(run.call_args_list[0].args[0], [
+            "loginctl", "show-user", str(os.getuid()), "--property=Display", "--value"])
+        self.assertIn("19", run.call_args_list[1].args[0])
+
+    def test_missing_primary_session_does_not_guess_a_display_session(self):
+        with mock.patch.object(console.subprocess, "run", return_value=
+                SimpleNamespace(returncode=0, stdout="\n")) as run:
+            self.assertFalse(console._active_graphical_display({"DISPLAY": ":0"}))
+        run.assert_called_once()
+
+    def test_invalid_supplied_session_is_not_replaced(self):
+        with mock.patch.object(console.subprocess, "run") as run:
+            self.assertFalse(console._active_graphical_display({"DISPLAY": ":0", "XDG_SESSION_ID": "../bad"}))
+        run.assert_not_called()
+
     def test_private_virtual_display_is_not_chosen_as_user_desktop(self):
         with mock.patch.object(console.subprocess, "run", return_value=self.desktop()), \
              mock.patch.object(Path, "read_text", return_value="tty7\n"):

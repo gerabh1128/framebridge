@@ -592,6 +592,8 @@ def build_parser():
     con_sub = console.add_subparsers(dest="console_command")
     login = con_sub.add_parser("login", help="Optional work-view opening after authenticated tty1 login; not service startup.")
     login.add_argument("console_login_action", choices=("enable", "status", "disable"))
+    desktop = con_sub.add_parser("desktop", help="Migrate a recognized legacy desktop console into this package.")
+    desktop.add_argument("console_desktop_action", choices=("migrate-legacy",))
     tty = sub.add_parser("tty", help="Manage persistent Bash sessions; persistence is between calls, not reboots.")
     ts = tty.add_subparsers(dest="tty_command", required=True, metavar="ACTION")
     tty_service = ts.add_parser("service", help="Manage the terminal daemon.")
@@ -764,6 +766,12 @@ def _dispatch(parser, args):
                 return _interaction_required("fb nodes run")
             return nodes_command(args, state)
         if args.command == "console":
+            if getattr(args, "console_desktop_action", None):
+                if args.node != "LOCAL" or args.status or args.login_action:
+                    raise ValueError("Desktop console migration must target the local profile alone.")
+                result = _module("console_desktop").migrate_legacy(state)
+                _show(result)
+                return _result_code(result)
             action = getattr(args, "console_login_action", None) or args.login_action
             if getattr(args, "console_login_action", None) and args.login_action:
                 raise ValueError("Choose one console login command form.")
