@@ -78,6 +78,38 @@ def _new_entry(state):
             "StartupWMClass=Gnome-terminal\n").encode()
 
 
+def _new_wrapper(state):
+    command = ["/usr/bin/fb", "--state-dir", str(state), "console"]
+    return ("#!/usr/bin/python3\n"
+            '"""Open the packaged FrameBridge console using the retained local profile."""\n'
+            "import os\nimport sys\n"
+            "command = " + repr(command) + "\n"
+            "if sys.argv[1:] == ['--inside']:\n"
+            "    command += ['--inside', '--mode', 'gui']\n"
+            "elif sys.argv[1:]:\n"
+            "    raise SystemExit('Usage: framebridge-console')\n"
+            "os.execv(command[0], command)\n").encode()
+
+
+def _migrate_wrapper(state, home):
+    path = home / ".local/bin/framebridge-console"
+    before, mode = _snapshot(path)
+    after = _new_wrapper(state)
+    if before == after:
+        return False
+    _need(hashlib.sha256(before).hexdigest() == LEGACY_WRAPPER_SHA256,
+          "CONSOLE_DESKTOP_LEGACY_WRAPPER_CHANGED")
+    backup = state / "console-wrapper-legacy.backup"
+    if backup.exists() or backup.is_symlink():
+        data, backup_mode = _snapshot(backup)
+        _need(data == before and backup_mode == 0o600, "CONSOLE_DESKTOP_WRAPPER_BACKUP_CHANGED")
+    else:
+        _atomic(backup, before)
+    _need(_snapshot(path)[0] == before, "CONSOLE_DESKTOP_WRAPPER_CHANGED_DURING_MIGRATION")
+    _atomic(path, after, mode)
+    return True
+
+
 def _legacy_identity(node, runtime):
     return {"socket": runtime / (node.lower() + "-tty1") / "console.sock",
             "session": node.upper() + "-FBTERM"}
@@ -123,7 +155,9 @@ def migrate_legacy(state, *, home=None, node=None, runtime=None):
     after = _new_entry(state)
     if before == after:
         _need(legacy_context(state, node, runtime) is not None, "CONSOLE_DESKTOP_RECORD_MISSING")
-        return {"ok": True, "changed": False, "reason": "ALREADY_MIGRATED"}
+        wrapper_changed = _migrate_wrapper(state, home)
+        return {"ok": True, "changed": wrapper_changed, "reason": "ALREADY_MIGRATED",
+                "wrapper_changed": wrapper_changed}
     if before != _legacy_entry(home):
         return {"ok": True, "changed": False, "reason": "CUSTOM_DESKTOP_ENTRY_PRESERVED"}
     wrapper, _ = _snapshot(home / ".local/bin/framebridge-console")
@@ -166,6 +200,8 @@ def migrate_legacy(state, *, home=None, node=None, runtime=None):
     _atomic(state / RECORD, (json.dumps(record, sort_keys=True, indent=2) + "\n").encode())
     _need(_snapshot(desktop)[0] == before, "CONSOLE_DESKTOP_CHANGED_DURING_MIGRATION")
     _atomic(desktop, after, mode)
+    wrapper_changed = _migrate_wrapper(state, home)
     return {"ok": True, "changed": True, "desktop": str(desktop),
+            "wrapper_changed": wrapper_changed,
             "session": identity["session"], "socket": str(identity["socket"]),
             "backup": str(backup), "runtime_changed": False}

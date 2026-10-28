@@ -56,6 +56,9 @@ class DesktopMigrationTests(unittest.TestCase):
         self.assertFalse(value["runtime_changed"])
         self.assertEqual((self.state / "console-desktop-legacy.backup").read_bytes(), before)
         self.assertEqual(self.desktop.read_bytes(), console_desktop._new_entry(self.state))
+        self.assertEqual(self.wrapper.read_bytes(), console_desktop._new_wrapper(self.state))
+        self.assertEqual((self.state / "console-wrapper-legacy.backup").read_bytes(), b"#!/usr/bin/python3\npass\n")
+        self.assertTrue(value["wrapper_changed"])
         context = console_desktop.legacy_context(self.state, "TestHost", self.runtime)
         self.assertEqual(context["session"], "TESTHOST-FBTERM")
         self.assertEqual(context["socket"], self.runtime / "testhost-tty1/console.sock")
@@ -121,6 +124,18 @@ class ConsoleWindowSelectionTests(unittest.TestCase):
              mock.patch.object(console, "tmux", side_effect=tmux):
             value = console.exists()
         return console, value
+
+    def test_migrated_wrapper_targets_the_packaged_profile_without_a_shell(self):
+        state = Path("/home/user/profile")
+        with mock.patch("sys.argv", ["framebridge-console"]), mock.patch("os.execv") as execute:
+            exec(compile(console_desktop._new_wrapper(state), "wrapper", "exec"), {})
+        execute.assert_called_once_with("/usr/bin/fb", ["/usr/bin/fb", "--state-dir", str(state), "console"])
+
+    def test_migrated_inside_wrapper_does_not_create_another_viewer(self):
+        state = Path("/home/user/profile")
+        with mock.patch("sys.argv", ["framebridge-console", "--inside"]), mock.patch("os.execv") as execute:
+            exec(compile(console_desktop._new_wrapper(state), "wrapper", "exec"), {})
+        self.assertEqual(execute.call_args.args[1][-3:], ["--inside", "--mode", "gui"])
 
     def test_monitor_receives_profile_jobs_root_as_an_explicit_argument(self):
         args = SimpleNamespace(socket="/owned/socket", session="NODE-FBTERM", node="NODE",
