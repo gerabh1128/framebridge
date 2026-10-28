@@ -18,6 +18,9 @@ from build_profiles import CANDIDATE_VERSION, PROFILES, SOURCE_VENDOR, VENDOR_RE
 BASE = Path(__file__).resolve().parents[1]
 ROOT = BASE.parent
 VERSION = CANDIDATE_VERSION
+# Oldest package retaining the privileged helper lifecycle. Candidate/release
+# version bumps must not move this downgrade revocation boundary.
+PRIVILEGED_HELPER_FLOOR = "0.3.2"
 PUBLIC_FILENAME = "FrameBridge-0.3.1.deb"
 GPL_SHA256 = "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
 EPOCH = calendar.timegm((2026, 10, 27, 0, 0, 0))
@@ -140,7 +143,8 @@ def install_legal_material(docs):
 def maintainer_prerm(version):
     """Revoke helper grants before a downgrade removes the helper's code.
 
-    Equal-version reinstalls and forward upgrades retain managed credentials.
+    The argument is the fixed helper compatibility floor, not the package version.
+    Targets retaining the helper lifecycle preserve managed credentials.
     The fixed installed cleanup module validates the helper's root ownership,
     permissions and ancestors before running its bounded purge-all command.
     """
@@ -298,7 +302,7 @@ def main(argv=None):
         " Optional virtual displays are explicitly identified as virtual.\n"
         " No phone or Owner Device pairing. Services start after connection setup.\n"
         " Installing the package alone does not activate a connection.\n")
-    (control / "prerm").write_text(maintainer_prerm(VERSION))
+    (control / "prerm").write_text(maintainer_prerm(PRIVILEGED_HELPER_FLOOR))
     (control / "prerm").chmod(0o755)
     rows = []
     for path in sorted(STAGE.rglob("*")):

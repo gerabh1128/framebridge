@@ -28,6 +28,8 @@ class BrokerError(ValueError):
     """A fixed public failure code; never include HTTP bodies or credentials."""
 
 
+_SETTINGS_LOCK = threading.RLock()
+
 _state = None
 _url = None
 _control_path = None
@@ -80,18 +82,22 @@ def validate_endpoint(url):
 
 def configure(broker_url=None, state_dir=None, control_key_path=None):
     global _state, _url, _control_path
-    _state = state_path(state_dir)
-    config = _config(_state)
-    port = config.get("ports", {}).get("broker", 20878)
-    _url = validate_endpoint(broker_url or config.get("broker_control_url") or config.get("broker_url")
-                             or f"http://127.0.0.1:{port}")
-    _control_path = Path(control_key_path or _state / "broker" / "control.key")
+    # Workers must see one fully validated profile, including explicit changes.
+    with _SETTINGS_LOCK:
+        state = state_path(state_dir)
+        config = _config(state)
+        port = config.get("ports", {}).get("broker", 20878)
+        url = validate_endpoint(broker_url or config.get("broker_control_url") or config.get("broker_url")
+                                or f"http://127.0.0.1:{port}")
+        control_path = Path(control_key_path or state / "broker" / "control.key")
+        _state, _url, _control_path = state, url, control_path
 
 
 def _settings():
-    if _state is None:
-        configure()
-    return _state, _url, _control_path
+    with _SETTINGS_LOCK:
+        if _state is None:
+            configure()
+        return _state, _url, _control_path
 
 
 def _private_read(path):

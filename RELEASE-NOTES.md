@@ -1,5 +1,19 @@
 # FrameBridge release notes
 
+## Unreleased — private production pilot fixes
+
+Private pilot validation remains in progress; these changes are not a public release.
+
+- Recover from classified transient broker failures with capped backoff and fresh signed nonces. Result acknowledgement retries retain the computed result and never reexecute a command. TLS, authentication and malformed-response failures remain terminal.
+- Dispatch blocking MCP operations in bounded workers, preserve synchronous internal callbacks, and protect shared initialization. Concurrent generated local job IDs are distinct.
+- Negotiate larger original-PNG chunks per capture while retaining legacy receivers. Apply a cooperative transfer budget and require fresh observation after uncertain input replies; performed claims require explicit matching backend confirmation.
+- Bind local real-terminal capture transport to the current node identity.
+- Keep privileged-helper downgrade revocation tied to the fixed 0.3.2 compatibility floor, allowing private candidates to return to 0.3.2 without revoking grants.
+
+Validation: 721 integrated source tests passed with zero failures, errors or skips. Frozen 0.3.2 source and signed Debian artifact remained unchanged. Focused tests cover real vendored MCP dispatch, retry/no-replay behavior, frozen screen-receiver compatibility and isolated maintainer-script semantics.
+
+Known limits: the cooperative capture budget can be exceeded by an already-running lower transport call. A broker restart can reject an unknown in-flight result; a lost poll reply can orphan a request. These cases do not reconstruct or replay commands. Live fleet acceptance remains separate from source-test success.
+
 ## 0.3.1 — Community Release
 
 Installer: FrameBridge-0.3.1.deb  

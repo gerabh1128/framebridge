@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import base64
+from functools import partial, wraps
+import inspect
 import hashlib
 import json
 import os
@@ -8,6 +10,9 @@ import socket
 import time
 import urllib.error
 import urllib.request
+import uuid
+
+import anyio
 from pathlib import Path
 
 from mcp import ClientSession
@@ -53,6 +58,45 @@ mcp = FastMCP(
 # The bundled FastMCP constructor does not expose a version argument. Its
 # bundled low-level server does; publish the product build, not the SDK version.
 mcp._mcp_server.version = PRODUCT_VERSION
+
+
+
+class _BlockingToolRegistrar:
+    """Offload only MCP dispatch while keeping synchronous callback bindings.
+
+    Use the public SDK decorator; do not change its dispatcher or the functions
+    passed to ScreenClient/TTY as synchronous EXEC callbacks. AnyIO bounds worker
+    concurrency. Waiting cancellation does not replay or undo an operation: a
+    running worker is allowed to finish, including any side effects.
+    """
+
+    def __init__(self, server):
+        self.server = server
+
+    def resource(self, *args, **kwargs):
+        return self.server.resource(*args, **kwargs)
+
+    def tool(self, *args, **kwargs):
+        register = self.server.tool(*args, **kwargs)
+
+        def decorate(function):
+            @wraps(function)
+            async def dispatch(*arguments, **keywords):
+                return await anyio.to_thread.run_sync(
+                    partial(function, *arguments, **keywords),
+                    abandon_on_cancel=False,
+                )
+
+            # Resolve future annotations in the defining module, including the
+            # screen presentation's Annotated return type, before registering.
+            dispatch.__signature__ = inspect.signature(function, eval_str=True)
+            register(dispatch)
+            return function
+
+        return decorate
+
+
+_blocking_tools = _BlockingToolRegistrar(mcp)
 
 
 def _registered_operations() -> list[str]:
@@ -395,7 +439,7 @@ def _framebridge_exec_geranas_impl(
     if not 1<=timeout_s<=600:
         return {"ok":False,"error":"INVALID_TIMEOUT"}
     if not job_id:
-        job_id="mcp-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
+        job_id="mcp-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]+"-"+uuid.uuid4().hex[:12]
     if not JOB_RE.fullmatch(job_id):
         return {"ok":False,"error":"INVALID_JOB_ID"}
     req={
@@ -468,7 +512,7 @@ def framebridge_cloud_dsm(action: str, authorized: bool = False, params_json: st
     return _cloud_dsm_rpc({"action":action,"authorized":bool(authorized),"params":params})
 
 
-@mcp.tool()
+@_blocking_tools.tool()
 def framebridge_exec(
     script: str,
     authorized: bool,
@@ -641,7 +685,7 @@ def asus_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -
     return {"ok":False,"error":"ASUS_CUA_TIMEOUT","request_id":rid}
 
 
-@mcp.tool()
+@_blocking_tools.tool()
 def framebridge_cua(
     action: str,
     authorized: bool,
@@ -830,12 +874,15 @@ def _screen_exec_request(
 
 
 from framebridge_expanded.real_screen.screen_frontdoor import register_framebridge_screen_tools, resolve_profile_node
-_real_screen_client = register_framebridge_screen_tools(mcp, _screen_exec_request, image_factory=Image, resolve_node=resolve_profile_node)
+_real_screen_client = register_framebridge_screen_tools(
+    _blocking_tools, _screen_exec_request, image_factory=Image,
+    resolve_node=resolve_profile_node, stdout_limit_bytes=65536, transfer_timeout_s=45,
+)
 from framebridge_expanded.real_screen.screen_presentation import register_screen_presentation
-register_screen_presentation(mcp, _real_screen_client)
+register_screen_presentation(_blocking_tools, _real_screen_client)
 
 from framebridge_expanded.tty_mcp import register_tools as register_tty_tools
-register_tty_tools(mcp, framebridge_exec)
+register_tty_tools(_blocking_tools, framebridge_exec, screen_client=_real_screen_client)
 
 if __name__ == "__main__":
     from framebridge_expanded.http_server import run_streamable_mcp

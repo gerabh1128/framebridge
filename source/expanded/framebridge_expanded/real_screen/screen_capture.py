@@ -32,7 +32,7 @@ import zlib
 MAX_PIXELS = 4096 * 2160
 MAX_FRAMEBUFFER_BYTES = 128 * 1024 * 1024
 MAX_IMAGE_BYTES = 32 * 1024 * 1024
-MAX_CHUNK_BYTES = 2400
+MAX_CHUNK_BYTES = 45000
 CAPTURE_ID = re.compile(r"[0-9a-f]{32}\Z")
 SESSION_ID = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
 DISPLAY_ID = re.compile(r":[0-9]{1,5}(?:\.[0-9]{1,3})?\Z")

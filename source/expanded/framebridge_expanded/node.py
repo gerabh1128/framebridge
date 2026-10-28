@@ -1,16 +1,25 @@
 """Original FBPAIR identity and outbound protocol for an explicitly enrolled node."""
 from __future__ import annotations
 
+import errno
 import hashlib
+import http.client
 import importlib
 import json
+import logging
 import os
 import socket
+import ssl
 import time
 import uuid
+import urllib.error
 from pathlib import Path
 
 from . import broker
+
+
+_LOG = logging.getLogger(__name__)
+_RETRY_MAX_SECONDS = 30
 
 
 class NodeError(ValueError):
@@ -177,6 +186,54 @@ def dispatch_request(request, adapter_request=None, state_dir=None):
         return {"ok": False, "error": "NODE_DISPATCH_FAILED"}
 
 
+def _retryable_broker_failure(exc):
+    # post_json intentionally hides transport details from its public error. Its
+    # exception context still distinguishes interruptions from TLS/JSON failures;
+    # never log that context or treat an unknown failure as transient.
+    code = str(exc)
+    if code in {"BROKER_HTTP_REJECTED_502", "BROKER_HTTP_REJECTED_503", "BROKER_HTTP_REJECTED_504"}:
+        return True
+    if code != "BROKER_TRANSPORT_FAILED":
+        return False
+    cause = exc.__context__
+    if isinstance(cause, urllib.error.URLError):
+        cause = cause.reason
+    if isinstance(cause, ssl.SSLError):
+        return False
+    if isinstance(cause, socket.gaierror):
+        return cause.errno == socket.EAI_AGAIN
+    if isinstance(cause, (ConnectionError, TimeoutError, http.client.IncompleteRead)):
+        return True
+    return isinstance(cause, OSError) and cause.errno in {
+        errno.ECONNREFUSED, errno.ECONNRESET, errno.ECONNABORTED, errno.ETIMEDOUT,
+        errno.EPIPE, errno.ENETUNREACH, errno.EHOSTUNREACH, errno.ENETDOWN,
+    }
+
+
+def _post_with_recovery(url, operation, payload, *, ctx, state, outbound, recover):
+    delay = 1
+    retries = 0
+    while True:
+        # A new signature/nonce is mandatory: the previous attempt may have been
+        # verified even when its response was lost. Do not replay its envelope.
+        envelope = outbound._signed_envelope(ctx, operation, payload)
+        try:
+            result = broker.post_json(url, envelope, state_dir=state)
+        except broker.BrokerError as exc:
+            if not recover or not _retryable_broker_failure(exc):
+                raise
+            retries += 1
+            _LOG.warning("NODE_BROKER_RETRY operation=%s error=%s delay_seconds=%d",
+                         operation, str(exc), delay)
+            # Signals and cancellation exceptions are deliberately not caught.
+            time.sleep(delay)
+            delay = min(delay * 2, _RETRY_MAX_SECONDS)
+        else:
+            if retries:
+                _LOG.warning("NODE_BROKER_RECOVERED operation=%s retries=%d", operation, retries)
+            return result
+
+
 def run(state_dir=None, once=False):
     state, config, ctx, identity = _context(state_dir)
     url = broker.validate_endpoint(config.get("broker_url", ""))
@@ -187,16 +244,20 @@ def run(state_dir=None, once=False):
         raise NodeError("PAIRING_BINDING_MISMATCH")
     outbound = _original("outbound_agent")
     while True:
-        poll = broker.post_json(url + "/fbpair/v1/node/poll",
-                                outbound._signed_envelope(ctx, "node.poll", {}), state_dir=state)
+        poll = _post_with_recovery(url + "/fbpair/v1/node/poll", "node.poll", {},
+                                   ctx=ctx, state=state, outbound=outbound, recover=not once)
         if poll.get("ok") is not True:
             raise NodeError("NODE_POLL_REJECTED")
         req = poll.get("request")
         result = {"ok": True, "idle": True}
         if isinstance(req, dict):
             value = dispatch_request(req, state_dir=state)
-            posted = broker.post_json(url + "/fbpair/v1/node/result", outbound._signed_envelope(
-                ctx, "node.result", {"request_id": req.get("request_id"), "result": value}), state_dir=state)
+            # Original put_result only records this request's result; repeating
+            # that acknowledgement cannot execute the command. Keep the value
+            # here and never return to dispatch/poll while its delivery is pending.
+            posted = _post_with_recovery(url + "/fbpair/v1/node/result", "node.result",
+                                         {"request_id": req.get("request_id"), "result": value},
+                                         ctx=ctx, state=state, outbound=outbound, recover=not once)
             if posted.get("ok") is not True:
                 raise NodeError("NODE_RESULT_REJECTED")
             result = {"ok": True, "idle": False, "request_id": req.get("request_id")}

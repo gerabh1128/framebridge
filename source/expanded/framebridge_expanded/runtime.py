@@ -16,6 +16,7 @@ import socket
 import stat
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -24,16 +25,20 @@ from .config import load_config, state_path, private_dir
 PREFIX = Path(os.environ.get("FRAMEBRIDGE_EXPANDED_PREFIX", Path(__file__).resolve().parents[2]))
 _STOP = False
 _LEGACY = None
+_LEGACY_LOCK = threading.RLock()
 
 def _legacy():
     global _LEGACY
-    if _LEGACY is None:
-        path = PREFIX / "bin/framebridge-original"
-        loader = importlib.machinery.SourceFileLoader("framebridge_original_launcher", str(path))
-        spec = importlib.util.spec_from_loader(loader.name, loader)
-        _LEGACY = importlib.util.module_from_spec(spec)
-        loader.exec_module(_LEGACY)
-    return _LEGACY
+    # Publish only a fully initialized module; a failed load remains retryable.
+    with _LEGACY_LOCK:
+        if _LEGACY is None:
+            path = PREFIX / "bin/framebridge-original"
+            loader = importlib.machinery.SourceFileLoader("framebridge_original_launcher", str(path))
+            spec = importlib.util.spec_from_loader(loader.name, loader)
+            module = importlib.util.module_from_spec(spec)
+            loader.exec_module(module)
+            _LEGACY = module
+        return _LEGACY
 
 def _args(state, config):
     return SimpleNamespace(state_dir=str(state), port=config["ports"]["mcp"],

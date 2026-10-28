@@ -3,6 +3,10 @@
 The bounded executor is a fixture. This is not VM, GUI, TTY or input acceptance.
 """
 import ast
+import base64
+import json
+import math
+import shlex
 from pathlib import Path
 import unittest
 
@@ -13,9 +17,26 @@ from test_screen_frontdoor import Executor, Image, MCP, NODE_ID
 PORTABLE = Path(__file__).resolve().parents[1] / "portable/front_door_mcp.py"
 
 
+class TypedChunkExecutor(Executor):
+    """Model the explicitly negotiated typed route without changing legacy fixtures."""
+    def __call__(self, **kwargs):
+        outer = super().__call__(**kwargs)
+        request = json.loads(base64.b64decode(shlex.split(kwargs["script"])[-1]))
+        if request["op"] == "read_chunk" and request.get("chunk_bytes"):
+            size, index = request["chunk_bytes"], request["index"]
+            envelope = json.loads(outer["stdout"])
+            envelope["result"].update(
+                total_chunks=math.ceil(len(self.data) / size),
+                data=base64.b64encode(self.data[index * size:(index + 1) * size]).decode(),
+                more=(index + 1) * size < len(self.data),
+            )
+            outer["stdout"] = json.dumps(envelope)
+        return outer
+
+
 class PortableScreenRegistrationTests(unittest.TestCase):
     def registration(self, target="LOCAL", corrupt=None):
-        fixture = Executor(hostname="fb-central-lab" if target == "LOCAL" else "fb-node-lab")
+        fixture = TypedChunkExecutor(hostname="fb-central-lab" if target == "LOCAL" else "fb-node-lab")
         calls, legacy_calls = [], []
 
         def expanded(alias, script, authorized, timeout_s=120, job_id="", sha256="", include_stdout=False):
@@ -51,6 +72,7 @@ class PortableScreenRegistrationTests(unittest.TestCase):
                      framebridge_exec=legacy,
                      register_framebridge_screen_tools=register_framebridge_screen_tools,
                      resolve_profile_node=lambda node: node)
+        scope["_blocking_tools"] = scope["mcp"]  # This fixture calls registrations synchronously.
         # Load the definition and registration from production source rather
         # than recreating the adapter inside this test.
         module = ast.Module(body=definitions + registrations, type_ignores=[])

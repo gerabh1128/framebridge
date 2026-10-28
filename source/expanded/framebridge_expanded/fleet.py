@@ -8,9 +8,12 @@ from pathlib import Path
 import re
 import socket
 import sys
+import threading
 import time
 import uuid
 from typing import Any
+
+_BOOTSTRAP_LOCK = threading.RLock()
 
 JOB_RE = re.compile(r"^[A-Za-z0-9._-]{1,80}$")
 READ_CAPABILITIES = frozenset({
@@ -56,18 +59,20 @@ def original_paths() -> tuple[Path, Path]:
 
 def bootstrap_original() -> None:
     """Extend the original package search path without copying or merging it."""
-    broker_source, fleet_source = original_paths()
-    for path in (fleet_source, broker_source):
-        if str(path) in sys.path:
-            sys.path.remove(str(path))
-        sys.path.insert(0, str(path))
-    import framebridge_linux_chatgpt
-    package_file = Path(framebridge_linux_chatgpt.__file__).resolve()
-    _require(package_file.is_relative_to(broker_source.resolve()), "ORIGINAL_PACKAGE_SHADOWED")
-    for root in (broker_source, fleet_source):
-        path = str(root / "framebridge_linux_chatgpt")
-        if path not in framebridge_linux_chatgpt.__path__:
-            framebridge_linux_chatgpt.__path__.append(path)
+    # Registration now dispatches in workers; protect shared import paths.
+    with _BOOTSTRAP_LOCK:
+        broker_source, fleet_source = original_paths()
+        for path in (fleet_source, broker_source):
+            if str(path) in sys.path:
+                sys.path.remove(str(path))
+            sys.path.insert(0, str(path))
+        import framebridge_linux_chatgpt
+        package_file = Path(framebridge_linux_chatgpt.__file__).resolve()
+        _require(package_file.is_relative_to(broker_source.resolve()), "ORIGINAL_PACKAGE_SHADOWED")
+        for root in (broker_source, fleet_source):
+            path = str(root / "framebridge_linux_chatgpt")
+            if path not in framebridge_linux_chatgpt.__path__:
+                framebridge_linux_chatgpt.__path__.append(path)
 
 
 def state_directory() -> Path:

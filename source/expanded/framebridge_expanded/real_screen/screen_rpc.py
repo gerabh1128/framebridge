@@ -13,7 +13,7 @@ import stat
 import sys
 import time
 
-from .screen_capture import CaptureError, capture_screen, read_chunk
+from .screen_capture import CaptureError, capture_screen, read_chunk, MAX_CHUNK_BYTES
 from .screen_control import ControlError, act, bind_screen, snapshot_binding
 
 MAX_REQUEST = 16384
@@ -89,7 +89,10 @@ def write_record(path: Path, value, *, replace=False):
 
 def public_manifest(manifest):
     # Internal path is unnecessary to use or understand a captured screen.
-    return {k: v for k, v in manifest.items() if k not in {'path', '_action_consumed'}}
+    result = {k: v for k, v in manifest.items() if k not in {'path', '_action_consumed'}}
+    # An old receiver omits this capability and only accepts the original schema.
+    result['max_chunk_bytes'] = MAX_CHUNK_BYTES
+    return result
 
 
 def observe(directory: Path, requested_session_id=None):
@@ -138,7 +141,7 @@ def validate_request(request):
     allowed = {
         'observe': {'op', 'session_id'},
         'status': {'op'},
-        'read_chunk': {'op', 'capture_id', 'index', 'expected_sha256'},
+        'read_chunk': {'op', 'capture_id', 'index', 'expected_sha256', 'chunk_bytes'},
         'read_capture': {'op', 'capture_id'},
         'key': {'op', 'capture_id', 'session_id', 'key'},
         'text': {'op', 'capture_id', 'session_id', 'text'},
@@ -149,6 +152,9 @@ def validate_request(request):
         sid = request['session_id']
         require(type(sid) is str and len(sid) <= 96 and re.fullmatch(r'[A-Za-z0-9_-]+', sid), 'SESSION_ID_INVALID')
     if op == 'read_chunk':
+        if 'chunk_bytes' in request:
+            require(type(request['chunk_bytes']) is int and
+                    1 <= request['chunk_bytes'] <= MAX_CHUNK_BYTES, 'CHUNK_BOUNDS_INVALID')
         require(type(request.get('index')) is int and request['index'] >= 0, 'CHUNK_INDEX_INVALID')
         require(type(request.get('expected_sha256')) is str and HEX_SHA.fullmatch(request['expected_sha256']), 'EXPECTED_SHA256_REQUIRED')
     if op == 'key':
@@ -179,7 +185,7 @@ def dispatch(request, directory=None):
     if op == 'read_chunk':
         require(manifest['sha256'] == request['expected_sha256'], 'CAPTURE_SHA256_MISMATCH')
         chunk = read_chunk(directory, manifest['capture_id'], request['index'],
-                           chunk_bytes=2100, expected_sha256=request['expected_sha256'])
+                           chunk_bytes=request.get('chunk_bytes', 2100), expected_sha256=request['expected_sha256'])
         return {'ok': True, 'result': chunk}
     if manifest.get('screen_type') == 'x11':
         raise ScreenRpcError('USE_GRAPHICAL_CUA_FOR_X11_INPUT')

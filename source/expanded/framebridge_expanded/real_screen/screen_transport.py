@@ -17,7 +17,10 @@ import signal
 import subprocess
 import time
 
-from .screen_frontdoor import RPC_COMMAND, MAX_STDOUT_BYTES
+from .screen_frontdoor import RPC_COMMAND, EXPANDED_STDOUT_BYTES
+
+# This typed route bypasses the legacy 4096-byte administrative sanitizer.
+MAX_STDOUT_BYTES = EXPANDED_STDOUT_BYTES
 from .screen_rpc import MAX_REQUEST, encode, validate_request, ScreenRpcError
 
 REQUEST_TYPE = "screen_rpc"
