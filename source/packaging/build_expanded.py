@@ -173,6 +173,28 @@ def maintainer_prerm(version):
     )
 
 
+
+def maintainer_preinst(version=None):
+    """Snapshot active profiles without stopping the process carrying APT."""
+    version = version or VERSION
+    if not re.fullmatch(r"[0-9][0-9A-Za-z.+:~\\-]*", version):
+        raise ValueError("Invalid package upgrade version")
+    module = (BASE / "expanded/framebridge_expanded/package_upgrade.py").read_text()
+    module = module.rsplit("if __name__ == '__main__':", 1)[0]
+    return ("#!/bin/sh\nset -eu\ncase \"$1\" in\n  upgrade)\n"
+            '/usr/bin/dpkg --validate-version "$2"\n'
+            'if /usr/bin/dpkg --compare-versions "$2" lt ' + shlex.quote(version) + "; then\n"
+            "/usr/bin/python3 -I -S - <<'FRAMEBRIDGE_UPGRADE_SNAPSHOT'\n"
+            + module + "\nraise SystemExit(main(['snapshot']))\n"
+            + "FRAMEBRIDGE_UPGRADE_SNAPSHOT\nfi\n    ;;\nesac\n")
+
+
+def maintainer_postinst():
+    return ("#!/bin/sh\nset -eu\ncase \"$1\" in\n  configure)\n"
+            "/usr/bin/python3 -I -S /usr/lib/framebridge-expanded/expanded/framebridge_expanded/package_upgrade.py schedule\n"
+            "    ;;\nesac\n")
+
+
 def package_relationships(profile):
     """Keep the opt-in virtual window manager out of automatic APT installs."""
     return {
@@ -304,6 +326,9 @@ def main(argv=None):
         " Installing the package alone does not activate a connection.\n")
     (control / "prerm").write_text(maintainer_prerm(PRIVILEGED_HELPER_FLOOR))
     (control / "prerm").chmod(0o755)
+    for hook, contents in (("preinst", maintainer_preinst()), ("postinst", maintainer_postinst())):
+        (control / hook).write_text(contents)
+        (control / hook).chmod(0o755)
     rows = []
     for path in sorted(STAGE.rglob("*")):
         if path.is_file() and not path.is_symlink() and control not in path.parents:

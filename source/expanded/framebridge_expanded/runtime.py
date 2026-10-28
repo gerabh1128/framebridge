@@ -466,11 +466,13 @@ def start(state):
     result.update(ok=False, error=result["error"] or "Startup failed. Check this profile's logs.")
     return result
 
-def stop(state):
+def stop(state, *, preserve_connection=False):
     state = state_path(state)
     load_config(state)
-    from .connection_background import disconnect
-    connection = disconnect(state)
+    from .connection_background import disconnect, status as connection_status
+    # Upgrade-only internal scope: retain an identity-verified background
+    # supervisor while local tools restart. Ordinary CLI stop is unchanged.
+    connection = connection_status(state) if preserve_connection else disconnect(state)
     if not connection.get("ok"):
         raise RuntimeError("The background ChatGPT connection could not be stopped safely; local services were left unchanged.")
     from . import tty
