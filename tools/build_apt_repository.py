@@ -18,6 +18,10 @@ import tempfile
 
 PACKAGE = "framebridge-original-expanded"
 FINGERPRINT = "2B1F01BC806C0B33CB6CEDDE52859CEBC91B8808"
+DEPENDENCY_SOURCE_ASSETS = {
+    "FrameBridge-0.3.1-Community-Preview1-dependency-sources.tar.gz": (82606998, "64540a85bd65eac3f394d8c0a967cacbc00e112676d57d644dcd1bb691c1926a"),
+    "FrameBridge-0.3.1-tunnel-client-dependency-sources.tar.gz": (26941745, "6445d4f0e773aba833fe5c610fbae54102b92de2ce636438f769f21e890c2bd9"),
+}
 PROFILES = {
     "debian": ("trixie", "Debian 13", "debian13-amd64-py313", "3.13"),
     "ubuntu": ("noble", "Ubuntu 24.04", "ubuntu24.04-amd64-py312", "3.12"),
@@ -73,6 +77,52 @@ def release_bytes(suite, label, date, files):
                      for name, data in sorted(files.items()))
     return ("\n".join(lines) + "\n").encode()
 
+
+def verify_detached(public_key, signature, payload):
+    with tempfile.TemporaryDirectory(prefix="framebridge-asset-verify-") as tmp:
+        tmp = Path(tmp)
+        ring = tmp / "release.gpg"
+        ring.write_bytes(run(["gpg", "--no-options", "--homedir", tmp, "--batch", "--output", "-",
+                              "--dearmor", public_key]).stdout)
+        result = run(["gpgv", "--homedir", tmp, "--keyring", ring, "--status-fd", "1", signature, payload])
+        require(f"[GNUPG:] VALIDSIG {FINGERPRINT} ".encode() in result.stdout, "Unexpected dependency-source signer")
+
+def prepare_downloads(args, inputs):
+    source = getattr(args, "source", None)
+    dependencies = getattr(args, "dependency_source", [])
+    if source is None:
+        require(not dependencies, "Dependency assets require the corresponding project-source archive")
+        return []
+    require(source.is_file() and not source.is_symlink() and
+            source.name == f"FrameBridge-{args.version}-source.tar.gz", "Unexpected project-source archive")
+    require({p.name for p in dependencies} == set(DEPENDENCY_SOURCE_ASSETS) and
+            len(dependencies) == len(DEPENDENCY_SOURCE_ASSETS), "Exactly the reviewed two dependency-source archives required")
+    for path in dependencies:
+        expected_size, expected_sha = DEPENDENCY_SOURCE_ASSETS[path.name]
+        require(path.is_file() and not path.is_symlink(), "Unsafe dependency-source archive")
+        data = path.read_bytes()
+        require(len(data) == expected_size and digest(data) == expected_sha, "Dependency-source archive hash mismatch")
+        verify_detached(args.public_key, path.with_name(path.name + ".asc"), path)
+    directory = args.output / "downloads"
+    directory.mkdir()
+    assets = []
+    def add(name, data, needs_signing):
+        target = directory / name
+        require(not target.exists(), "Duplicate release filename")
+        target.write_bytes(data)
+        assets.append({"filename": name, "size_bytes": len(data), "sha256": digest(data),
+                       "signature": name + ".asc", "needs_signing": needs_signing})
+    for _, _, _, profile, _, data in inputs:
+        add(f"FrameBridge-{args.version}-{profile}.deb", data, True)
+    add(source.name, source.read_bytes(), True)
+    for path in dependencies:
+        add(path.name, path.read_bytes(), False)
+        shutil.copyfile(path.with_name(path.name + ".asc"), directory / (path.name + ".asc"))
+    shutil.copyfile(args.public_key, directory / "framebridge-release-key.asc")
+    sums = "".join(item["sha256"] + "  " + item["filename"] + "\n" for item in assets)
+    add("SHA256SUMS", sums.encode(), True)
+    return assets
+
 def prepare(args):
     output = args.output
     require(not output.exists(), "Output must be a new directory; never overwrite a published repository")
@@ -117,12 +167,13 @@ def prepare(args):
         records.append({"distribution": distro, "label": label, "suite": suite,
                         "profile": profile, "filename": relative,
                         "size": len(data), "sha256": digest(data)})
+    downloads = prepare_downloads(args, inputs)
     shutil.copyfile(args.public_key, output / "framebridge-archive-keyring.asc")
     files = {p.relative_to(output).as_posix(): {"bytes": p.stat().st_size,
              "sha256": digest(p.read_bytes())} for p in sorted(output.rglob("*")) if p.is_file()}
     manifest = {"schema": 1, "package": PACKAGE, "version": args.version,
                 "fingerprint": FINGERPRINT, "prepared_utc": date.isoformat(),
-                "artifacts": records, "files": files}
+                "artifacts": records, "download_assets": downloads, "files": files}
     dump(output / "APT-INPUT-MANIFEST.json", manifest)
     manifest_hash = digest((output / "APT-INPUT-MANIFEST.json").read_bytes())
     print(json.dumps({"prepared": True, "signed": False, "directory": str(output),
@@ -151,11 +202,19 @@ def check_inputs(output, expected):
     public_fingerprint(output / "framebridge-archive-keyring.asc")
     return manifest
 
-def signature_paths(output):
+def signature_paths(output, sign_only=False):
     for suite, *_ in PROFILES.values():
         root = output / "dists" / suite
         yield root / "Release", root / "InRelease", True
         yield root / "Release", root / "Release.gpg", False
+    manifest = json.loads((output / "APT-INPUT-MANIFEST.json").read_text())
+    for asset in manifest.get("download_assets", []):
+        if sign_only and not asset["needs_signing"]:
+            continue
+        filename = asset["filename"]
+        require(Path(filename).name == filename and Path(asset["signature"]).name == asset["signature"],
+                "Unsafe download signature path")
+        yield output / "downloads" / filename, output / "downloads" / asset["signature"], False
 
 def verify_signatures(output, manifest):
     with tempfile.TemporaryDirectory(prefix="framebridge-apt-verify-") as tmp:
@@ -183,7 +242,7 @@ def sign(args):
     require(args.key_home.is_dir() and not args.key_home.is_symlink(), "Unsafe signing home")
     key_stat = args.key_home.stat()
     require(key_stat.st_uid == os.getuid() and key_stat.st_mode & 0o077 == 0, "Signing home must be owner-private")
-    targets = list(signature_paths(args.output))
+    targets = list(signature_paths(args.output, sign_only=True))
     require(all(not target.exists() for _, target, _ in targets), "Signatures already exist; do not overwrite")
     common = ["gpg", "--no-options", "--homedir", args.key_home, "--pinentry-mode", "default",
               "--local-user", FINGERPRINT, "--digest-algo", "SHA256"]
@@ -212,6 +271,9 @@ def main():
         prepare_parser.add_argument("--" + distro, type=Path, required=True)
     prepare_parser.add_argument("--public-key", type=Path, required=True)
     prepare_parser.add_argument("--epoch", type=int)
+    prepare_parser.add_argument("--source", type=Path, help="Reviewed corresponding project-source tar.gz")
+    prepare_parser.add_argument("--dependency-source", type=Path, action="append", default=[],
+                                help="Reviewed dependency-source archive with its unchanged sibling .asc")
     for name in ("sign", "verify"):
         sub = commands.add_parser(name)
         sub.add_argument("--output", type=Path, required=True)

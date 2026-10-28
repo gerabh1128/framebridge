@@ -71,7 +71,7 @@ class RepositoryTests(unittest.TestCase):
         return hashlib.sha256(raw).hexdigest(), json.loads(raw)
 
     def sign_test_releases(self):
-        for source, signed, clearsign in builder.signature_paths(self.output):
+        for source, signed, clearsign in builder.signature_paths(self.output, sign_only=True):
             subprocess.run(["gpg", "--no-options", "--homedir", str(self.key_home), "--batch",
                             "--pinentry-mode", "loopback", "--passphrase", "", "--local-user", builder.FINGERPRINT,
                             "--digest-algo", "SHA256", "--output", str(signed),
@@ -137,6 +137,41 @@ class RepositoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exactly one official primary"):
             self.prepare(public_key=bundle)
         self.assertFalse(self.output.exists())
+
+
+    def test_one_release_manifest_covers_downloads_and_preserves_dependency_signatures(self):
+        source = self.output.parent / "FrameBridge-0.3.3-source.tar.gz"
+        source.write_bytes(b"disposable source-archive fixture")
+        original = builder.DEPENDENCY_SOURCE_ASSETS
+        dependencies = []
+        signatures = {}
+        try:
+            builder.DEPENDENCY_SOURCE_ASSETS = {}
+            for index, name in enumerate(original):
+                path = self.output.parent / name
+                data = ("disposable dependency " + str(index)).encode()
+                path.write_bytes(data)
+                builder.DEPENDENCY_SOURCE_ASSETS[name] = (len(data), hashlib.sha256(data).hexdigest())
+                signature = path.with_name(name + ".asc")
+                subprocess.run(["gpg", "--no-options", "--homedir", str(self.key_home), "--batch",
+                    "--pinentry-mode", "loopback", "--passphrase", "", "--local-user", builder.FINGERPRINT,
+                    "--armor", "--output", str(signature), "--detach-sign", str(path)], check=True, capture_output=True)
+                signatures[name] = signature.read_bytes()
+                dependencies.append(path)
+            expected, manifest = self.prepare(source=source, dependency_source=dependencies)
+            self.assertEqual(len(manifest["download_assets"]), 7)
+            for path in dependencies:
+                self.assertEqual((self.output / "downloads" / (path.name + ".asc")).read_bytes(),
+                                 signatures[path.name])
+            self.sign_test_releases()
+            self.assertTrue(builder.verify_signatures(self.output, manifest)["verified"])
+            self.assertEqual(builder.check_inputs(self.output, expected)["version"], "0.3.3")
+            source_copy = self.output / "downloads" / source.name
+            source_copy.write_bytes(b"altered")
+            with self.assertRaisesRegex(ValueError, "Input changed"):
+                builder.check_inputs(self.output, expected)
+        finally:
+            builder.DEPENDENCY_SOURCE_ASSETS = original
 
     def test_changed_signed_release_fails_verification(self):
         _, manifest = self.prepare()

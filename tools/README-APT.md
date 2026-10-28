@@ -97,3 +97,38 @@ disposable signing identity in a temporary directory. It tests actual isolated
 APT acceptance for each suite and rejects altered packages/indexes/signatures,
 unexpected versions, path traversal and bundled extra primary trust keys.
 It never uses the official private signing key or changes system APT sources.
+
+
+## One signing session for the release
+
+For a complete release, also pass --source with the reviewed
+FrameBridge-VERSION-source.tar.gz and --dependency-source twice with the two
+existing dependency-source archives. Their original sibling .asc signatures
+are verified and copied unchanged. The generator creates a downloads staging
+subdirectory with the three DEBs, source, dependency sources and SHA256SUMS.
+The same input manifest covers all of these bytes. The owner-terminal sign
+command signs the three DEBs, project source and checksums in the same session
+as the three APT suites. Existing dependency signatures are preserved.
+
+Map the staging downloads subdirectory to the existing public /downloads/;
+the rest of the repository goes under /debian/. Do not publish a nested second
+/debian/downloads/ route as the official download location. Verify every
+signature with the pinned manifest before activating either path.
+
+## Canonical Gitea publication
+
+publish_gitea.py is an administrator tool for the existing GERANAS Gitea, not a
+second Git host. Its default mode checks a root-frozen bundle SHA-256, exact old
+main, ancestor relationship and the new release tag. --apply requires an
+exclusive journal in a root-owned private directory. Run only the reviewed
+root-frozen tool and bundle using the normal authorized administrator context.
+
+The tool creates a narrowly scoped, uniquely named temporary token using the
+installed Gitea administrator CLI. It keeps the token only in process memory,
+feeds normal Git ASKPASS through a private Unix socket and performs an atomic
+push without a force flag. It verifies exact refs, revokes the temporary token
+through normal Basic authentication and verifies HTTP 401 afterward. The
+journal contains the nonsecret token name so an interrupted transaction can be
+reviewed. If any step is uncertain, inspect that transaction rather than
+replaying it. No token value is placed in URLs, arguments, environment variables,
+files or reports.
