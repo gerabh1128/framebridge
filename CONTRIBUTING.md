@@ -9,3 +9,7 @@ Work in a separate source checkout. Describe the problem, resulting behavior, af
 Official branches and release artifacts are maintainer-controlled. Changes enter them through review; official packages are built from identified source revisions and signed through the release process. A pull request does not itself become an official binary. See [OFFICIAL-RELEASES.md](OFFICIAL-RELEASES.md).
 
 Preserve the historical RC7 installer and source evidence. New executable or payload changes require a separately identifiable build. Do not present a modified artifact as the unchanged certified RC7 release.
+
+## Run source tests
+
+From a fresh clone, run `python3 tools/run_tests.py` as your normal Linux user. The runner creates the private `source/qa` fixture directory and a temporary test home, clears inherited FrameBridge profile variables, and tests the repository source. It requires the native tools used by the tests, including `tmux`, `openssl`, `dpkg` and `systemd` command-line utilities. Test fixtures are generated from tracked source; no previous build directory or installed profile is copied.
