@@ -1,10 +1,10 @@
 # FrameBridge
 
-**Bring your ChatGPT conversations to Linux computers you control.**
+**Administer your Linux network from a connected conversation.**
 
-Run a task on your own machine, return to the same Bash terminal, inspect an X11 desktop, or select an enrolled computer. ChatGPT remains hosted; FrameBridge runs the tools on your Linux computers.
+Use a central gateway and enrolled nodes to administer Linux computers you control. Run commands and return to persistent Bash terminals; an existing X11 desktop adds optional graphical tools. ChatGPT remains hosted; FrameBridge runs the tools on your Linux computers.
 
-> **Unsigned release candidate: `0.3.2`.** This source preparation promotes the compatibility candidate; it is not a signed public release. Final artifact validation and signing are recorded separately. The signed 0.3.1 release remains a different artifact. Read the [compatibility scope and history](docs/LINUX-COMPATIBILITY-CANDIDATE.md); use the exact artifact release record when choosing a package.
+> **Latest signed release: `0.3.3`.** Packages and signed APT repositories are published for Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. Choose the exact distribution profile on the [official download page](https://framebridge.betancourt.one/download/). The signed `v0.3.3` tag and corresponding-source archive identify the released code; the default branch can receive later documentation updates.
 
 ## Start here
 
@@ -18,22 +18,22 @@ Start on the Linux computer you want to connect, with a person at its terminal o
 
 ### 1. Install the matching package
 
-The compatibility candidate has separate native Python builds; it is not one interchangeable `.deb` for every Linux system.
+The release has three native Python builds. Choose the package matching the distribution and system Python.
 
-| Distribution | Architecture | System Python | Candidate package profile |
+| Distribution | Architecture | System Python | Release package profile |
 | --- | --- | --- | --- |
 | Debian 13 | amd64 / x86_64 | 3.13 | `debian13-amd64-py313` |
 | Ubuntu 24.04 | amd64 / x86_64 | 3.12 | `ubuntu24.04-amd64-py312` |
 | Linux Mint 22.x | amd64 / x86_64 | 3.12 | `mint22-amd64-py312` |
 
-The preceding compatibility candidate `0.3.2~compat.20261027.3` passed installation, normal and optional virtual-runtime startup, actual MCP HTTP/SSE exchanges, terminal and cleanup tests on Debian 13, Ubuntu 24.04 and Mint 22.3 VMs. Mint also passed its Cinnamon window-capture test with its existing WebSocket library unchanged. This 0.3.2 source preparation preserves that runtime behavior; the exact final package bytes require their own artifact validation and release signatures. Ubuntu 26.04 and LMDE 7 builds remain experimental; other distributions, older releases and CPU architectures are outside this candidate's scope.
+The 0.3.3 packages passed actual signed APT updates and managed-service lifecycle checks on Debian 13, Ubuntu 24.04 and Linux Mint 22.3 VMs. The updates preserved profiles and boot policy, and the services remained ready after the installer exited. Ubuntu 26.04, LMDE 7, other distributions, older releases and other CPU architectures are outside the validated scope of this release. Earlier compatibility experiments are recorded in the [compatibility history](docs/LINUX-COMPATIBILITY-CANDIDATE.md).
 
-Verify official releases with the independently trusted project key as described in [Official releases](OFFICIAL-RELEASES.md). A candidate's recorded SHA-256 identifies its reviewed file; it is not a release signature. Candidate packages are for reviewed pilots.
+Verify the signing-key fingerprint, package checksum and detached signature using the instructions on the [official download page](https://framebridge.betancourt.one/download/). Historical release records remain in [Official releases](OFFICIAL-RELEASES.md). A checksum identifies a file; the release signature authenticates it with the independently trusted project key.
 
-For example, with the **Mint** candidate downloaded into the current directory:
+For example, with the **Mint** 0.3.3 package downloaded into the current directory:
 
 ~~~bash
-sudo apt install ./FrameBridge-0.3.2-mint22-amd64-py312.deb
+sudo apt install ./FrameBridge-0.3.3-mint22-amd64-py312.deb
 ~~~
 
 Use the corresponding profile filename on Debian or Ubuntu. Review APT's proposed changes for the actual computer. Installation places the software on disk; it does not establish a ChatGPT connection or replace the system Python.
@@ -106,9 +106,9 @@ Use `python3 source/packaging/build_expanded.py --help` for package build profil
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) to propose a change and [SECURITY.md](SECURITY.md) for security reports. Useful compatibility reports name the exact distribution, version, Python version, package profile and tests actually performed. Independent copies retain their applicable software freedoms; they must not be presented as maintainer-approved releases.
 
-Project home and 0.3.2 publication origin: https://betancourt.one/framebridge/
+Project home: https://framebridge.betancourt.one/
 
-Use the corresponding-source archive identified in each release record. When that record marks the source mirror published, its read-only HTTP Git endpoint is `https://betancourt.one/framebridge/git/framebridge.git`. Final 0.3.2 publication is pending; this source preparation does not claim that the new packages or mirror are already live.
+The public Git repository is `https://framebridge.betancourt.one/git/gerardo/framebridge.git`. For the exact 0.3.3 release, use the signed `v0.3.3` tag or its signed corresponding-source archive from the download page. The repositories, package downloads and source archive are published; normal owner authentication and connection setup are still required on a newly installed computer.
 
 Programming: **ChatGPT**.  
 Original concept and project coordination: **Gerardo Betancourt**.
