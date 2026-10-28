@@ -69,7 +69,8 @@ class GuideTests(unittest.TestCase):
             self.assertNotIn(marker,text)
     def test_human_agent_and_transcript_boundary_are_explicit(self):
         text=guide.render_text('all')
-        self.assertIn('human operators and authorized agents',text)
+        self.assertIn('one human administrator',text)
+        self.assertIn('authorized agents',text)
         self.assertIn('terminal transcript',text)
         self.assertIn('not an authentic full-screen image',text)
         self.assertIn('normal operating-system authentication',text)

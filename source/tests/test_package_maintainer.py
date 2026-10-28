@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packaging"))
-from build_expanded import maintainer_prerm
+from build_expanded import maintainer_prerm, PRIVILEGED_HELPER_FLOOR
 from build_profiles import CANDIDATE_VERSION
 
 
@@ -30,7 +30,7 @@ class MaintainerScriptTests(unittest.TestCase):
         self.screen = self.root / "screen-access.json"
 
     def run_script(self, args, *, fail=0, screen=False):
-        script = maintainer_prerm(CANDIDATE_VERSION)
+        script = maintainer_prerm(PRIVILEGED_HELPER_FLOOR)
         # Only side-effecting commands and config probes are redirected. The
         # real dpkg comparisons are read-only and verify Debian version ordering.
         script = script.replace("/usr/bin/python3", shlex.quote(str(self.stub)))
