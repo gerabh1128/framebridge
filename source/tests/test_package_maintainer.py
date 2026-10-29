@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packaging"))
-from build_expanded import maintainer_prerm, PRIVILEGED_HELPER_FLOOR
+from build_expanded import maintainer_preinst, maintainer_prerm, PRIVILEGED_HELPER_FLOOR
 from build_profiles import CANDIDATE_VERSION
 
 
@@ -90,6 +90,38 @@ class MaintainerScriptTests(unittest.TestCase):
     def test_current_version_cannot_inject_script_paths(self):
         with self.assertRaises(ValueError):
             maintainer_prerm("0.3.2'; /tmp/untrusted-script; '")
+
+    def run_preinst(self, arguments, *, version="0.3.4~dev.20261029.4", fail=0):
+        script = maintainer_preinst(version)
+        script = script.replace("/usr/bin/python3 -I -S - <<'FRAMEBRIDGE_UPGRADE_SNAPSHOT'",
+                                shlex.quote(str(self.stub)) + " -I -S - <<'FRAMEBRIDGE_UPGRADE_SNAPSHOT'")
+        result = subprocess.run(["/bin/sh", "-s", "--", *arguments], input=script,
+                                text=True, capture_output=True, timeout=10,
+                                env=dict(os.environ, TEST_CALLS=str(self.trace), TEST_CLEANUP_RC=str(fail)))
+        calls = [json.loads(row) for row in self.trace.read_text().splitlines()] if self.trace.exists() else []
+        return result, calls
+
+    def test_same_version_reinstall_takes_a_new_current_runtime_snapshot(self):
+        result, calls = self.run_preinst(["upgrade", "0.3.4~dev.20261029.4"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls, [["-I", "-S", "-"]])
+
+    def test_forward_upgrade_still_takes_a_runtime_snapshot(self):
+        result, calls = self.run_preinst(["upgrade", "0.3.4~dev.20261029.3"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls, [["-I", "-S", "-"]])
+
+    def test_fresh_install_and_downgrade_do_not_capture_unrelated_running_profiles(self):
+        for arguments in (["install"], ["upgrade", "0.3.5"]):
+            with self.subTest(arguments=arguments):
+                result, calls = self.run_preinst(arguments)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(calls, [])
+
+    def test_failed_reinstall_snapshot_blocks_package_replacement(self):
+        result, calls = self.run_preinst(["upgrade", "0.3.4~dev.20261029.4"], fail=17)
+        self.assertEqual(result.returncode, 17)
+        self.assertEqual(calls, [["-I", "-S", "-"]])
 
 
 if __name__ == "__main__":

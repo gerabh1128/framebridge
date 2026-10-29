@@ -14,10 +14,13 @@ import shlex
 import subprocess
 
 from build_profiles import CANDIDATE_VERSION, PROFILES, SOURCE_VENDOR, VENDOR_RELATIVE, target_profile, validate_vendor, vendor_versions
+from release_metadata import release_source
 
 BASE = Path(__file__).resolve().parents[1]
 ROOT = BASE.parent
 VERSION = CANDIDATE_VERSION
+PUBLIC_RELEASE = False
+SOURCE_ARCHIVE = None
 # Oldest package retaining the privileged helper lifecycle. Candidate/release
 # version bumps must not move this downgrade revocation boundary.
 PRIVILEGED_HELPER_FLOOR = "0.3.2"
@@ -33,6 +36,14 @@ DEPENDENCY_SOURCE_ASSETS = [{'filename': 'FrameBridge-0.3.1-Community-Preview1-d
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def contains_private_path(data, private_root):
+    """Match an actual path component, not e.g. /root in root_model.py."""
+    prefix = str(private_root).rstrip("/").encode()
+    if not prefix:
+        return False
+    return re.search(re.escape(prefix) + rb"(?=$|[/\s\"'<>`])", data) is not None
 
 
 # These are release inputs, not files inferred from installed runtime profiles.
@@ -83,7 +94,7 @@ def legal_preflight():
     for path in inputs:
         data = path.read_bytes()
         for private_root in private_roots:
-            if private_root.encode() in data:
+            if contains_private_path(data, private_root):
                 raise RuntimeError("Local path found in legal input: " + str(path.relative_to(ROOT)))
     return index
 
@@ -101,7 +112,7 @@ def install_legal_material(docs):
         shutil.copy2(ROOT / "blog" / name, docs / "blog" / name)
     shutil.copy2(ROOT / "RELEASE-NOTES.md", docs / "RELEASE-NOTES.md")
     (docs / "copyright").write_text(
-        "FrameBridge Original Expanded — compatibility candidate " + VERSION + "\n\n"
+        "FrameBridge Original Expanded — " + ("release " if PUBLIC_RELEASE else "compatibility candidate ") + VERSION + "\n\n"
         "Original FrameBridge material: GNU GPL version 3 only (GPL-3.0-only).\n"
         "The complete license is included in LICENSE. COPYRIGHT.md and LICENSING.md\n"
         "identify attribution, scope and third-party exceptions.\n\n"
@@ -115,7 +126,8 @@ def install_legal_material(docs):
         "[licensing/third-party](licensing/third-party/THIRD-PARTY-NOTICES.md).\n"
         "Original vendored notices are preserved with their components.\n")
     lines = ["# Source availability for FrameBridge " + VERSION, "",
-             "Candidate source must be retained with its build identity; no public archive is asserted.", "",
+             ("Matching corresponding source: " + SOURCE_ARCHIVE["filename"] + " (SHA-256 " + SOURCE_ARCHIVE["sha256"] + ")."
+              if PUBLIC_RELEASE else "Candidate source must be retained with its build identity; no public archive is asserted."), "",
              "The release source set also includes these separate assets:", ""]
     for item in DEPENDENCY_SOURCE_ASSETS:
         lines.extend(["- " + item["filename"],
@@ -131,12 +143,13 @@ def install_legal_material(docs):
                   "signature status are external release records, not builder claims.", ""])
     (docs / "SOURCE-AVAILABILITY.md").write_text("\n".join(lines))
     (docs / "COMMUNITY-RELEASE-STATUS.json").write_text(json.dumps({
-        "schema_version": 1, "version": VERSION, "status": "COMPATIBILITY_CANDIDATE_BUILD",
+        "schema_version": 1, "version": VERSION,
+        "status": "PUBLIC_RELEASE_BUILD_ASSEMBLED" if PUBLIC_RELEASE else "COMPATIBILITY_CANDIDATE_BUILD",
         "certified_as_RC7": False,
         "public_readiness": "EXTERNAL_RELEASE_RECORD",
         "signature_status": "EXTERNAL_RELEASE_RECORD",
         "vm_lifecycle_validation": "NOT_ASSERTED_BY_BUILDER",
-        "source_archive": "CANDIDATE_SOURCE_REQUIRED_BEFORE_PUBLICATION",
+        "source_archive": SOURCE_ARCHIVE if PUBLIC_RELEASE else "CANDIDATE_SOURCE_REQUIRED_BEFORE_PUBLICATION",
         "dependency_source_archives": DEPENDENCY_SOURCE_ASSETS
     }, indent=2) + "\n")
 
@@ -175,7 +188,7 @@ def maintainer_prerm(version):
 
 
 def maintainer_preinst(version=None):
-    """Snapshot active profiles without stopping the process carrying APT."""
+    """Snapshot running profiles for upgrades and same-version reinstalls."""
     version = version or VERSION
     if not re.fullmatch(r"[0-9][0-9A-Za-z.+:~\\-]*", version):
         raise ValueError("Invalid package upgrade version")
@@ -183,7 +196,7 @@ def maintainer_preinst(version=None):
     module = module.rsplit("if __name__ == '__main__':", 1)[0]
     return ("#!/bin/sh\nset -eu\ncase \"$1\" in\n  upgrade)\n"
             '/usr/bin/dpkg --validate-version "$2"\n'
-            'if /usr/bin/dpkg --compare-versions "$2" lt ' + shlex.quote(version) + "; then\n"
+            'if /usr/bin/dpkg --compare-versions "$2" le ' + shlex.quote(version) + "; then\n"
             "/usr/bin/python3 -I -S - <<'FRAMEBRIDGE_UPGRADE_SNAPSHOT'\n"
             + module + "\nraise SystemExit(main(['snapshot']))\n"
             + "FRAMEBRIDGE_UPGRADE_SNAPSHOT\nfi\n    ;;\nesac\n")
@@ -204,17 +217,25 @@ def package_relationships(profile):
 
 
 def main(argv=None):
-    global VERSION, PUBLIC_FILENAME, RELEASE, STAGE, PREFIX
+    global VERSION, PUBLIC_FILENAME, RELEASE, STAGE, PREFIX, PUBLIC_RELEASE, SOURCE_ARCHIVE
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", required=True, choices=sorted(PROFILES))
     parser.add_argument("--version", default=CANDIDATE_VERSION)
     parser.add_argument("--vendor-dir", type=Path, help="Reviewed target-ABI Fleet Hub vendor tree; never installed globally")
+    parser.add_argument("--public-release", action="store_true", help="Bind an official release profile to its assembled corresponding-source archive")
+    parser.add_argument("--source-manifest", type=Path, help="Matching SOURCE-ARCHIVE-MANIFEST.json kept beside its source archive")
     parser.add_argument("--check-vendor", action="store_true", help="Validate inputs without staging or building a package")
     args = parser.parse_args(argv)
     if not re.fullmatch(r"[0-9][0-9A-Za-z.+:~\-]*", args.version) or args.version == "0.3.1":
         parser.error("A distinct valid Debian candidate version is required")
     subprocess.run(["dpkg", "--validate-version", args.version], check=True)
     VERSION = args.version
+    PUBLIC_RELEASE = args.public_release
+    SOURCE_ARCHIVE = None
+    if args.public_release and args.source_manifest is None:
+        parser.error("--public-release requires --source-manifest")
+    if args.source_manifest and not args.public_release:
+        parser.error("--source-manifest requires --public-release")
     version_assignments = [node for node in ast.parse((BASE / "expanded/framebridge_expanded/__init__.py").read_text()).body
                            if isinstance(node, ast.Assign) and any(isinstance(item, ast.Name) and item.id == "__version__" for item in node.targets)]
     if len(version_assignments) != 1 or ast.literal_eval(version_assignments[0].value) != VERSION:
@@ -227,6 +248,11 @@ def main(argv=None):
         parser.error("This target requires --vendor-dir with reviewed " + profile["python_abi"] + " wheels")
     vendor_evidence = validate_vendor(vendor, profile, vendor_versions(original_vendor))
     profile["vendor"] = vendor_evidence
+    if args.public_release:
+        from archive_sources import source_files
+        SOURCE_ARCHIVE = release_source(args.source_manifest, VERSION, args.target, source_files(), vendor_evidence)
+        profile["validation_status"] = "release_build"
+        profile["source_archive"] = SOURCE_ARCHIVE
     PUBLIC_FILENAME = "FrameBridge-" + VERSION + "-" + args.target + ".deb"
     RELEASE = BASE / "release" / args.target
     STAGE = BASE / "build" / args.target / "package-root"
@@ -352,7 +378,7 @@ def main(argv=None):
     env = dict(os.environ, SOURCE_DATE_EPOCH=str(EPOCH))
     subprocess.run(["dpkg-deb", "--root-owner-group", "-Zxz", "-z6", "--build", str(STAGE), str(output)], check=True, env=env)
     shutil.copy2(output, RELEASE / PUBLIC_FILENAME)
-    print(json.dumps({"package": str(output), "bytes": output.stat().st_size, "sha256": sha(output), "payload_entries": len(manifest), "profile_id": args.target, "validation_status": "candidate", "public_filename": PUBLIC_FILENAME, "status": "COMPATIBILITY_CANDIDATE_BUILD"}))
+    print(json.dumps({"package": str(output), "bytes": output.stat().st_size, "sha256": sha(output), "payload_entries": len(manifest), "profile_id": args.target, "validation_status": "release_build" if PUBLIC_RELEASE else "candidate", "public_filename": PUBLIC_FILENAME, "status": "PUBLIC_RELEASE_BUILD_ASSEMBLED" if PUBLIC_RELEASE else "COMPATIBILITY_CANDIDATE_BUILD"}))
 
 if __name__ == "__main__":
     main()

@@ -451,6 +451,18 @@ def _doctor_command(args, state):
     return _result_code(value)
 
 
+def _health_command(args, state):
+    health = _module("health")
+    value = health.collect(state)
+    if args.json:
+        _show(value)
+    else:
+        print(health.render(value))
+    # Query success and operational health are deliberately separate. An
+    # intentional pause can be healthy; missing/unknown state cannot pass.
+    return 0 if value.get("ok") is True and value.get("health", {}).get("healthy") is True else 1
+
+
 def _service_command(args, state):
     action = args.service_action
     lifecycle = _module("lifecycle")
@@ -540,6 +552,7 @@ def build_parser():
     status = sub.add_parser("status", help="Observe local tools, ChatGPT connection and startup policy without changing them.")
     status.add_argument("scope", nargs="?", choices=("connection", "runtime", "boot", "console"))
     sub.add_parser("doctor", help="Diagnose prerequisites and problems; does not repair or connect.")
+    sub.add_parser("health", help="Read one local profile's health, identity and prerequisites; no repair or connection.")
     sub.add_parser("setup", help="Optional advanced role/profile setup; does not start services or connect.")
     help_parser = sub.add_parser("help", help="Read the installed, versioned English guide.")
     help_parser.add_argument("topic", nargs="?", default="start", help="Guide topic; use all for the complete reference.")
@@ -665,14 +678,14 @@ def _dispatch(parser, args):
                 return _help_command(argparse.Namespace(command="help", topic="start", json=True, non_interactive=True))
             parser.print_help()
             return 0
-        print("FrameBridge\n1. Connect\n2. Status\n3. Doctor\n4. Open console\n5. Help\n6. Advanced setup\n0. Exit")
+        print("FrameBridge\n1. Connect\n2. Status\n3. Doctor\n4. Open console\n5. Help\n6. Advanced setup\n7. Health summary\n0. Exit")
         try:
             choice = input("Choose an action: ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nCancelled.", file=sys.stderr)
             return 130
         action = {"1":["connect"], "2":["status"], "3":["doctor"], "4":["console"],
-                  "5":["help"], "6":["setup"]}.get(choice)
+                  "5":["help"], "6":["setup"], "7":["health"]}.get(choice)
         if choice == "0":
             return 0
         if action is None:
@@ -712,6 +725,8 @@ def _dispatch(parser, args):
             return _status_command(args, state)
         if args.command == "doctor":
             return _doctor_command(args, state)
+        if args.command == "health":
+            return _health_command(args, state)
         if args.command == "service":
             return _service_command(args, state)
         if args.command == "connection":

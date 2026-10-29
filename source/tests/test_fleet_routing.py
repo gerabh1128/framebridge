@@ -1,4 +1,5 @@
 """Routing contract tests; original read provider is exercised locally."""
+import base64
 import hashlib
 from pathlib import Path
 import socket
@@ -10,6 +11,8 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "expanded"))
 from framebridge_expanded import fleet
+from framebridge_expanded.real_screen.screen_frontdoor import RPC_COMMAND
+from framebridge_expanded.real_screen.screen_rpc import encode
 
 LOCAL_ID = "c6d827a4-219f-48fc-82d8-f410176313ca"
 REMOTE_ID = "6d88c5ae-343e-4413-a202-ccae2ae7694a"
@@ -133,6 +136,99 @@ class FleetRoutingTests(unittest.TestCase):
         self.remote["operational_transport_ready"] = False
         self.assertEqual(fleet.execute_node("test-node", "printf ok", True)["error"], "NODE_OFFLINE")
         self.assertEqual(fleet.node_read("test-node", "system.status", {})["error"], "NODE_OFFLINE")
+
+    @staticmethod
+    def screen_script():
+        return RPC_COMMAND + base64.b64encode(encode({"op": "observe"})).decode("ascii") + "\n"
+
+    def assert_identity(self, value, requested, local=False):
+        self.assertEqual(value["requested_target"], requested)
+        self.assertEqual(value["resolved_target"], "test-central" if local else "test-node")
+        self.assertEqual(value["node"], value["resolved_target"])
+        self.assertEqual(value["target"], "LOCAL" if local else "test-node")
+        self.assertEqual(value["node_id"], LOCAL_ID if local else REMOTE_ID)
+        self.assertEqual(value["hostname"], socket.gethostname() if local else "test-node")
+        self.assertEqual(value["transport"], "local" if local else "broker_outbound")
+
+    @staticmethod
+    def misleading_response(payload=None):
+        value = {"ok": True, "target": "wrong-machine", "node": "wrong-machine",
+                 "requested_target": "wrong-machine", "resolved_target": "wrong-machine",
+                 "node_id": "wrong-id", "hostname": "wrong-host", "transport": "wrong-route"}
+        if payload is not None:
+            value.update(job_id=payload["job_id"], command_sha256=payload.get("sha256"))
+        return value
+
+    def test_read_identity_comes_from_confirmed_route(self):
+        for requested, local in [("LOCAL", True), ("test-central", True), (LOCAL_ID, True),
+                                 ("test-node", False), (REMOTE_ID, False)]:
+            with self.subTest(requested=requested), \
+                    mock.patch.object(fleet, "read_local", return_value=self.misleading_response()), \
+                    mock.patch("framebridge_expanded.broker.request", return_value=self.misleading_response()):
+                value = fleet.node_read(requested, "system.status", {})
+            self.assertTrue(value["ok"])
+            self.assert_identity(value, requested, local)
+            self.assertEqual(value["node"], value["resolved_target"])
+
+    def test_execution_routes_overwrite_upstream_identity(self):
+        def remote_response(node_id, capability, payload, timeout_s):
+            return self.misleading_response(payload)
+        calls = [
+            lambda alias: fleet.execute_node(alias, "printf ok", True, job_id="identity-exec"),
+            lambda alias: fleet.execute_screen_node(alias, self.screen_script(), True,
+                                                    job_id="identity-screen", include_stdout=True),
+            lambda alias: fleet.cua_node(alias, {"action": "OBSERVE"}, True, job_id="identity-cua"),
+        ]
+        for route in calls:
+            for requested, local in [("LOCAL", True), ("test-central", True), (LOCAL_ID, True),
+                                     ("test-node", False), (REMOTE_ID, False)]:
+                with self.subTest(route=route, requested=requested), \
+                        mock.patch("framebridge_expanded.runtime.adapter_request",
+                                   side_effect=self.misleading_response), \
+                        mock.patch("framebridge_expanded.broker.request", side_effect=remote_response):
+                    value = route(requested)
+                self.assertTrue(value["ok"], value)
+                self.assert_identity(value, requested, local)
+
+    def test_unknown_target_never_falls_back_to_local(self):
+        with mock.patch("framebridge_expanded.runtime.adapter_request") as local, \
+                mock.patch("framebridge_expanded.broker.request") as remote:
+            values = [
+                fleet.node_read("unknown-node", "system.status", {}),
+                fleet.execute_node("unknown-node", "printf ok", True),
+                fleet.execute_screen_node("unknown-node", self.screen_script(), True, include_stdout=True),
+                fleet.cua_node("unknown-node", {"action": "OBSERVE"}, True),
+            ]
+        local.assert_not_called()
+        remote.assert_not_called()
+        for value in values:
+            self.assertFalse(value["ok"])
+            self.assertEqual(value["error"], "NODE_NOT_FOUND")
+            self.assertNotIn("resolved_target", value)
+            self.assertNotIn("node_id", value)
+
+    def test_offline_target_errors_retain_confirmed_identity(self):
+        self.remote["operational_transport_ready"] = False
+        with mock.patch("framebridge_expanded.broker.request") as remote:
+            values = [
+                fleet.node_read(REMOTE_ID, "system.status", {}),
+                fleet.execute_node(REMOTE_ID, "printf ok", True),
+                fleet.execute_screen_node(REMOTE_ID, self.screen_script(), True, include_stdout=True),
+                fleet.cua_node(REMOTE_ID, {"action": "OBSERVE"}, True),
+            ]
+        remote.assert_not_called()
+        for value in values:
+            self.assertFalse(value["ok"])
+            self.assertEqual(value["error"], "NODE_OFFLINE")
+            self.assert_identity(value, REMOTE_ID)
+
+    def test_pre_resolution_failure_does_not_claim_identity(self):
+        with mock.patch.object(fleet, "resolve_node") as lookup:
+            value = fleet.execute_node("test-node", "printf ok", False)
+        lookup.assert_not_called()
+        self.assertEqual(value["error"], "AUTHORIZED_TRUE_REQUIRED")
+        for field in ("requested_target", "resolved_target", "node_id", "hostname", "transport"):
+            self.assertNotIn(field, value)
 
 
 if __name__ == "__main__":

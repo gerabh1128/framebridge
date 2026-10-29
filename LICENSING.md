@@ -6,7 +6,7 @@ The owner selected GNU General Public License version 3 only, SPDX identifier GP
 
 The grant covers original FrameBridge code and project documentation that the rightsholders are entitled to license. Recipients may use, study, modify and redistribute that material under the GPL. Modified private copies and lawful independent distributions do not require submitting a pull request to this project. Original blog article text explicitly marked for that purpose uses CC-BY-SA-4.0 under [blog/LICENSING.md](blog/LICENSING.md); media and separately licensed components retain their own terms.
 
-[licensing/SOURCE-LICENSE-SCOPE.json](licensing/SOURCE-LICENSE-SCOPE.json) records classification and provenance. File location is not proof of ownership. Preserve [COPYRIGHT.md](COPYRIGHT.md) and applicable notices.
+[licensing/SOURCE-LICENSE-SCOPE.json](licensing/SOURCE-LICENSE-SCOPE.json) records historical classification and provenance; the matching release SOURCE-ARCHIVE-MANIFEST.json identifies the complete current source set. File location is not proof of ownership. Preserve [COPYRIGHT.md](COPYRIGHT.md) and applicable notices.
 
 ## Third-party material
 
@@ -18,7 +18,7 @@ The tunnel executable identifies its own module as a development build without a
 
 ## Source delivery
 
-Distribute the matching FrameBridge 0.3.1 source archive beside its installer, the immutable shared Python/Rust dependency-source asset, the new tunnel-client dependency-source supplement and retained notices. [Source availability](licensing/third-party/SOURCE-AVAILABILITY.md) identifies the files and hashes.
+Distribute the matching FrameBridge 0.3.4 source archive beside each of its three distribution-profile installers, the immutable shared Python/Rust dependency-source asset, the new tunnel-client dependency-source supplement and retained notices. [Source availability](licensing/third-party/SOURCE-AVAILABILITY.md) identifies the files and hashes.
 
 The unchanged Certifi source arrangement retains its exact upstream source assets, original notice, full MPL-2.0 text and recipient access instructions. The historical Mozilla certdata revision remains unidentified. No independent native-wheel or tunnel-client rebuild is claimed. These are provenance and reproducibility limits, not claims that unavailable proof has been obtained.
 

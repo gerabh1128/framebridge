@@ -4,11 +4,13 @@ This is a setup and verification workflow for an assistant that **already has au
 
 The currently tested connection is the manual ChatGPT workflow. A coding assistant can help prepare it through the CLI; this document does not claim drop-in integration with every AI client.
 
-Source preparation: **0.3.2, unsigned release candidate**, promoted from compatibility revision `0.3.2~compat.20261027.3` after its Debian 13, Ubuntu 24.04 and Mint 22.3 VM checks passed. Check the exact artifact release record before installation; this prior behavior evidence does not verify the final package bytes or claim public availability.
+Latest signed release: **0.3.3**, published for Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. Use the exact profile, signatures and source record from the [official download page](https://framebridge.betancourt.one/download/). A later source checkout can contain unreleased changes; it is not evidence that a new package has been built, signed or published. Historical compatibility-candidate checks remain separate from validation of the actual release artifacts.
 
 ## Before handing over
 
 Give the assistant the computer you want to work on, the intended task, and the local path of the reviewed matching package. Use the [README's package matrix](../README.md#1-install-the-matching-package). If this is a pilot beside an existing installation, identify a new isolated `--state-dir` and the existing services that must remain running.
+
+Name both the computer receiving the assistant's tool call and the intended execution target. `LOCAL` means the current FrameBridge receiver, not a fixed computer called ASUS or the computer displaying the chat. Discover enrolled nodes and use their confirmed aliases or IDs. A legacy connector can have a different default target; changing endpoints does not preserve that default automatically.
 
 Do not put passwords, tunnel IDs, server access keys or browser codes in the prompt. The owner will enter them in the local hidden prompts. An MCP server access key is not an OpenAI API key.
 
@@ -20,12 +22,16 @@ Help me install and verify FrameBridge on this Linux computer.
 Target computer: [the computer to which you already have authorized shell access]
 Reviewed package: [absolute local path to the matching FrameBridge .deb]
 Scope: [new installation, or the specifically authorized pilot/profile]
+Receiver and execution target: [identify both; do not assume LOCAL means ASUS]
 
 First establish where you are running. Inspect the distribution/version,
 architecture and system Python. Match them to the package's release profile.
 Read the project's README and the installed versioned help where available.
 Reuse FrameBridge's existing CLI and package; do not invent a replacement
 transport or rewrite the application to complete setup.
+Confirm the receiver and selected target before the first remote operation.
+Use an enrolled alias or ID for another computer and inspect the effective
+target in the response. Do not fall back to a different computer on error.
 
 Use my existing task authorization. Complete the authorized preparatory work
 before asking for information or a decision that is actually missing.
@@ -70,6 +76,8 @@ If desktop access is in scope, first identify the actual X11 session and use
 a new test window. A virtual display must be described as virtual. Terminal
 text is not a screen capture, and a VM's desktop is not the owner's physical
 display. Do not claim a screenshot or successful input unless it was observed.
+Coordinate one controller at a time for a shared desktop. Preserve existing
+console windows and their work unless changing them is part of the task.
 
 Check actual command exit codes and operation results. An outer tool wrapper's
 success flag is not proof that its inner command succeeded. Distinguish local

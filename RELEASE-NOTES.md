@@ -1,5 +1,9 @@
 # FrameBridge release notes
 
+## 0.3.4
+
+Native persistent startup improvements, lower idle disk writes, local health reporting and confirmed Fleet destinations. The release has three amd64 distribution profiles and matching source with both Python ABIs. See [the complete 0.3.4 notes](docs/RELEASE-NOTES-0.3.4.md); signatures and actual lifecycle results are recorded with the release artifacts.
+
 ## Unreleased — private production pilot fixes
 
 Private pilot validation remains in progress; these changes are not a public release.

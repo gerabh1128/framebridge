@@ -111,7 +111,7 @@ def assess(prefix, *, os_release=None, machine=None, python_version=None, libc=N
             expected = PROFILES[manifest["profile_id"]]
             if (manifest.get("architecture"), manifest.get("python_minor"), manifest.get("python_abi")) != ("amd64", expected[2], expected[3]):
                 raise ValueError("inconsistent profile ABI")
-            if manifest.get("validation_status") not in {"candidate", "validated"}:
+            if manifest.get("validation_status") not in {"candidate", "release_build", "validated"}:
                 raise ValueError("missing validation status")
             if manifest["profile_id"] != selected or manifest["python_minor"] != minor or manifest["python_abi"] != abi:
                 issues.append("Installed artifact profile/ABI does not match this operating system and interpreter.")
@@ -126,7 +126,9 @@ def assess(prefix, *, os_release=None, machine=None, python_version=None, libc=N
             warnings.append("Source checkout has no artifact manifest; only the legacy Debian 13/cp313 profile is eligible.")
     issues.extend(_vendor_issues(prefix, abi))
     validation = manifest.get("validation_status") if manifest else "source-unvalidated"
-    if validation != "validated":
+    if validation == "release_build":
+        warnings.append("Release assembly does not establish a tested installation on this target; consult the external release acceptance record.")
+    elif validation != "validated":
         warnings.append("Candidate compatibility checks do not establish a tested installation on this target.")
     return {"ok": not issues, "profile_id": selected, "artifact_profile_id": manifest.get("profile_id") if manifest else None,
             "architecture": machine, "python_minor": minor, "python_abi": abi, "python_implementation": implementation, "python_abi_flags": abi_flags,

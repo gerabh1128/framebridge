@@ -31,7 +31,8 @@ class CandidateArchiveTests(unittest.TestCase):
              mock.patch.object(archive_sources, "validate_vendor", return_value=evidence), \
              contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as stderr:
             archive_sources.main(args)
-        return self.base / "release/candidate-source" / archive_sources.ARCHIVE_NAME, stderr.getvalue()
+        directory = "public-source" if "--public-release" in args else "candidate-source"
+        return self.base / "release" / directory / archive_sources.ARCHIVE_NAME, stderr.getvalue()
 
     def test_default_archive_declares_missing_alternate_abis(self):
         output, warning = self.run_archive([])
@@ -63,6 +64,25 @@ class CandidateArchiveTests(unittest.TestCase):
         self.assertFalse(any("FB-ABI-PREPARED" in name or name.endswith("bin/tool") or name.endswith("private.log") for name in names))
         self.assertEqual(set(data["vendors"]), {"cp312", "cp313", "cp314"})
         self.assertEqual(data["omitted_vendor_abis"], [])
+
+    def test_public_archive_requires_matching_cp312_and_excludes_experimental_input(self):
+        for args in (["--public-release"], ["--public-release", "--vendor-cp312", str(self.root), "--vendor-cp314", str(self.root)]):
+            with self.assertRaises(SystemExit):
+                self.run_archive(args)
+
+    def test_public_archive_describes_three_profiles_without_claiming_publication(self):
+        vendor = self.root / "cp312"; vendor.mkdir()
+        (vendor / "module.py").write_text("# reviewed cp312 input\n")
+        output, warning = self.run_archive(["--public-release", "--vendor-cp312", str(vendor)])
+        self.assertFalse(warning)
+        manifest = json.loads((output.parent / "SOURCE-ARCHIVE-MANIFEST.json").read_text())
+        self.assertEqual(manifest["status"], "RELEASE_SOURCE_ASSEMBLED")
+        self.assertEqual(set(manifest["vendor_inputs"]["vendors"]), {"cp312", "cp313"})
+        with tarfile.open(output) as archive:
+            readme = archive.extractfile(archive_sources.ARCHIVE_ROOT + "/README-SOURCE-ARCHIVE.md").read().decode()
+        self.assertIn("--public-release --source-manifest", readme)
+        self.assertNotIn("compatibility candidate source", readme)
+        self.assertIn("Signatures, publication", readme)
 
     def test_alternate_vendor_symlink_is_rejected(self):
         vendor = self.root / "cp312"; vendor.mkdir()

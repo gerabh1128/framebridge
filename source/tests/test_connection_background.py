@@ -141,6 +141,11 @@ class BackgroundTests(unittest.TestCase):
             record=json.loads(path.read_text());record['verified_at']=time.time()-30
             record['message']='\x1b[31m'+FAKE
             background._write(path,record)
+            if record.get('heartbeat_backend') == background._HEARTBEAT_BACKEND:
+                heartbeat_path=background._heartbeat_directory(self.state)/'status.json'
+                heartbeat=background._read(heartbeat_path)
+                heartbeat['verified_at']=time.time()-30
+                background._write(heartbeat_path,heartbeat)
             current=background.status(self.state)
             self.assertFalse(current['verified'])
             self.assertEqual(current['state'],'retrying')

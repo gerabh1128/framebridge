@@ -202,6 +202,58 @@ class PackageUpgradeTests(unittest.TestCase):
         self.assertEqual(value['phase'], 'CAPTURED')
         run.assert_not_called()
 
+    def test_reinstall_after_failure_preserves_receipt_and_keeps_stopped_profiles_stopped(self):
+        failed = {'schema': 1, 'transaction': 'a' * 16, 'phase': 'FAILED',
+                  'profiles': [{'state': str(self.state), 'phase': 'FAILED',
+                                'error': 'UPGRADE_OWNER_OPERATION_FAILED:user-ready'}]}
+        self.write(self.root / 'pending.json', failed)
+        processes = self.root / 'no-running-managers'
+        processes.mkdir()
+        marker = self.state / 'manual-stop.json'
+        marker.write_bytes(b'{"manual_stop": true}\n')
+        before_marker = marker.read_bytes()
+        with mock.patch.object(upgrade, 'ROOT', self.root), \
+             mock.patch.object(upgrade, '_root'), \
+             mock.patch.object(upgrade, '_read', side_effect=self.root_read), \
+             mock.patch.object(upgrade.subprocess, 'run') as run:
+            value = upgrade.snapshot(processes)
+            self.assertEqual(value['profiles'], [])
+            self.assertEqual(upgrade.schedule()['phase'], 'COMPLETE')
+        self.assertEqual(json.loads((self.root / 'previous.json').read_text()), failed)
+        self.assertEqual(marker.read_bytes(), before_marker)
+        run.assert_not_called()
+
+    def test_reinstall_after_failure_captures_only_current_managers_without_replaying_old_intent(self):
+        failed = {'schema': 1, 'phase': 'FAILED',
+                  'profiles': [{'state': '/home/owner/previous-profile', 'phase': 'FAILED'}]}
+        self.write(self.root / 'pending.json', failed)
+        row = {'uid': 1000, 'state': str(self.state), 'pid': 1234, 'phase': 'CAPTURED'}
+        with mock.patch.object(upgrade, 'ROOT', self.root), \
+             mock.patch.object(upgrade, '_root'), \
+             mock.patch.object(upgrade, '_read', side_effect=self.root_read), \
+             mock.patch.object(upgrade, 'identify', return_value=row), \
+             mock.patch.object(upgrade.subprocess, 'run', return_value=SimpleNamespace(returncode=0)) as run:
+            value = upgrade.snapshot(self.root)
+            self.assertEqual(value['profiles'], [row])
+            self.assertEqual(upgrade.schedule()['phase'], 'SCHEDULED')
+        self.assertEqual(json.loads((self.root / 'previous.json').read_text()), failed)
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args[0][-2:], [upgrade.MODULE, 'resume'])
+
+    def test_reinstall_does_not_replace_a_snapshot_with_a_live_upgrade_worker(self):
+        for phase in ('SCHEDULED', 'RUNNING'):
+            with self.subTest(phase=phase):
+                self.write(self.root / 'pending.json', {'schema': 1, 'phase': phase})
+                before = (self.root / 'pending.json').read_bytes()
+                with mock.patch.object(upgrade, 'ROOT', self.root), \
+                     mock.patch.object(upgrade, '_root'), \
+                     mock.patch.object(upgrade, '_read', side_effect=self.root_read), \
+                     mock.patch.object(upgrade, 'identify', return_value=None):
+                    with self.assertRaisesRegex(RuntimeError, 'PREVIOUS_WORKER_PENDING'):
+                        upgrade.snapshot(self.root)
+                self.assertEqual((self.root / 'pending.json').read_bytes(), before)
+                self.assertFalse((self.root / 'previous.json').exists())
+
     def test_optional_desktop_migration_failure_does_not_stop_runtime_recovery(self):
         row = {'uid': 1000, 'user': 'owner', 'home': '/home/owner',
                'state': str(self.state), 'pid': 1234, 'birth': '99',

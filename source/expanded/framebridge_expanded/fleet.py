@@ -164,6 +164,19 @@ def resolve_node(alias: str) -> dict[str, Any]:
     return matches[0]
 
 
+def _target_identity(requested: str, node: dict[str, Any]) -> dict[str, Any]:
+    """Describe the confirmed route, never identity claimed by a node response."""
+    return {
+        "requested_target": requested,
+        "resolved_target": node["alias"],
+        "node": node["alias"],
+        "target": "LOCAL" if node["transport"] == "local" else node["alias"],
+        "node_id": node["node_id"],
+        "hostname": node.get("hostname"),
+        "transport": node["transport"],
+    }
+
+
 def _normalize_read(capability: str, args: dict[str, Any]) -> dict[str, Any]:
     bootstrap_original()
     from framebridge_linux_chatgpt.fleet_routing import ReadCapability, normalize_read_args
@@ -185,6 +198,7 @@ def read_local(capability: str, args: dict[str, Any]) -> dict[str, Any]:
 
 
 def node_read(alias: str, capability: str, args: dict[str, Any]) -> dict[str, Any]:
+    node = None
     try:
         normalized = _normalize_read(capability, args)
         node = resolve_node(alias)
@@ -196,10 +210,13 @@ def node_read(alias: str, capability: str, args: dict[str, Any]) -> dict[str, An
             result = broker.request(node["node_id"], capability, normalized, timeout_s=30)
         _require(type(result) is dict, "NODE_READ_RESPONSE_INVALID")
         response = dict(result)
-        response.update(node=node["alias"], hostname=node["hostname"], transport=node["transport"])
+        response.update(_target_identity(alias, node))
         return response
     except Exception as exc:
-        return {"ok": False, "error": str(exc) if isinstance(exc, FleetError) else "NODE_READ_FAILED"}
+        response = {"ok": False, "error": str(exc) if isinstance(exc, FleetError) else "NODE_READ_FAILED"}
+        if node is not None:
+            response.update(_target_identity(alias, node))
+        return response
 
 
 def _exec_payload(script: str, authorized: bool, timeout_s: int, job_id: str,
@@ -224,6 +241,7 @@ def _exec_payload(script: str, authorized: bool, timeout_s: int, job_id: str,
 
 def execute_node(alias: str, script: str, authorized: bool, timeout_s: int = 120,
                  job_id: str = "", sha256: str = "", include_stdout: bool = False) -> dict[str, Any]:
+    node = None
     try:
         payload = _exec_payload(script, authorized, timeout_s, job_id, sha256, include_stdout)
         node = resolve_node(alias)
@@ -241,20 +259,24 @@ def execute_node(alias: str, script: str, authorized: bool, timeout_s: int = 120
                      "NODE_EXEC_JOB_BINDING_INVALID")
             _require(response.get("mcp_script_sha256", response.get("command_sha256")) == payload["sha256"],
                      "NODE_EXEC_HASH_BINDING_INVALID")
-        response.update(target="LOCAL" if node["transport"] == "local" else node["alias"],
-                        node_id=node["node_id"], mcp_job_id=payload["job_id"],
+        response.update(_target_identity(alias, node))
+        response.update(mcp_job_id=payload["job_id"],
                         mcp_script_sha256=payload["sha256"])
         if include_stdout is not True:
             response.pop("stdout", None)
         return response
     except Exception as exc:
-        return {"ok": False, "error": str(exc) if isinstance(exc, FleetError) else "NODE_EXEC_FAILED"}
+        response = {"ok": False, "error": str(exc) if isinstance(exc, FleetError) else "NODE_EXEC_FAILED"}
+        if node is not None:
+            response.update(_target_identity(alias, node))
+        return response
 
 
 def execute_screen_node(alias: str, script: str, authorized: bool, timeout_s: int = 30,
                         job_id: str = "", sha256: str = "", include_stdout: bool = False) -> dict[str, Any]:
     """Use the same confirmed-node authority with an explicit non-shell screen operation."""
     from .real_screen.screen_transport import REQUEST_TYPE, validate_payload, ScreenTransportError
+    node = None
     try:
         _require(type(timeout_s) is int and 1 <= timeout_s <= 30, "INVALID_SCREEN_TIMEOUT")
         payload = _exec_payload(script, authorized, timeout_s, job_id, sha256, include_stdout)
@@ -280,16 +302,20 @@ def execute_screen_node(alias: str, script: str, authorized: bool, timeout_s: in
             from .real_screen.screen_rpc import encode
             response.update(ok=False, exit_code="1", stdout_truncated=False,
                             stdout=encode({"ok": False, "error": {"code": "SCREEN_RPC_UNSUPPORTED_ON_NODE"}}).decode("ascii") + "\n")
-        response.update(target="LOCAL" if node["transport"] == "local" else node["alias"],
-                        node_id=node["node_id"], mcp_job_id=payload["job_id"],
+        response.update(_target_identity(alias, node))
+        response.update(mcp_job_id=payload["job_id"],
                         mcp_script_sha256=payload["sha256"])
         return response
     except Exception as exc:
-        return {"ok": False, "error": str(exc) if isinstance(exc, (FleetError, ScreenTransportError)) else "SCREEN_RPC_FAILED"}
+        response = {"ok": False, "error": str(exc) if isinstance(exc, (FleetError, ScreenTransportError)) else "SCREEN_RPC_FAILED"}
+        if node is not None:
+            response.update(_target_identity(alias, node))
+        return response
 
 
 def cua_node(alias: str, payload: dict[str, Any], authorized: bool,
              timeout_s: int = 60, job_id: str = "") -> dict[str, Any]:
+    node = None
     try:
         _require(authorized is True, "AUTHORIZED_TRUE_REQUIRED")
         _require(type(payload) is dict, "CUA_PAYLOAD_REQUIRED")
@@ -316,10 +342,13 @@ def cua_node(alias: str, payload: dict[str, Any], authorized: bool,
         response = dict(result)
         if response.get("ok") is True:
             _require(response.get("job_id") == job, "NODE_CUA_JOB_BINDING_INVALID")
-        response.update(target="LOCAL" if node["transport"] == "local" else node["alias"], node_id=node["node_id"])
+        response.update(_target_identity(alias, node))
         return response
     except Exception as exc:
-        return {"ok": False, "error": str(exc) if isinstance(exc, FleetError) else "NODE_CUA_FAILED"}
+        response = {"ok": False, "error": str(exc) if isinstance(exc, FleetError) else "NODE_CUA_FAILED"}
+        if node is not None:
+            response.update(_target_identity(alias, node))
+        return response
 
 
 def main() -> None:

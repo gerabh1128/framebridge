@@ -1,4 +1,4 @@
-# Third-party terms and source delivery — FrameBridge 0.3.1
+# Third-party terms and source delivery — FrameBridge 0.3.4
 
 This scoped release record combines the retained Python/Rust review with the 0.3.1 OpenAI tunnel-client notice supplement. It does not relabel incorporated components as FrameBridge-owned GPL material.
 
@@ -20,7 +20,7 @@ The executable's own module is marked (devel) and has no embedded VCS revision. 
 
 ## Delivery conditions and limits
 
-Provide FrameBridge-0.3.1.deb, its exact corresponding FrameBridge source archive, both dependency-source assets, R2 supplement and retained notices through actual working download paths. Verify file hashes at staging and public delivery. Private collection or a future URL is not public availability.
+Provide all three FrameBridge 0.3.4 distribution-profile packages, their exact corresponding FrameBridge-0.3.4-source.tar.gz and SOURCE-ARCHIVE-MANIFEST.json, both dependency-source assets, R2 supplement and retained notices through actual working download paths. Verify file hashes at staging and public delivery. Private collection or a future URL is not public availability.
 
 The unchanged Certifi arrangement retains its exact source assets, original notice, full MPL-2.0 text and recipient access instructions. The original historical Mozilla certdata revision remains unidentified. No independent native-wheel rebuild is claimed. These provenance/reproducibility limits remain explicit.
 

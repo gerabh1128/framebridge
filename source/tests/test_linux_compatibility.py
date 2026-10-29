@@ -1,10 +1,13 @@
 """Candidate profile/ABI selection; tests use inert native-file fixtures."""
 import hashlib
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
 import tempfile
 import stat
+import sys
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -63,6 +66,43 @@ class LinuxCompatibilityTests(unittest.TestCase):
             with self.subTest(distro=distro, version=version):
                 self.assertFalse(self.check(distro, version, (3, 12))["ok"])
         self.assertIsNone(compat.profile_for({"ID": "other", "ID_LIKE": "ubuntu", "VERSION_ID": "24.04"}))
+
+    def test_public_builder_profiles_are_accepted_by_the_runtime_without_claiming_validation(self):
+        # Use the real public builder's profile output, rather than duplicating
+        # its validation_status value in a fixture. Archive/vendor verification
+        # has separate tests; --check-vendor does not stage/install a package.
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packaging"))
+        import archive_sources
+        import build_expanded
+        targets = [("debian13-amd64-py313", "debian", "13", (3, 13)),
+                   ("ubuntu24.04-amd64-py312", "ubuntu", "24.04", (3, 12)),
+                   ("mint22-amd64-py312", "linuxmint", "22.3", (3, 12))]
+        for profile_id, distro, version, python in targets:
+            with self.subTest(profile=profile_id):
+                self.artifact(profile_id)
+                output = io.StringIO()
+                globals_before = {name: getattr(build_expanded, name) for name in
+                                  ("VERSION", "PUBLIC_RELEASE", "SOURCE_ARCHIVE", "PUBLIC_FILENAME", "RELEASE", "STAGE", "PREFIX")}
+                args = ["--target", profile_id, "--public-release", "--source-manifest", str(self.prefix / "source.json"), "--check-vendor"]
+                if profile_id != "debian13-amd64-py313":
+                    args += ["--vendor-dir", str(self.prefix / "reviewed-cp312")]
+                with patch.multiple(build_expanded, **globals_before), \
+                     patch.object(build_expanded.subprocess, "run"), \
+                     patch.object(build_expanded, "vendor_versions", return_value={}), \
+                     patch.object(build_expanded, "validate_vendor", return_value={"vendor_sha256": "a" * 64}), \
+                     patch.object(build_expanded, "release_source", return_value={"filename": "FrameBridge-0.3.4-source.tar.gz", "sha256": "b" * 64}), \
+                     patch.object(build_expanded, "legal_preflight"), \
+                     patch.object(archive_sources, "source_files", return_value={}), \
+                     contextlib.redirect_stdout(output):
+                    build_expanded.main(args)
+                manifest = json.loads(output.getvalue())
+                self.assertEqual(manifest["validation_status"], "release_build")
+                (self.prefix / "release-profile.json").write_text(json.dumps(manifest))
+                result = self.check(distro, version, python)
+                self.assertTrue(result["ok"], result)
+                self.assertEqual(result["validation_status"], manifest["validation_status"])
+                self.assertIn("Release assembly does not establish a tested installation", result["warnings"][0])
+                self.assertNotEqual(result["validation_status"], "validated")
 
     def test_interpreter_artifact_and_cpu_must_all_match(self):
         self.artifact("ubuntu24.04-amd64-py312")

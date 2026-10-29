@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import unittest
 from unittest import mock
-from framebridge_expanded import autostart, config, runtime, connection_background
+from framebridge_expanded import autostart, config, runtime, connection_background, credential_helper
 
 ID = "tunnel_0123456789abcdef0123456789abcdef"
 MARKER = "FRAMEBRIDGE-SYNTHETIC-NOT-A-REAL-KEY-AUTOSTART"
@@ -435,6 +435,161 @@ class AutostartTests(unittest.TestCase):
         self.assertNotIn("LoadCredentialEncrypted", unit.read_text())
         self.assertFalse((directory / "credential.cred").exists())
 
+    def test_fresh_node_with_existing_linger_authenticates_before_existing_grant_cleanup(self):
+        for start_now in (False, True):
+            with self.subTest(start_now=start_now):
+                state = self.home / ("node-now" if start_now else "node-boot")
+                config.save_config(state, config.default_config(role="node"))
+                before = (state / "config.json").read_bytes()
+                self.calls.clear()
+                self.system_calls.clear()
+                with mock.patch.object(autostart, "_linger", return_value=True), mock.patch.object(autostart, "_helper_present", return_value=True), mock.patch.object(autostart, "_node_helper_cleanup_required", return_value=True), mock.patch.object(autostart, "_credential_backend", side_effect=AssertionError("A node has no connection credential")):
+                    autostart._enable(state, start_now=start_now, confirm=False)
+                _, directory, unit = autostart._paths(state)
+                expected_prune = ["sudo", "-n", "--", str(autostart.HELPER), "prune", autostart._profile_id(state), "-"]
+                # Exercise the real prune implementation through the command
+                # boundary: no authentication or global boot change is hidden.
+                self.assertEqual([["sudo", "-v"], expected_prune], [args for args, _ in self.calls])
+                self.assertEqual(before, (state / "config.json").read_bytes())
+                self.assertTrue(autostart._manifest(directory)["linger_before"])
+                self.assertTrue(autostart._manifest(directory)["node"])
+                self.assertFalse((directory / "credential.cred").exists())
+                self.assertIn(("enable", "--now", unit.name) if start_now else ("enable", unit.name), self.system_calls)
+                self.assertEqual(0o600, stat.S_IMODE(unit.stat().st_mode))
+                self.inputs.assert_not_called()
+                self.key_prompt.assert_not_called()
+
+    def test_fresh_node_with_existing_linger_fails_closed_when_prune_is_not_authorized(self):
+        config.save_config(self.state, config.default_config(role="node"))
+        before = (self.state / "config.json").read_bytes()
+
+        def denied_prune(args, **kwargs):
+            if len(args) > 4 and args[:4] == ["sudo", "-n", "--", str(autostart.HELPER)] and args[4] == "prune":
+                self.calls.append((args, kwargs))
+                raise RuntimeError("Synthetic cleanup grant denied")
+            return self.fake_command(args, **kwargs)
+
+        self.command.side_effect = denied_prune
+        with mock.patch.object(autostart, "_linger", return_value=True), mock.patch.object(autostart, "_helper_present", return_value=True), mock.patch.object(autostart, "_node_helper_cleanup_required", return_value=True):
+            with self.assertRaisesRegex(RuntimeError, "cleanup grant denied"):
+                autostart._enable(self.state, confirm=False)
+        _, directory, unit = autostart._paths(self.state)
+        self.assertEqual(before, (self.state / "config.json").read_bytes())
+        self.assertFalse(unit.exists())
+        self.assertFalse((directory / "installation.json").exists())
+        self.assertEqual([], self.system_calls)
+        self.assertEqual(["sudo", "-v"], self.calls[0][0])
+        self.assertFalse(any("loginctl" in args for args, _ in self.calls))
+
+    def test_fresh_node_with_existing_linger_and_no_managed_grants_needs_no_privilege(self):
+        policies = self.root / "policies"
+        policies.mkdir()
+        profile = autostart._profile_id(self.state)
+        # Other profiles and owners must not cause an unnecessary request.
+        (policies / ("framebridge-credential-" + str(os.getuid()) + "-" + "a" * 64 + "-" + "b" * 64)).touch()
+        (policies / ("framebridge-credential-987654321-" + profile + "-" + "b" * 64)).touch()
+        config.save_config(self.state, config.default_config(role="node"))
+        before = (self.state / "config.json").read_bytes()
+        with mock.patch.object(autostart, "_linger", return_value=True), mock.patch.object(autostart, "_helper_present", return_value=True), mock.patch.object(credential_helper, "SUDOERS", policies), mock.patch.object(credential_helper, "_root_path", side_effect=lambda path, **kw: path):
+            autostart._enable(self.state, confirm=False, start_now=False)
+        _, directory, unit = autostart._paths(self.state)
+        self.assertEqual([], self.calls)
+        self.assertEqual(before, (self.state / "config.json").read_bytes())
+        self.assertIn(("enable", unit.name), self.system_calls)
+        self.assertTrue(autostart._manifest(directory)["node"])
+        self.assertFalse((directory / "credential.cred").exists())
+        self.key_prompt.assert_not_called()
+
+    def test_ambiguous_node_policy_fails_before_authentication_or_managed_writes(self):
+        policies = self.root / "policies"
+        policies.mkdir()
+        name = "framebridge-credential-authorize-" + str(os.getuid()) + "-" + autostart._profile_id(self.state) + "-unknown"
+        (policies / name).touch()
+        config.save_config(self.state, config.default_config(role="node"))
+        before = (self.state / "config.json").read_bytes()
+        with mock.patch.object(autostart, "_linger", return_value=True), mock.patch.object(autostart, "_helper_present", return_value=True), mock.patch.object(credential_helper, "SUDOERS", policies), mock.patch.object(credential_helper, "_root_path", side_effect=lambda path, **kw: path):
+            with self.assertRaisesRegex(RuntimeError, "ambiguous.*administrator review"):
+                autostart._enable(self.state, confirm=False)
+        _, directory, unit = autostart._paths(self.state)
+        self.assertEqual([], self.calls)
+        self.assertEqual([], self.system_calls)
+        self.assertEqual(before, (self.state / "config.json").read_bytes())
+        self.assertFalse(unit.exists())
+        self.assertFalse((directory / "installation.json").exists())
+        self.assertFalse((directory / "credential.cred").exists())
+        self.assertTrue((policies / name).exists())
+
+    def test_fresh_node_without_linger_requires_authentication_before_managed_writes(self):
+        config.save_config(self.state, config.default_config(role="node"))
+        before = (self.state / "config.json").read_bytes()
+
+        def denied_authentication(args, **kwargs):
+            if args == ["sudo", "-v"]:
+                self.calls.append((args, kwargs))
+                raise RuntimeError("Synthetic owner authentication required")
+            return self.fake_command(args, **kwargs)
+
+        self.command.side_effect = denied_authentication
+        with mock.patch.object(autostart, "_helper_present", return_value=True):
+            with self.assertRaisesRegex(RuntimeError, "owner authentication required"):
+                autostart._enable(self.state, confirm=False)
+        _, directory, unit = autostart._paths(self.state)
+        self.assertEqual([["sudo", "-v"]], [args for args, _ in self.calls])
+        self.assertEqual(before, (self.state / "config.json").read_bytes())
+        self.assertFalse(unit.exists())
+        self.assertFalse((directory / "installation.json").exists())
+        self.assertFalse((directory / "credential.cred").exists())
+        self.assertEqual([], self.system_calls)
+        self.key_prompt.assert_not_called()
+
+    def test_fresh_node_without_linger_keeps_administrative_boot_setup(self):
+        config.save_config(self.state, config.default_config(role="node"))
+        with mock.patch.object(autostart, "_helper_present", return_value=True):
+            autostart._enable(self.state, confirm=False)
+        user = autostart.pwd.getpwuid(os.getuid()).pw_name
+        expected_prune = ["sudo", "-n", "--", str(autostart.HELPER), "prune", autostart._profile_id(self.state), "-"]
+        self.assertEqual([["sudo", "-v"], expected_prune,
+                          ["sudo", "-n", "--", "loginctl", "enable-linger", user]],
+                         [args for args, _ in self.calls])
+        self.key_prompt.assert_not_called()
+
+    def test_central_with_existing_linger_still_authenticates_and_protects_its_key(self):
+        settings = config.default_config(role="central")
+        settings.update(tunnel_id=ID, headless="auto")
+        config.save_config(self.state, settings)
+        with mock.patch.object(autostart, "_linger", return_value=True):
+            autostart.enable(self.state)
+        self.assertIn(["sudo", "-v"], [args for args, _ in self.calls])
+        encryption = [(args, options) for args, options in self.calls if "encrypt" in args and "-ll" not in args]
+        self.assertEqual(1, len(encryption))
+        self.assertEqual(MARKER.encode(), encryption[0][1]["data"])
+        self.assertNotIn(MARKER, " ".join(encryption[0][0]))
+        self.key_prompt.assert_called_once_with("Connection key (hidden): ")
+        _, directory, _ = autostart._paths(self.state)
+        self.assertTrue((directory / "credential.cred").exists())
+
+    def test_central_existing_linger_does_not_bypass_failed_owner_authentication(self):
+        settings = config.default_config(role="central")
+        settings.update(tunnel_id=ID, headless="auto")
+        config.save_config(self.state, settings)
+        before = (self.state / "config.json").read_bytes()
+
+        def denied_authentication(args, **kwargs):
+            if args == ["sudo", "-v"]:
+                raise RuntimeError("Synthetic owner authentication required")
+            return self.fake_command(args, **kwargs)
+
+        self.command.side_effect = denied_authentication
+        with mock.patch.object(autostart, "_linger", return_value=True):
+            with self.assertRaisesRegex(RuntimeError, "owner authentication required"):
+                autostart.enable(self.state)
+        _, directory, unit = autostart._paths(self.state)
+        self.assertEqual(before, (self.state / "config.json").read_bytes())
+        self.assertFalse(unit.exists())
+        self.assertFalse((directory / "installation.json").exists())
+        self.assertFalse((directory / "credential.cred").exists())
+        self.key_prompt.assert_not_called()
+
     def test_private_file_reader_rejects_symlink_hardlink_fifo_and_public_file(self):
         original = self.root / "original"
         original.write_bytes(b"safe")
@@ -465,6 +620,89 @@ class AutostartTests(unittest.TestCase):
             self.key_prompt.assert_not_called()
         finally:
             os.close(fd)
+
+    def _service_directory_owners(self, owners):
+        actual_lstat = Path.lstat
+
+        def owner_lstat(path, *args, **kwargs):
+            values = list(actual_lstat(path, *args, **kwargs))
+            values[4] = owners.get(path, values[4])
+            return os.stat_result(values)
+
+        return mock.patch.object(Path, "lstat", owner_lstat)
+
+    def test_root_owned_service_ancestors_allow_owned_final_directory_without_changes(self):
+        final = self.home / ".config/systemd/user"
+        final.mkdir(parents=True, mode=0o700)
+        directories = [self.home / ".config", final.parent, final]
+        before = {p: (p.stat().st_uid, p.stat().st_mode) for p in directories}
+        owners = {directories[0]: 0, directories[1]: 0, final: 1000}
+        with mock.patch.object(autostart.os, "getuid", return_value=1000), self._service_directory_owners(owners):
+            autostart._check_unit_directory(final / "test.service")
+        self.assertEqual(before, {p: (p.stat().st_uid, p.stat().st_mode) for p in directories})
+        self.assertEqual([], list(final.iterdir()))
+
+    def test_root_or_other_account_cannot_own_final_service_directory(self):
+        final = self.home / ".config/systemd/user"
+        final.mkdir(parents=True, mode=0o700)
+        for owner in (0, 2000):
+            with self.subTest(owner=owner), mock.patch.object(autostart.os, "getuid", return_value=1000), self._service_directory_owners({self.home / ".config": 0, final.parent: 0, final: owner}):
+                with self.assertRaisesRegex(RuntimeError, "final directory must belong"):
+                    autostart._check_unit_directory(final / "test.service")
+        self.assertEqual([], list(final.iterdir()))
+
+    def test_other_account_cannot_own_service_ancestors(self):
+        final = self.home / ".config/systemd/user"
+        final.mkdir(parents=True, mode=0o700)
+        for ancestor in (self.home / ".config", final.parent):
+            owners = {self.home / ".config": 0, final.parent: 0, final: 1000, ancestor: 2000}
+            with self.subTest(ancestor=ancestor.name), mock.patch.object(autostart.os, "getuid", return_value=1000), self._service_directory_owners(owners):
+                with self.assertRaisesRegex(RuntimeError, "safe owner"):
+                    autostart._check_unit_directory(final / "test.service")
+
+    def test_root_owned_service_ancestors_still_reject_writable_or_symbolic_directories(self):
+        final = self.home / ".config/systemd/user"
+        final.mkdir(parents=True, mode=0o700)
+        directories = [self.home / ".config", final.parent, final]
+        owners = {directories[0]: 0, directories[1]: 0, final: 1000}
+        for directory in directories:
+            original = directory.stat().st_mode
+            for mode in (0o775, 0o777):
+                with self.subTest(directory=directory.name, mode=mode):
+                    directory.chmod(mode)
+                    with mock.patch.object(autostart.os, "getuid", return_value=1000), self._service_directory_owners(owners):
+                        with self.assertRaisesRegex(RuntimeError, "not be writable"):
+                            autostart._check_unit_directory(final / "test.service")
+                    self.assertEqual(mode, stat.S_IMODE(directory.stat().st_mode))
+            directory.chmod(stat.S_IMODE(original))
+            moved = directory.with_name(directory.name + "-target")
+            directory.rename(moved)
+            directory.symlink_to(moved, target_is_directory=True)
+            try:
+                with self.subTest(directory=directory.name, symbolic=True):
+                    with self.assertRaisesRegex(RuntimeError, "symbolic links"):
+                        autostart._check_unit_directory(final / "test.service")
+            finally:
+                directory.unlink()
+                moved.rename(directory)
+
+    def test_root_owned_parent_creation_failure_preserves_permissions_and_explains_failure(self):
+        parent = self.home / ".config/systemd"
+        parent.mkdir(parents=True, mode=0o755)
+        final = parent / "user"
+        before = {p: (p.stat().st_uid, p.stat().st_mode) for p in (parent.parent, parent)}
+        actual_mkdir = Path.mkdir
+
+        def denied_final(path, *args, **kwargs):
+            if path == final:
+                raise PermissionError("Synthetic administrator-owned parent")
+            return actual_mkdir(path, *args, **kwargs)
+
+        with mock.patch.object(autostart.os, "getuid", return_value=1000), self._service_directory_owners({parent.parent: 0, parent: 0}), mock.patch.object(Path, "mkdir", denied_final):
+            with self.assertRaisesRegex(RuntimeError, "cannot create.*left unchanged"):
+                autostart._check_unit_directory(final / "test.service")
+        self.assertFalse(final.exists())
+        self.assertEqual(before, {p: (p.stat().st_uid, p.stat().st_mode) for p in before})
 
     def test_unit_quotes_specifiers_and_dollars_without_shell_or_missing_package_loop(self):
         text = autostart.unit_text(Path('/tmp/a % b ${HOME} "quoted"'), Path('/tmp/key % file'))

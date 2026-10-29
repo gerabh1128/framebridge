@@ -132,6 +132,39 @@ def _prune_helpers(state, keep=()):
     _command(["sudo", "-n", "--", str(HELPER), "prune", _profile_id(state), ",".join(values) or "-"])
 
 
+def _node_helper_cleanup_required(state):
+    """Only omit privileged cleanup when no managed grant can authorize it.
+
+    The encrypted registry is deliberately private to root. Its orphaned
+    ciphertext does not grant access without a matching sudo policy. Inspect
+    only policy names in the secured, root-owned policy directory; never read
+    rule contents or treat a failed/incomplete inspection as an empty registry.
+    """
+    from .credential_helper import SUDOERS, _root_path
+    _helper_ready()
+    uid, profile = str(os.getuid()), _profile_id(state)
+    prefixes = ("framebridge-credential-" + uid + "-" + profile + "-",
+                "framebridge-credential-authorize-" + uid + "-" + profile + "-")
+    patterns = (re.escape(prefixes[0]) + r"[0-9a-f]{64}",
+                re.escape(prefixes[1]) + r"(?:host|user)")
+    try:
+        directory = _root_path(SUDOERS, directory=True)
+        names = [path.name for path in directory.iterdir()]
+    except (OSError, RuntimeError):
+        return True
+    cleanup_required = False
+    for name in names:
+        if any(re.fullmatch(pattern, name) for pattern in patterns):
+            cleanup_required = True
+            continue
+        # A malformed entry in this exact owner's/profile's managed namespace
+        # is ambiguous. The helper's normal cleanup does not recognize every
+        # malformed authorization name, so require explicit review instead.
+        if name.startswith(prefixes):
+            raise RuntimeError("An ambiguous managed credential policy needs administrator review before node startup can be configured.")
+    return cleanup_required
+
+
 @contextmanager
 def _credential_transaction(state, encrypted, backend):
     transaction = {"committed": False}
@@ -270,10 +303,17 @@ def _check_unit_directory(path):
     for directory in [Path.home() / ".config", Path.home() / ".config/systemd", path.parent]:
         if directory.is_symlink():
             raise RuntimeError("User service directories must not be symbolic links.")
-        directory.mkdir(mode=0o700, exist_ok=True)
-        info = directory.stat()
-        if info.st_uid != os.getuid() or info.st_mode & 0o022:
-            raise RuntimeError("User service directories must be owned by this user and not writable by others.")
+        try:
+            directory.mkdir(mode=0o700, exist_ok=True)
+        except PermissionError:
+            raise RuntimeError("This account cannot create its user service directory; existing ownership and permissions were left unchanged.") from None
+        info = directory.lstat()
+        # Service accounts can have administrator-owned .config ancestors.
+        # Those ancestors are safe when immutable to other accounts; the
+        # directory containing the unit must still belong to this owner.
+        allowed_owner = info.st_uid == os.getuid() or (directory != path.parent and info.st_uid == 0)
+        if not stat.S_ISDIR(info.st_mode) or not allowed_owner or info.st_mode & 0o022:
+            raise RuntimeError("User service directories must have a safe owner and not be writable by others; the final directory must belong to this user.")
 
 
 def _manifest(directory):
@@ -653,9 +693,15 @@ def _enable(state, *, start_now=True, confirm=True):
     _check_unit_directory(unit)
     if unit.exists() or unit.is_symlink() or (directory / "credential.cred").exists() or (directory / "credential.cred").is_symlink():
         raise RuntimeError("Existing unowned service or encrypted credential; nothing was replaced.")
-    _command(["sudo", "-v"], timeout=180)
     user = pwd.getpwuid(os.getuid()).pw_name
     linger_before = _linger(user)
+    helper_cleanup_required = (node and _helper_present() and
+                               (not linger_before or _node_helper_cleanup_required(state)))
+    # An administrator may already have enabled this node owner's user
+    # services at boot. Installing its own unit then needs no new privilege.
+    # Central profiles still authenticate before protecting connection input.
+    if not node or not linger_before or helper_cleanup_required:
+        _command(["sudo", "-v"], timeout=180)
     units_before = _enabled_units()
     encrypted = b""
     print("[2/3] Preparing this node..." if node else "[2/3] Protecting the connection key...", flush=True)
@@ -672,7 +718,7 @@ def _enable(state, *, start_now=True, confirm=True):
             runtime_key = ""
         if len(encrypted) < 80 or len(encrypted) > 131072:
             raise RuntimeError("Credential encryption returned an invalid result.")
-    elif _helper_present():
+    elif helper_cleanup_required:
         _prune_helpers(state)
     with _credential_transaction(state, encrypted, backend) as transaction:
         blob = directory / "credential.cred"
@@ -693,7 +739,8 @@ def _enable(state, *, start_now=True, confirm=True):
                 record["changed_config_sha256"] = hashlib.sha256(_read(state / "config.json")).hexdigest()
             _json(directory / "installation.json", record); created.append(directory / "installation.json")
             print("[3/3] Enabling automatic startup...", flush=True)
-            _command(["sudo", "-n", "--", "loginctl", "enable-linger", user])
+            if not node or not linger_before:
+                _command(["sudo", "-n", "--", "loginctl", "enable-linger", user])
             _systemctl("daemon-reload")
             if start_now:
                 _systemctl("enable", "--now", unit.name)
@@ -946,7 +993,17 @@ def _connection_action(state, action):
 
 
 def _worker_status(directory, name):
-    _json(directory / "worker-status.json", {"state": name, "updated_at": time.time()}, replace=True)
+    path = directory / "worker-status.json"
+    try:
+        previous = json.loads(_read(path))
+    except (FileNotFoundError, ValueError):
+        previous = None
+    # This is a transition timestamp, not a liveness heartbeat. systemd and the
+    # owned process identity report liveness separately. Avoid a durable fsync
+    # every two seconds while the worker remains in the same state.
+    if isinstance(previous, dict) and previous.get("state") == name:
+        return
+    _json(path, {"state": name, "updated_at": time.time()}, replace=True)
 
 
 def worker(state):

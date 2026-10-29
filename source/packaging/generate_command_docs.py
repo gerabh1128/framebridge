@@ -26,7 +26,7 @@ def markdown(data, title):
 def roff(text):
     return text.replace('\\','\\e').replace('-','\\-')
 def man(data):
-    lines=['.TH FRAMEBRIDGE 1 "2026-10-28" "FrameBridge '+__version__+'" "User Commands"',
+    lines=['.TH FRAMEBRIDGE 1 "2026-10-29" "FrameBridge '+__version__+'" "User Commands"',
            '.SH NAME','framebridge, fb \\- use local Linux tools and enrolled nodes with ChatGPT',
            '.SH SYNOPSIS','.B framebridge',
            '[\\-\\-json] [\\-\\-state\\-dir DIRECTORY] COMMAND [ARGUMENTS]',

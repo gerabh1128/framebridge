@@ -1,5 +1,6 @@
 {
   "schema_version": 4,
+  "historical_snapshot_notice": "This classification snapshot retains its original counts, hashes and version. The matching release SOURCE-ARCHIVE-MANIFEST.json identifies the complete current source set; historical path classifications do not prove ownership.",
   "project_license": "GPL-3.0-only",
   "basis": "Owner decision for original FrameBridge material the rightsholders are entitled to license.",
   "scope_notice": "../LICENSING.md",

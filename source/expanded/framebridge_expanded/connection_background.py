@@ -1,6 +1,7 @@
 """Profile-scoped detached ChatGPT supervision without a persistent credential."""
 from __future__ import annotations
 import fcntl
+import hashlib
 import json
 import os
 import resource
@@ -17,6 +18,10 @@ from .config import private_dir, state_path
 _BOOTSTRAP = "import sys;sys.path.insert(0,sys.argv[1]);from framebridge_expanded.connection_background import worker_main;worker_main(sys.argv[2],int(sys.argv[3]))"
 _PACKAGE_PARENT = str(Path(__file__).resolve().parents[1])
 _STATES = {"starting", "checking", "access", "ready", "retrying", "rejected", "unverified", "error", "stopped", "closed"}
+_RUNTIME_PARENT = Path("/run/user")
+_HEARTBEAT_BACKEND = "user-runtime-v1"
+_IDENTITY_FIELDS = ("pid", "uid", "start_ticks", "boot_id", "session_id", "process_group", "state_dir", "lock_fd")
+_DURABLE_HEARTBEAT_INTERVAL = 5.0
 _MESSAGES = {
     "starting": "[1/3] Starting the background tunnel client.",
     "checking": "[2/3] Verifying the local MCP service.",
@@ -57,6 +62,40 @@ def _checked_fd(path, flags, create=False):
     except BaseException:
         os.close(fd)
         raise
+
+
+def _heartbeat_directory(state, create=False):
+    """Keep disposable liveness updates out of the durable profile filesystem.
+
+    Do not create a login runtime directory, follow symlinks, change existing
+    permissions, or trust an arbitrary XDG_RUNTIME_DIR supplied by a caller.
+    Hosts without a user runtime directory retain bounded durable heartbeats.
+    """
+    root = _RUNTIME_PARENT / str(os.getuid())
+    for parent in (_RUNTIME_PARENT.parent, _RUNTIME_PARENT):
+        try:
+            parent_info = parent.lstat()
+        except FileNotFoundError:
+            return None
+        if not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_uid not in (0, os.getuid()) or stat.S_IMODE(parent_info.st_mode) & 0o022:
+            raise RuntimeError("The user runtime parent directory is unsafe.")
+    try:
+        info = root.lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
+        raise RuntimeError("The user runtime directory is not private and owned by this user.")
+    name = "framebridge-connection-" + hashlib.sha256(str(state_path(state)).encode()).hexdigest()
+    directory = root / name
+    if create:
+        return private_dir(directory)
+    try:
+        info = directory.lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
+        raise RuntimeError("The connection heartbeat directory is not private and owned by this user.")
+    return directory
 
 
 def _read(path):
@@ -146,6 +185,11 @@ def status(state):
     if not alive and phase not in {"error", "closed", "stopped"}:
         phase = "stopped"
     checked = record.get("verified_at")
+    if record.get("heartbeat_backend") == _HEARTBEAT_BACKEND:
+        heartbeat_directory = _heartbeat_directory(state)
+        heartbeat = _read(heartbeat_directory / "status.json") if heartbeat_directory else {}
+        same_worker = all(heartbeat.get(key) == record.get(key) for key in _IDENTITY_FIELDS)
+        checked = heartbeat.get("verified_at") if same_worker and heartbeat.get("state") == phase else None
     verified = alive and phase == "ready" and type(checked) in (int, float) and 0 <= time.time() - checked <= 15
     if alive and phase == "ready" and not verified:
         phase = "retrying"
@@ -185,9 +229,14 @@ def disconnect(state, *, timeout=16):
 
 class _StatusOutput:
     """Progress destination owned by the worker, with no parent pipe or terminal."""
-    def __init__(self, path, identity):
+    def __init__(self, path, identity, heartbeat_path=None):
         self.path = path
         self.record = dict(identity)
+        self.heartbeat_path = heartbeat_path
+        if heartbeat_path is not None:
+            self.record["heartbeat_backend"] = _HEARTBEAT_BACKEND
+        self.last_observed = None
+        self.last_durable_write = 0.0
         self.pending = ""
         self.change("starting", "[1/3] Starting the background tunnel client.")
 
@@ -198,13 +247,25 @@ class _StatusOutput:
         pass
 
     def change(self, state, message):
+        if self.record.get("state") == state and self.record.get("message") == message:
+            return
         self.record.update(state=state, message=message, updated_at=time.time())
         _write(self.path, self.record)
+        self.last_durable_write = time.monotonic()
 
     def observe(self, state):
         self.record["checked_at"] = time.time()
         self.record["verified_at"] = time.time() if state == "ready" else None
-        _write(self.path, self.record)
+        if self.heartbeat_path is not None:
+            heartbeat = {key: self.record[key] for key in _IDENTITY_FIELDS}
+            heartbeat.update(state=state, checked_at=self.record["checked_at"], verified_at=self.record["verified_at"])
+            _write(self.heartbeat_path, heartbeat)
+        elif state != self.last_observed or time.monotonic() - self.last_durable_write >= _DURABLE_HEARTBEAT_INTERVAL:
+            # Legacy/manual sessions can run without systemd's user runtime
+            # directory. Preserve the 15-second freshness contract there too.
+            _write(self.path, self.record)
+            self.last_durable_write = time.monotonic()
+        self.last_observed = state
 
     def write(self, text):
         self.pending += text
@@ -243,7 +304,9 @@ def worker_main(state, lock_fd):
             return
         if not isinstance(command, list) or not command or any(not isinstance(v, str) or "\0" in v for v in command):
             return
-        sink = _StatusOutput(directory / "status.json", _identity(os.getpid(), state, lock_fd))
+        heartbeat_directory = _heartbeat_directory(state, create=True)
+        heartbeat_path = heartbeat_directory / "status.json" if heartbeat_directory else None
+        sink = _StatusOutput(directory / "status.json", _identity(os.getpid(), state, lock_fd), heartbeat_path)
         from .tunnel import run_foreground
         rc = run_foreground(command, credential, state=state, output=sink, observe=sink.observe)
     except BaseException:

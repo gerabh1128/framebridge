@@ -1,6 +1,6 @@
 # FrameBridge — command guide
 
-Version: 0.3.3 | Guide schema: 1
+Version: 0.3.4 | Guide schema: 1
 
 This reference is generated from the shared CLI/MCP guide. Use the matching installed version.
 
@@ -36,7 +36,6 @@ fb --json status
 Install the package built for your exact Debian 13, Ubuntu 24.04 or Linux Mint 22.x amd64 profile. These are the three release profiles; other distributions and architectures are outside this release. Keep the distribution system Python: 3.13 on Debian 13, 3.12 on Ubuntu 24.04 and Mint 22.x. Use the matching signed APT suite: trixie, noble or mint22. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.
 
 ~~~sh
-sudo apt install ./framebridge-expanded_0.3.3_amd64.deb
 fb connect
 ~~~
 
@@ -80,6 +79,7 @@ fb status runtime
 fb status boot
 fb status console
 fb doctor
+fb health
 fb setup
 fb console
 fb help
@@ -231,7 +231,7 @@ fb nodes status
 
 ### Targets
 
-LOCAL means the actual receiving machine. Use enrolled, confirmed aliases or IDs and inspect the selected target before work. Do not guess SSH identities or use historical lab hostnames as defaults. CLI tty --node can use the authenticated node transport. The interactive console command is local; run it at the destination or use an explicitly configured SSH destination.
+LOCAL means the actual receiving machine. Use enrolled, confirmed aliases or IDs and inspect the selected target before work. Fleet results include requested_target, resolved_target, node_id, hostname and transport from the confirmed descriptor. The compatibility target field can remain LOCAL; resolved_target names the actual local computer. Unknown targets never fall back to LOCAL. Do not guess SSH identities or use historical lab hostnames as defaults. CLI tty --node can use the authenticated node transport. The interactive console command is local; run it at the destination or use an explicitly configured SSH destination.
 
 ### Transport trust
 
@@ -344,10 +344,19 @@ fb status boot
 
 ### Doctor
 
-doctor diagnoses prerequisites and reports findings with suggested next steps. It is not an implicit repair, and it is not a substitute for checking actual live connection state. Inspect the diagnosis and relevant private application logs before considering configuration changes. Candidate eligibility checks the exact OS release, amd64 architecture, package profile and CPython ABI before starting native components. Debian 13/LMDE 7 use cp313, Ubuntu 24.04/Mint 22.x use cp312, and Ubuntu 26.04 uses cp314. A matching profile does not establish a tested installation; never repair an ABI mismatch by replacing system Python or weakening package dependencies.
+doctor diagnoses prerequisites and reports findings with suggested next steps. It is not an implicit repair, and it is not a substitute for checking actual live connection state. Inspect the diagnosis and relevant private application logs before considering configuration changes. Eligibility checks the exact OS release, amd64 architecture, package profile and CPython ABI before starting native components. The published 0.3.3 scope is Debian 13 with cp313 and Ubuntu 24.04/Mint 22.x with cp312. LMDE 7 and Ubuntu 26.04 builder experiments remain outside that validated scope. A matching profile or a successful development build does not establish a tested installation; never repair an ABI mismatch by replacing system Python or weakening package dependencies.
 
 ~~~sh
 fb doctor
+~~~
+
+### Local health summary
+
+health combines this local profile's existing status and prerequisite observations into an allowlisted report. It identifies LOCAL as this computer and reports the profile, role, connection intent, local tools, boot policy and desktop availability. It never starts, repairs, connects, changes boot policy or creates an absent profile. It does not scan the fleet or probe terminal commands, screen capture or input. States are healthy, paused, degraded, unavailable and unconfigured. An intentional connection pause can be healthy; missing information cannot. JSON result.ok describes observation completeness; result.health.healthy describes health. Health exits 0 for a complete healthy or intentionally paused observation and 1 for degraded, unavailable or unconfigured state. The CLI version is not proof of the running version. Detailed troubleshooting remains local in status and doctor.
+
+~~~sh
+fb health
+fb --json health
 ~~~
 
 ### Logs and progress
