@@ -1,0 +1,252 @@
+--- original/front_door_mcp.py
++++ portable/front_door_mcp.py
+@@ -13,26 +13,28 @@
+ from mcp import ClientSession
+ from mcp.client.streamable_http import streamablehttp_client
+ from mcp.server.fastmcp import FastMCP, Image
++from framebridge_expanded.fleet import execute_node as expanded_execute_node, cua_node as expanded_cua_node, bootstrap_original
++bootstrap_original()
+ 
+ HOME = Path.home()
+-ADAPTER_SOCKET = HOME / ".local/share/framebridge/tool-adapter/adapter.sock"
++ADAPTER_SOCKET = Path(os.environ.get("FRAMEBRIDGE_TOOL_ROOT", str(HOME / ".local/share/framebridge/tool-adapter"))) / "adapter.sock"
+ JOBS_ROOT = HOME / ".local/share/framebridge/fbterm/jobs"
+-HUB_URL = os.environ.get("FRAMEBRIDGE_HUB_MCP_URL", "http://127.0.0.1:8877/mcp")
+-BROKER_CONTROL = os.environ.get("FRAMEBRIDGE_BROKER_CONTROL", "http://127.0.0.1:28765")
+-ASUS_NODE_ID = os.environ.get("FRAMEBRIDGE_ASUS_NODE_ID", "4b4157f9-3c98-4d24-bff4-840825d50951")
+-GERAMEG_NODE_ID = os.environ.get("FRAMEBRIDGE_GERAMEG_NODE_ID", "76885f27-da2e-4cca-bbde-6ec981e91e68")
++HUB_URL = os.environ.get("FRAMEBRIDGE_HUB_MCP_URL", "http://127.0.0.1:20877/mcp")
++BROKER_CONTROL = os.environ.get("FRAMEBRIDGE_BROKER_CONTROL", "http://127.0.0.1:20878")
++ASUS_NODE_ID = os.environ.get("FRAMEBRIDGE_ASUS_NODE_ID", "")
++GERAMEG_NODE_ID = os.environ.get("FRAMEBRIDGE_GERAMEG_NODE_ID", "")
+ HOST = os.environ.get("FRAMEBRIDGE_FRONT_DOOR_HOST", "127.0.0.1")
+-PORT = int(os.environ.get("FRAMEBRIDGE_FRONT_DOOR_PORT", "8865"))
++PORT = int(os.environ.get("FRAMEBRIDGE_FRONT_DOOR_PORT", "20865"))
+ JOB_RE = re.compile(r"^[A-Za-z0-9._-]{1,80}$")
+ SENSITIVE = re.compile(r"(?i)(secret|token|password|passwd|api[_-]?key|private[_-]?key|cookie|authorization|credential)")
+ KEY_BEGIN = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----")
+ KEY_END = re.compile(r"-----END [A-Z0-9 ]*PRIVATE KEY-----")
+ 
+ mcp = FastMCP(
+-    "FrameBridge GERANAS Front Door",
++    "FrameBridge Original Front Door",
+     instructions=(
+-        "Front Door privado de FrameBridge en GERANAS. "
+-        "framebridge_exec enruta por target: ASUS y GERAMEG mediante broker_outbound, GERANAS via FBTERM local, autorizado explicitamente; sin target mantiene ASUS. "
++        "Front Door original en el equipo receptor. "
++        "framebridge_exec defaults to LOCAL; other targets are confirmed Fleet aliases or node IDs. "
+         "Las seis herramientas Fleet son READ-only y se enrutan al Hub local."
+     ),
+     host=HOST,
+@@ -100,7 +102,7 @@
+     mode=oct(ADAPTER_SOCKET.stat().st_mode & 0o777) if ok else None
+     return {
+         "ok":ok,
+-        "host":"geranas",
++        "host":socket.gethostname(),
+         "adapter_socket":str(ADAPTER_SOCKET),
+         "socket_mode":mode,
+         "mcp_transport":"streamable-http",
+@@ -158,6 +160,8 @@
+     if not JOB_RE.fullmatch(job_id):
+         return {"ok":False,"error":"INVALID_JOB_ID"}
+ 
++    if not ASUS_NODE_ID:
++        return {"ok":False,"error":"REMOTE_NODE_NOT_CONFIGURED"}
+     queued=broker_post(
+         "/fbpair/v1/control/admin-exec",
+         {
+@@ -243,6 +247,8 @@
+     if not JOB_RE.fullmatch(job_id):
+         return {"ok":False,"error":"INVALID_JOB_ID"}
+ 
++    if not GERAMEG_NODE_ID:
++        return {"ok":False,"error":"REMOTE_NODE_NOT_CONFIGURED"}
+     queued=broker_post(
+         "/fbpair/v1/control/admin-exec",
+         {
+@@ -310,7 +316,7 @@
+     sha256: str = "",
+     include_stdout: bool = False,
+ ) -> dict:
+-    """Administrative/lab exec on GERANAS local FBTERM."""
++    """Historical alias for original local FBTERM execution on this receiver."""
+     return _framebridge_exec_geranas_impl(
+         script=script,
+         authorized=authorized,
+@@ -371,13 +377,13 @@
+ 
+ 
+ def _cloud_dsm_rpc(payload: dict) -> dict:
+-    """Private GERANAS local socket; root-only approval never exposed through MCP."""
++    """Optional private local socket; root-only approval never exposed through MCP."""
+     import socket as _socket
+     import json as _json
+     sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+     sock.settimeout(38)
+     try:
+-        sock.connect("/run/framebridge-dsm/cloud.sock")
++        sock.connect(os.environ.get("FRAMEBRIDGE_CLOUD_DSM_SOCKET", str(HOME / ".local/share/framebridge/dsm/cloud.sock")))
+         body = (_json.dumps(payload, separators=(",",":"),ensure_ascii=True) + "\n").encode("utf8")
+         if len(body)>12000:
+             return {"ok":False,"error":"CLOUD_REQUEST_TOO_LARGE","target":"CLOUD"}
+@@ -428,49 +434,16 @@
+     job_id: str = "",
+     sha256: str = "",
+     include_stdout: bool = False,
+-    target: str = "ASUS",
++    target: str = "LOCAL",
+ ) -> dict:
+-    """Generic administrative/lab exec. target=ASUS or GERAMEG uses broker; target=GERANAS uses local FBTERM. Legacy calls without target remain ASUS. CLOUD uses only typed JSON actions, never shell commands."""
+-    if target == "CLOUD":
+-        import json as _json
+-        try:
+-            payload = _json.loads(script)
+-            if not isinstance(payload,dict) or len(script)>2000:
+-                return {"ok":False,"error":"CLOUD_REQUIRES_JSON_ACTION"}
+-        except (TypeError,ValueError):
+-            return {"ok":False,"error":"CLOUD_ACCEPTS_ONLY_TYPED_JSON_ACTION_NOT_SHELL"}
+-        if payload.get("action")=="approve":
+-            return {"ok":False,"error":"CLOUD_OWNER_APPROVAL_LOCAL_TTY_ONLY"}
+-        return _cloud_dsm_rpc({"action":payload.get("action"),
+-                               "params":payload.get("params",{}),
+-                               "authorized":bool(authorized)})
+-    if target == "GERANAS":
+-        result = _framebridge_exec_geranas_impl(
+-            script=script,
+-            authorized=authorized,
+-            timeout_s=timeout_s,
+-            job_id=job_id,
+-            sha256=sha256,
+-            include_stdout=include_stdout,
+-        )
++    """Execute through original local FBTERM or a confirmed Fleet node alias."""
++    if target == "LOCAL":
++        result = _framebridge_exec_geranas_impl(script, authorized, timeout_s, job_id, sha256, include_stdout)
+         if isinstance(result, dict):
+             result = dict(result)
+-            result["target"] = "GERANAS"
++            result["target"] = "LOCAL"
+         return result
+-    if target not in ("ASUS", "GERAMEG"):
+-        return {"ok": False, "error": "UNSUPPORTED_TARGET", "allowed_targets": ["ASUS", "GERANAS", "GERAMEG", "CLOUD"]}
+-    exec_request = asus_exec_request if target == "ASUS" else gerameg_exec_request
+-    result=exec_request(
+-        script=script,
+-        authorized=authorized,
+-        timeout_s=timeout_s,
+-        job_id=job_id,
+-        sha256=sha256,
+-    )
+-    if include_stdout is not True and isinstance(result,dict):
+-        result=dict(result)
+-        result.pop("stdout",None)
+-    return result
++    return expanded_execute_node(target, script, authorized, timeout_s, job_id, sha256, include_stdout)
+ 
+ 
+ def _cua_frame_fields(frame_output: str) -> dict:
+@@ -510,6 +483,54 @@
+     return result
+ 
+ 
++def local_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -> dict:
++    if authorized is not True:
++        return {"ok":False,"error":"AUTHORIZED_TRUE_REQUIRED"}
++    if not isinstance(cua,dict):
++        return {"ok":False,"error":"CUA_PAYLOAD_REQUIRED"}
++    action=str(cua.get("action") or "").upper().strip()
++    if action not in {"OBSERVE","CLICK","DOUBLE_CLICK","TYPE","KEY","SCROLL","DRAG"}:
++        return {"ok":False,"error":"CUA_ACTION_UNSUPPORTED"}
++    try:
++        timeout_s=int(timeout_s)
++    except Exception:
++        return {"ok":False,"error":"INVALID_CUA_TIMEOUT"}
++    if not 1<=timeout_s<=180:
++        return {"ok":False,"error":"INVALID_CUA_TIMEOUT"}
++    if not job_id:
++        seed=json.dumps({"action":action,"time":time.time_ns()},sort_keys=True).encode()
++        digest=hashlib.sha256(seed).hexdigest()
++        job_id="cua-local-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
++    if not JOB_RE.fullmatch(job_id):
++        return {"ok":False,"error":"INVALID_JOB_ID"}
++
++    result=adapter_request({
++        "version":1,"mode":"EXEC","request_type":"cua",
++        "authorized":True,"job_id":job_id,"timeout_s":timeout_s,"cua":cua,
++    })
++    if not isinstance(result,dict):
++        return {"ok":False,"error":"CUA_LOCAL_ADAPTER_RESULT_INVALID","target":"LOCAL"}
++    value=dict(result)
++    frame_output=str(value.pop("frame_output",""))
++    if frame_output:
++        value.update(_cua_frame_fields(frame_output))
++    value["target"]="LOCAL"
++    return value
++
++def dispatch_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str, target: str = "LOCAL") -> dict:
++    """Reuse the original local CUA contract and route confirmed remote nodes."""
++    if target == "LOCAL":
++        return local_cua_request(cua, authorized, timeout_s, job_id)
++    result = expanded_cua_node(target, cua, authorized, timeout_s, job_id)
++    if not isinstance(result, dict):
++        return {"ok":False,"error":"NODE_CUA_RESPONSE_INVALID"}
++    result = dict(result)
++    frame_output = str(result.pop("frame_output", ""))
++    if frame_output:
++        result.update(_cua_frame_fields(frame_output))
++    return result
++
++
+ def asus_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -> dict:
+     if authorized is not True:
+         return {"ok":False,"error":"AUTHORIZED_TRUE_REQUIRED"}
+@@ -531,6 +552,8 @@
+     if not JOB_RE.fullmatch(job_id):
+         return {"ok":False,"error":"INVALID_JOB_ID"}
+ 
++    if not ASUS_NODE_ID:
++        return {"ok":False,"error":"REMOTE_NODE_NOT_CONFIGURED"}
+     queued=broker_post(
+         "/fbpair/v1/control/admin-cua",
+         {
+@@ -606,8 +629,9 @@
+     expected_source_height: int = 0,
+     timeout_s: int = 60,
+     job_id: str = "",
++    target: str = "LOCAL",
+ ):
+-    """CUA R8 on ASUS through GERANAS. Requires explicit per-use chat authorization."""
++    """Original CUA R8 on this receiver through its local Tool Adapter."""
+     if authorized is not True:
+         return {"ok":False,"error":"AUTHORIZED_TRUE_REQUIRED"}
+     action=str(action).upper().strip()
+@@ -659,7 +683,7 @@
+             "button":str(button).lower(),"steps":int(steps),"duration_ms":int(duration_ms),
+         })
+ 
+-    result=asus_cua_request(payload,True,timeout_s,job_id)
++    result=dispatch_cua_request(payload,True,timeout_s,job_id,target)
+     if bool(observe_after) and action!="OBSERVE" and bool(result.get("ok")):
+         post=dict(payload)
+         post.clear()
+@@ -667,7 +691,7 @@
+         if expected_window_id:
+             post["expected_window_id"]=str(expected_window_id)
+         post_id=(str(job_id or "cua")[:72]+"-post")[:80]
+-        post_result=asus_cua_request(post,True,timeout_s,post_id)
++        post_result=dispatch_cua_request(post,True,timeout_s,post_id,target)
+         result["post_ok"]=bool(post_result.get("ok"))
+         result["post_resultado_final"]=post_result.get("resultado_final")
+         for key_name in (
+@@ -742,8 +766,8 @@
+ async def framebridge_fleet_node_service_status(node: str, service: str) -> dict:
+     return await hub_call("framebridge_fleet_node_service_status",{"node":node,"service":service})
+ 
+-from gerameg_cua_frontdoor import register_tools as register_gerameg_cua_tools
+-register_gerameg_cua_tools(mcp, gerameg_exec_request)
++from framebridge_expanded.tty_mcp import register_tools as register_tty_tools
++register_tty_tools(mcp, framebridge_exec)
+ 
+ if __name__ == "__main__":
+     mcp.run(transport="streamable-http")

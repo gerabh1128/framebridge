@@ -1,0 +1,125 @@
+{
+  "format": "FRAMEBRIDGE_ORIGINAL_SOURCE_SNAPSHOT_V1",
+  "source_host": "Original desktop source capture; community derivative",
+  "file_count": 14,
+  "scan_result": "HISTORICAL_CAPTURE_CHECK_ONLY; see current community privacy review",
+  "scope": "PUBLIC_PROGRAM_FILES_ONLY",
+  "runtime_state_included": false,
+  "configuration_files_included": false,
+  "embedded_lab_route_mapping_in_host_source": false,
+  "files": [
+    {
+      "archive_path": "tool-adapter/bin/framebridge_tool_adapter.py",
+      "source_path": "tool-adapter/bin/framebridge_tool_adapter.py",
+      "bytes": 10268,
+      "sha256": "dca9bf3dfbae7881aa6824ca79a2922fb4ec7ab1b61b5696b39cb64630c4d86b",
+      "source_mode": "0o700",
+      "archive_mode": "0755"
+    },
+    {
+      "archive_path": "tool-adapter/bin/framebridge_tool_client.py",
+      "source_path": "tool-adapter/bin/framebridge_tool_client.py",
+      "bytes": 1073,
+      "sha256": "1d1514f08653c31f6b67ebcdcf61686947321bec96752a692b7e46cee6285f6e",
+      "source_mode": "0o700",
+      "archive_mode": "0755"
+    },
+    {
+      "archive_path": "fbterm/bin/fbterm_engine.py",
+      "source_path": "fbterm/bin/fbterm_engine.py",
+      "bytes": 13763,
+      "sha256": "9408aa2dfba2ceecf1bcc4d9e6b1d52fec1f8971183f5baa7145f2d6357c7635",
+      "source_mode": "0o700",
+      "archive_mode": "0755"
+    },
+    {
+      "archive_path": "fbterm/bin/fbterm-run",
+      "source_path": "fbterm/bin/fbterm-run",
+      "bytes": 2628,
+      "sha256": "bbfc19c878746518e482adbe61cd6f8ae8560dca75a1e3db9921e1cb40b42e71",
+      "source_mode": "0o700",
+      "archive_mode": "0755"
+    },
+    {
+      "archive_path": "fbterm/bin/fbterm-shell",
+      "source_path": "fbterm/bin/fbterm-shell",
+      "bytes": 612,
+      "sha256": "eb6de30bfd6430165f7ebc982021f3565b2e80c4b82480b4e01e64e15e65957a",
+      "source_mode": "0o700",
+      "archive_mode": "0755"
+    },
+    {
+      "archive_path": "fbterm/bin/fbterm-prompt-ready",
+      "source_path": "fbterm/bin/fbterm-prompt-ready",
+      "bytes": 286,
+      "sha256": "276f657e23ff26c75f5e430731fdf5b095d777eabcbaad86e11c69b0919c691c",
+      "source_mode": "0o700",
+      "archive_mode": "0755"
+    },
+    {
+      "archive_path": "fbterm/bin/fbx",
+      "source_path": "fbterm/bin/fbx",
+      "bytes": 2517,
+      "sha256": "84589ad19ea0eab7cfc766ef4dba736be05c509c3918f572f4054585ee4c5efb",
+      "source_mode": "0o700",
+      "archive_mode": "0755"
+    },
+    {
+      "archive_path": "framebridge-native/host/framebridge_host.py",
+      "source_path": "framebridge-native/host/framebridge_host.py",
+      "bytes": 45347,
+      "sha256": "85d165bf8875fa8f9b202b129f985ca4cf040a1f4778ef43ed4c9f5b0164b3eb",
+      "source_mode": "0o755",
+      "archive_mode": "0755"
+    },
+    {
+      "archive_path": "framebridge-native/host/framebridge_cua_linux.py",
+      "source_path": "framebridge-native/host/framebridge_cua_linux.py",
+      "bytes": 45731,
+      "sha256": "aed73125f88b4408bad83ef4aae220fd79bd8f57e41ff15ebc9930453bdc69a1",
+      "source_mode": "0o600",
+      "archive_mode": "0644"
+    },
+    {
+      "archive_path": "framebridge-native/host/framebridge_voice_command.py",
+      "source_path": "framebridge-native/host/framebridge_voice_command.py",
+      "bytes": 1127,
+      "sha256": "ed0aff0070799d437a5570b16dbfa0a3878e51b73166c14bebaf8df45ebdc86c",
+      "source_mode": "0o664",
+      "archive_mode": "0644"
+    },
+    {
+      "archive_path": "framebridge-native/host/framebridge_voice_status.py",
+      "source_path": "framebridge-native/host/framebridge_voice_status.py",
+      "bytes": 1843,
+      "sha256": "f8520095e973a91249876d733143399fe40a0d72cd64c741c5cf85d8898a3ffb",
+      "source_mode": "0o664",
+      "archive_mode": "0644"
+    },
+    {
+      "archive_path": "framebridge-native/host/open-terminal.sh",
+      "source_path": "framebridge-native/host/open-terminal.sh",
+      "bytes": 690,
+      "sha256": "facaea7a5ca6635311a4c05e18edecdec98a137ce552fce39bdbc0ee755aa34c",
+      "source_mode": "0o775",
+      "archive_mode": "0755"
+    },
+    {
+      "archive_path": "framebridge-native/host/open-interactive-terminal.sh",
+      "source_path": "framebridge-native/host/open-interactive-terminal.sh",
+      "bytes": 4631,
+      "sha256": "e5c191c9cc354fd4d88a23c02e5eafbe454a7d3b3586265288d5f89ee9d8c602",
+      "source_mode": "0o775",
+      "archive_mode": "0755"
+    },
+    {
+      "archive_path": "framebridge-native/host/open-progress-console.sh",
+      "source_path": "framebridge-native/host/open-progress-console.sh",
+      "bytes": 3488,
+      "sha256": "cb519186ce299e21381e4698faf5490a3e947ad01187b9674f78d4e8bc21ef65",
+      "source_mode": "0o775",
+      "archive_mode": "0755"
+    }
+  ],
+  "community_derivative": true
+}

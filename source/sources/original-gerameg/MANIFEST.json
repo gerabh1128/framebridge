@@ -1,0 +1,59 @@
+{
+  "origin": "Original text-console source capture; community derivative",
+  "files": [
+    {
+      "source": "gerameg_cua_runtime.py",
+      "path": "gerameg_cua_runtime.py",
+      "bytes": 5049,
+      "sha256": "381a7dc740227e27085e66d5f7e5d398a09f86eff66d6aefce9025e896634887"
+    },
+    {
+      "source": "real_tty_manager.py",
+      "path": "real_tty_manager.py",
+      "bytes": 9647,
+      "sha256": "3c8fe23cf1499172d4064f04f373656f6fd6109a1c1bc01657d669aabd4121d8"
+    },
+    {
+      "source": "cua_tty_rpc.py",
+      "path": "cua_tty_rpc.py",
+      "bytes": 9957,
+      "sha256": "e64b0b9283c8143b5fc4db2c6020c288927f0a26a9c4fd42cfc8aca8bfc36175"
+    },
+    {
+      "source": "framebridge_cua_tty/__init__.py",
+      "path": "framebridge_cua_tty/__init__.py",
+      "bytes": 98,
+      "sha256": "a873aecc609c08bd8b703e0917370278a64e6ad24fc96b5da2fd04c9d958855c"
+    },
+    {
+      "source": "framebridge_cua_tty/client.py",
+      "path": "framebridge_cua_tty/client.py",
+      "bytes": 1465,
+      "sha256": "6a1fc004f2d50944661fcce67002b04534721bc3118eaf44e3f0694e19d15fe7"
+    },
+    {
+      "source": "framebridge_cua_tty/core.py",
+      "path": "framebridge_cua_tty/core.py",
+      "bytes": 7850,
+      "sha256": "1c259afd5233f8dc4b0df58c2e69e7df346637e20f8c6fc24303bdb7a4e29590"
+    },
+    {
+      "source": "framebridge_cua_tty/demo.py",
+      "path": "framebridge_cua_tty/demo.py",
+      "bytes": 1385,
+      "sha256": "22614e47bc2189f83fed4ef294bd48a78bea587b3619f8d333eff74570dee39d"
+    },
+    {
+      "source": "framebridge_cua_tty/screen.py",
+      "path": "framebridge_cua_tty/screen.py",
+      "bytes": 5362,
+      "sha256": "20f47b9d21189f1e9ac679ba7a0a01d0298d7dcce459d88cfb589504be0893d7"
+    },
+    {
+      "source": "framebridge_cua_tty/server.py",
+      "path": "framebridge_cua_tty/server.py",
+      "bytes": 5977,
+      "sha256": "7c803ca0de25e28914fd15804d0cc785c4362d38c8a29b6f7fb377c5b963674d"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "archive": "FrameBridge-0.3.1-tunnel-client-dependency-sources.tar.gz",
+  "size_bytes": 26941745,
+  "sha256": "6445d4f0e773aba833fe5c610fbae54102b92de2ce636438f769f21e890c2bd9",
+  "binary_sha256": "472eb9dd9dd625b4e6023c3b4a5736b3a2e5a1b6dbe9338e001887a64ec992a6",
+  "go_modules_h1_verified": 47,
+  "module_legal_files": 61,
+  "archive_entries": 116,
+  "own_component_license": "Apache-2.0",
+  "own_source_vcs_revision_known": false,
+  "scope": "Exact Go dependency sources and retained upstream notices; not a claim of exact tunnel executable build provenance."
+}

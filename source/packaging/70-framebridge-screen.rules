@@ -1,0 +1,3 @@
+# Inactive until an administrator explicitly enables a named user.
+ACTION=="add", SUBSYSTEM=="graphics", KERNEL=="fb0", TEST=="/etc/framebridge-expanded/screen-access.json", RUN+="/usr/lib/framebridge-expanded/bin/framebridge-screen-access apply-device"
+ACTION=="change", SUBSYSTEM=="graphics", KERNEL=="fb0", TEST=="/etc/framebridge-expanded/screen-access.json", RUN+="/usr/lib/framebridge-expanded/bin/framebridge-screen-access apply-device"

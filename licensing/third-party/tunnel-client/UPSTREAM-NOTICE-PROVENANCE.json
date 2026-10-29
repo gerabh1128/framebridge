@@ -1,0 +1,26 @@
+{
+  "openai_notice_source_commit": "cc81b261aa51059f6ef464ca236ce8d0c2347382",
+  "not_claimed_to_be_binary_build_commit": true,
+  "assets": [
+    {
+      "name": "OPENAI-LICENSE",
+      "url": "https://raw.githubusercontent.com/openai/tunnel-client/cc81b261aa51059f6ef464ca236ce8d0c2347382/LICENSE",
+      "sha256": "f4c1d7ba32ef5bcf5cf03e2eefec5825ebafedf50fa330a36700a49c605c1ef4"
+    },
+    {
+      "name": "OPENAI-NOTICE",
+      "url": "https://raw.githubusercontent.com/openai/tunnel-client/cc81b261aa51059f6ef464ca236ce8d0c2347382/NOTICE",
+      "sha256": "1364c020d86ecf948b78b7c655175032068203d13aece70fb0bfe112d7802dc2"
+    },
+    {
+      "name": "GO-LICENSE",
+      "url": "https://raw.githubusercontent.com/golang/go/go1.27.0/LICENSE",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad"
+    },
+    {
+      "name": "GO-PATENTS",
+      "url": "https://raw.githubusercontent.com/golang/go/go1.27.0/PATENTS",
+      "sha256": "96f408bfae65bf137fc2525d3ecb030271c50c1e90799f87abf8846d8dd505cc"
+    }
+  ]
+}

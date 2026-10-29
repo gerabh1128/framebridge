@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+
+umask 077
+
+ROOT="${FBTERM_ROOT:?FBTERM_ROOT no definido}"
+
+# R2: mientras fbterm-run esta activo, el pane no esta disponible.
+rm -f "$ROOT/prompt.ready"
+JOB_ID="${1:-}"
+
+case "$JOB_ID" in
+    ''|*[!A-Za-z0-9._-]*)
+        printf 'FBTERM_ERROR=INVALID_JOB_ID\n' >&2
+        exit 64
+        ;;
+esac
+
+JOB="$ROOT/jobs/$JOB_ID"
+CMD="$JOB/command.bash"
+TIMEOUT_FILE="$JOB/timeout.seconds"
+
+if [ ! -f "$CMD" ]; then
+    printf 'FBTERM_ERROR=COMMAND_NOT_FOUND JOB_ID=%s\n' "$JOB_ID" >&2
+    exit 66
+fi
+
+TIMEOUT_S='120'
+
+if [ -f "$TIMEOUT_FILE" ]; then
+    VALUE="$(cat "$TIMEOUT_FILE" 2>/dev/null || true)"
+    case "$VALUE" in
+        ''|*[!0-9]*)
+            ;;
+        *)
+            if [ "$VALUE" -ge 1 ] 2>/dev/null &&
+               [ "$VALUE" -le 3600 ] 2>/dev/null
+            then
+                TIMEOUT_S="$VALUE"
+            fi
+            ;;
+    esac
+fi
+
+OUT_FIFO="$JOB/stdout.fifo"
+ERR_FIFO="$JOB/stderr.fifo"
+
+STDOUT="$JOB/stdout.bin"
+STDERR="$JOB/stderr.bin"
+
+rm -f "$OUT_FIFO" "$ERR_FIFO"
+
+mkfifo "$OUT_FIFO" "$ERR_FIFO"
+
+: > "$STDOUT"
+: > "$STDERR"
+
+date -Ins > "$JOB/started.at"
+
+sha256sum "$CMD" |
+    awk '{print $1}' > "$JOB/command.sha256"
+
+tee "$STDOUT" < "$OUT_FIFO" &
+OUT_TEE_PID=$!
+
+tee "$STDERR" < "$ERR_FIFO" >&2 &
+ERR_TEE_PID=$!
+
+/usr/bin/timeout \
+    --signal=TERM \
+    --kill-after=2s \
+    "${TIMEOUT_S}s" \
+    bash --noprofile --norc "$CMD" \
+    > "$OUT_FIFO" \
+    2> "$ERR_FIFO"
+
+RC=$?
+
+wait "$OUT_TEE_PID"
+OUT_TEE_RC=$?
+
+wait "$ERR_TEE_PID"
+ERR_TEE_RC=$?
+
+printf '%s\n' "$RC" > "$JOB/exit.code"
+printf '%s\n' "$OUT_TEE_RC" > "$JOB/stdout-tee.exit"
+printf '%s\n' "$ERR_TEE_RC" > "$JOB/stderr-tee.exit"
+
+sha256sum "$STDOUT" |
+    awk '{print $1}' > "$JOB/stdout.sha256"
+
+sha256sum "$STDERR" |
+    awk '{print $1}' > "$JOB/stderr.sha256"
+
+stat -c '%s' "$STDOUT" > "$JOB/stdout.bytes"
+stat -c '%s' "$STDERR" > "$JOB/stderr.bytes"
+
+date -Ins > "$JOB/finished.at"
+
+{
+    printf 'JOB_ID=%s\n' "$JOB_ID"
+    printf 'EXIT=%s\n' "$RC"
+    printf 'COMMAND_SHA256=%s\n' \
+        "$(cat "$JOB/command.sha256")"
+    printf 'STDOUT_SHA256=%s\n' \
+        "$(cat "$JOB/stdout.sha256")"
+    printf 'STDERR_SHA256=%s\n' \
+        "$(cat "$JOB/stderr.sha256")"
+    printf 'STDOUT_BYTES=%s\n' \
+        "$(cat "$JOB/stdout.bytes")"
+    printf 'STDERR_BYTES=%s\n' \
+        "$(cat "$JOB/stderr.bytes")"
+    printf 'STDOUT_TEE_EXIT=%s\n' "$OUT_TEE_RC"
+    printf 'STDERR_TEE_EXIT=%s\n' "$ERR_TEE_RC"
+} > "$JOB/result.tmp"
+
+mv "$JOB/result.tmp" "$JOB/result.env"
+touch "$JOB/DONE"
+
+rm -f "$OUT_FIFO" "$ERR_FIFO"
+
+printf 'FBTERM_JOB_COMPLETE JOB_ID=%s EXIT=%s\n' \
+    "$JOB_ID" "$RC"
+
+exit "$RC"

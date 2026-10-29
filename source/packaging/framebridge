@@ -1,0 +1,10 @@
+#!/usr/bin/python3
+"""FrameBridge Expanded command-line entry point."""
+import os
+import sys
+from pathlib import Path
+prefix = Path(__file__).resolve().parents[1]
+os.environ.setdefault("FRAMEBRIDGE_EXPANDED_PREFIX", str(prefix))
+sys.path.insert(0, str(prefix / "expanded"))
+from framebridge_expanded.cli import main
+raise SystemExit(main())
