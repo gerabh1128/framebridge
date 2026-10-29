@@ -108,13 +108,13 @@ Versioned source archives include the FrameBridge implementation, builders, test
 
 Use `python3 source/packaging/build_expanded.py --help` for package build profiles and `python3 source/packaging/archive_sources.py --help` for source archiving. Building does not install, start, sign or publish the product.
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) to propose a change and [SECURITY.md](SECURITY.md) for security reports. Useful compatibility reports name the exact distribution, version, Python version, package profile and tests actually performed. Independent copies retain their applicable software freedoms; they must not be presented as maintainer-approved releases.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) to propose a change and [SECURITY.md](SECURITY.md) for security reports. Use [project issues](https://framebridge.betancourt.one/git/gerardo/framebridge/issues) for non-sensitive bug reports and installation questions. Useful compatibility reports name the exact distribution, version, Python version, package profile and tests actually performed. Independent copies retain their applicable software freedoms; they must not be presented as maintainer-approved releases.
 
 The [claims and evidence boundaries](docs/CLAIMS-AND-LIMITS.md) distinguish package installation, connection and operation results. The [operations roadmap](docs/OPERATIONS-ROADMAP.md) describes proposed follow-up work and acceptance checks; it is not a list of features already delivered.
 
 Project home: https://framebridge.betancourt.one/
 
-The public Git repository is `https://framebridge.betancourt.one/git/gerardo/framebridge.git`. For the exact 0.3.3 release, use the signed `v0.3.3` tag or its signed corresponding-source archive from the download page. The repositories, package downloads and source archive are published; normal owner authentication and connection setup are still required on a newly installed computer.
+The public Git repository is `https://framebridge.betancourt.one/git/gerardo/framebridge.git`. For the exact 0.3.4 release, use the signed `v0.3.4` tag or its signed corresponding-source archive from the download page. The repositories, package downloads and source archive are published; normal owner authentication and connection setup are still required on a newly installed computer.
 
 Programming: **ChatGPT**.  
 Original concept and project coordination: **Gerardo Betancourt**.
