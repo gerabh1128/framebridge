@@ -228,6 +228,8 @@ def _owner(row, operation):
     if background:
         args += ['--connection-pid', str(background['pid']),
                  '--connection-birth', str(background['start_ticks'])]
+    if operation == 'user-profile' and row.get('default_profile_ambiguous'):
+        args += ['--ambiguous-profiles']
     result = subprocess.run(args, env=ENV, capture_output=True, text=True, timeout=120)
     _need(result.returncode == 0, 'UPGRADE_OWNER_OPERATION_FAILED:' + operation)
     value = json.loads(result.stdout)
@@ -268,12 +270,25 @@ def _resume():
     value['phase'] = 'RUNNING'
     _write(pending, value)
     failures = []
+    captured_by_uid = {}
+    for captured in value['profiles']:
+        captured_by_uid.setdefault(captured['uid'], set()).add(captured['state'])
+    default_reviewed = set()
     for row in value['profiles']:
         try:
             current = identify(Path('/proc') / str(row['pid']))
             _need(current and all(current[k] == row[k] for k in
                   ('uid', 'user', 'home', 'state', 'pid', 'birth', 'config_sha256', 'unit')),
                   'UPGRADE_MANAGER_IDENTITY_CHANGED')
+            # Only profiles captured from a verified installed manager are
+            # eligible. Never scan homes or pick the first of several paths.
+            if row['uid'] not in default_reviewed:
+                row['default_profile_ambiguous'] = len(captured_by_uid[row['uid']]) != 1
+                try:
+                    row['default_profile'] = _owner(row, 'user-profile')
+                except Exception as profile_error:
+                    row['default_profile'] = {'ok': False, 'warning': str(profile_error)[:160]}
+                default_reviewed.add(row['uid'])
             # Migration runs as the profile owner and only recognizes the old
             # FrameBridge desktop entry; no third-party launcher is overwritten.
             try:
@@ -346,13 +361,16 @@ def _background(state):
 
 
 def user_operation(operation, state, config_sha256, *, manager_pid=None, manager_birth=None,
-                   connection_pid=None, connection_birth=None):
+                   connection_pid=None, connection_birth=None, ambiguous_profiles=False):
     _need(os.getuid() != 0 and os.getuid() == os.geteuid(), 'UPGRADE_OWNER_REQUIRED')
     state = Path(state)
     _private(state, os.getuid())
     data = _read(state / 'config.json', os.getuid())
     _need(hashlib.sha256(data).hexdigest() == config_sha256, 'UPGRADE_CONFIG_CHANGED')
     sys.path.insert(0, PREFIX + '/expanded')
+    if operation == 'user-profile':
+        from framebridge_expanded.profiles import migrate
+        return migrate(state, ambiguous=ambiguous_profiles)
     if operation == 'user-desktop':
         from framebridge_expanded.console_desktop import migrate_legacy
         return migrate_legacy(state)
@@ -413,19 +431,21 @@ def user_operation(operation, state, config_sha256, *, manager_pid=None, manager
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('operation', choices=['snapshot', 'schedule', 'resume',
-                        'user-stop', 'user-ready', 'user-desktop'])
+                        'user-stop', 'user-ready', 'user-desktop', 'user-profile'])
     parser.add_argument('--state')
     parser.add_argument('--config-sha256')
     parser.add_argument('--manager-pid', type=int)
     parser.add_argument('--manager-birth')
     parser.add_argument('--connection-pid', type=int)
     parser.add_argument('--connection-birth', type=int)
+    parser.add_argument('--ambiguous-profiles', action='store_true')
     args = parser.parse_args(argv)
     try:
         if args.operation.startswith('user-'):
             value = user_operation(args.operation, args.state, args.config_sha256,
                 manager_pid=args.manager_pid, manager_birth=args.manager_birth,
-                connection_pid=args.connection_pid, connection_birth=args.connection_birth)
+                connection_pid=args.connection_pid, connection_birth=args.connection_birth,
+                ambiguous_profiles=args.ambiguous_profiles)
         else:
             value = globals()[args.operation]()
         print(json.dumps(value))

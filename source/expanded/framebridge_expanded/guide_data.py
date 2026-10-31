@@ -408,3 +408,14 @@ GUIDE = {'start': {'title': 'Start with FrameBridge',
                                          'data; a cached manual from an earlier build can describe '
                                          'a different workflow.',
                                  'commands': ['fb help compatibility']}]}}
+
+GUIDE['commands']['sections'].insert(1, {
+    'heading': 'Selected local profile',
+    'body': 'An explicit --state-dir has first priority, followed by FRAMEBRIDGE_EXPANDED_STATE or FRAMEBRIDGE_STATE_DIR, then the private saved profile reference, and finally the legacy default directory. Successful setup, connection and managed startup can retain the selected profile without copying connection secrets. A validated upgrade can migrate one previously running native profile. Multiple profiles require an explicit selection; an invalid saved reference reports an error rather than silently showing a different empty profile. profile show reads the preference, select records the explicitly chosen configured profile and clear removes only that reference.',
+    'commands': ['fb profile show', 'fb --state-dir /path/to/profile profile select', 'fb profile clear'],
+})
+GUIDE['terminals']['sections'].append({
+    'heading': 'Automatic read-only FBTERM viewer',
+    'body': 'When an execution job needs the original FBTERM activity viewer, a current validated X11 session of the same Linux user can open the FrameBridge Expanded window automatically. Its tmux attachment is read-only and remains separate from the interactive work console. A service that started before graphical login discovers the current desktop and session bus when opening the viewer. Only the viewer subprocess receives the graphical environment; existing shells and jobs retain theirs. Without an available desktop, text execution remains available and no visible window is claimed.',
+    'commands': ['fb console', 'fb status console'],
+})

@@ -18,7 +18,7 @@ The tunnel executable identifies its own module as a development build without a
 
 ## Source delivery
 
-Distribute the matching FrameBridge 0.3.4 source archive beside each of its three distribution-profile installers, the immutable shared Python/Rust dependency-source asset, the new tunnel-client dependency-source supplement and retained notices. [Source availability](licensing/third-party/SOURCE-AVAILABILITY.md) identifies the files and hashes.
+Distribute the matching FrameBridge 0.3.5 source archive beside each of its three distribution-profile installers, the immutable shared Python/Rust dependency-source asset, the new tunnel-client dependency-source supplement and retained notices. [Source availability](licensing/third-party/SOURCE-AVAILABILITY.md) identifies the files and hashes.
 
 The unchanged Certifi source arrangement retains its exact upstream source assets, original notice, full MPL-2.0 text and recipient access instructions. The historical Mozilla certdata revision remains unidentified. No independent native-wheel or tunnel-client rebuild is claimed. These are provenance and reproducibility limits, not claims that unavailable proof has been obtained.
 

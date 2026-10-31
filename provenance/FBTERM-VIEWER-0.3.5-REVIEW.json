@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "release_version": "0.3.5",
+  "reviewed_on": "2026-10-31",
+  "path": "source/sources/original-asus/fbterm/bin/fbterm_engine.py",
+  "baseline_source_key": "original-asus/fbterm/bin/fbterm_engine.py",
+  "previous_sha256": "9408aa2dfba2ceecf1bcc4d9e6b1d52fec1f8971183f5baa7145f2d6357c7635",
+  "installed_hotfix_without_modification_notice_sha256": "cfdebf9902c0a3c4f77beea2f6b3584db304e2a4f89e1587027244af65bde866",
+  "reviewed_sha256": "e3c2798d886919b67321b79b3233d6989b7f618c83190e390794ddb9a9053128",
+  "patch": "provenance/patches/fbterm-viewer-0.3.5.patch",
+  "patch_sha256": "ed174250804384f6444af576e54cf79aa35452d9401456fba47438b28276a337",
+  "scope": "Read-only viewer launch and visibility environment only; job execution and tmux shell methods are unchanged.",
+  "historical_record_policy": "Existing historical artifact and snapshot identifiers retain their original meaning. This entry updates the strict current-source build input, not the historical package.",
+  "validation": {
+    "tls_regression_tests": 12,
+    "viewer_environment_tests": 21,
+    "preserved_methods": "Normalized 0.3.4 AST hashes checked by source/tests/test_fbterm_viewer_environment.py",
+    "native_desktop_acceptance": "Recorded separately; unit tests do not certify a real desktop."
+  }
+}

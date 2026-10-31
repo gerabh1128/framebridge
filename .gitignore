@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+/source/build/
+/source/release/
+/source/qa/
+/website/dist/
