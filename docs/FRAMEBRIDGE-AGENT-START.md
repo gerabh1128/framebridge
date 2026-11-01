@@ -102,6 +102,21 @@ fb console
 
 Normal first connection needs no separate `fb setup` or `fb service start`. Advanced roles, enrollment, startup policy and credential management are documented in `fb help commands`.
 
+## Windows private preview and RDP
+
+The public release matrix above covers Linux. If a separately deployed Windows
+private preview is part of the authorized task, consult the
+[Windows RDP-to-console runbook](WINDOWS-RDP-CONSOLE.md) before diagnosing graphical
+CUA from a Remmina/RDP session. Start Windows observation with the native `ROOT`
+capture scope; `node:WINDOWS` selects the Linux screen path and can itself cause
+`SCREEN_EXEC_FAILED`, even after a successful handoff. A connected FBEXEC service can work in session 0
+while the browser is in RDP and the screen backend requires the physical console.
+Check the actual session and executing identity; do not reuse a historical session
+ID or weaken the console-session guard. The runbook describes the owner's normal
+`tscon` handoff, its RDP-disconnection/physical-desktop effects, and the required
+fresh screen verification. It does not add native RDP capture or execute a handoff
+automatically.
+
 ## Keep undo specific
 
 - `fb disconnect` pauses the connection until the next explicit connect, including after reboot; local tools and saved material remain.
