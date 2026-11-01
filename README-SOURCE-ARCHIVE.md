@@ -1,4 +1,4 @@
-# FrameBridge 0.3.4 corresponding source
+# FrameBridge 0.3.5 corresponding source
 
 This archive supplies the project source and the reviewed cp313 and cp312 vendor
 inputs for Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. Keep its matching

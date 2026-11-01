@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import contextlib
 import io
+from http.server import BaseHTTPRequestHandler
 import tempfile
-import types
 import unittest
 from unittest import mock
 
@@ -118,16 +118,22 @@ class LegacyBrokerPeerTests(unittest.TestCase):
                     request.read_json.assert_called_once()
 
     def test_expanded_control_keeps_authentication_and_blocks_development_routes(self):
-        def no_socket_server(address, handler):
-            return types.SimpleNamespace(RequestHandlerClass=handler)
+        def no_socket_init(server, address, handler):
+            # Keep the real server base class so the bounded TLS subclass is
+            # constructed normally. Replacing that base with a MagicMock would
+            # make class construction/RequestHandlerClass itself a mock.
+            server.server_address = address
+            server.RequestHandlerClass = handler
 
         with tempfile.TemporaryDirectory(prefix='framebridge-broker-policy-') as state, \
              mock.patch.object(broker, '_config', return_value={}), \
              mock.patch.object(broker, '_control_secret', return_value='fixture-control'), \
-             mock.patch.object(broker, 'ThreadingHTTPServer', side_effect=no_socket_server), \
+             mock.patch.object(broker.ThreadingHTTPServer, '__init__', new=no_socket_init), \
              mock.patch.object(self.original, 'control_peer_allowed', side_effect=AssertionError('legacy gate reached')):
             server = broker.make_server(host='localhost', state_dir=state)
             handler = server.RequestHandlerClass
+            self.assertIsInstance(handler, type)
+            self.assertTrue(issubclass(handler, BaseHTTPRequestHandler))
             for path, status, error in (
                 ('/fbpair/v1/control/nodes', 403, 'CONTROL_AUTH_REQUIRED'),
                 ('/dev/authenticate-and-approve', 404, 'ENDPOINT_NOT_AVAILABLE'),

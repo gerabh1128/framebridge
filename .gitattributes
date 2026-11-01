@@ -1,0 +1,2 @@
+# Unified patches intentionally contain a space for blank context lines.
+provenance/patches/*.patch -whitespace

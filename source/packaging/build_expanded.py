@@ -202,8 +202,74 @@ def maintainer_preinst(version=None):
             + "FRAMEBRIDGE_UPGRADE_SNAPSHOT\nfi\n    ;;\nesac\n")
 
 
+def bytecode_cleanup_source(prefix="/usr/lib/framebridge-expanded"):
+    """Standalone post-install cleanup, before importing newly installed code.
+
+    Package timestamps are reproducible, so equal-size source updates can leave
+    a timestamp-based cache apparently valid. Walk directory descriptors inside
+    this fixed package prefix; never traverse a link or touch user profiles.
+    The argument exists for isolated maintainer-script tests, not a CLI input.
+    """
+    prefix = str(prefix)
+    if not prefix.startswith("/") or prefix == "/" or os.path.normpath(prefix) != prefix:
+        raise ValueError("Invalid installed bytecode prefix")
+    return '''import os
+import stat
+
+PREFIX = @PREFIX@
+FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+
+def checked_directory(fd):
+    info = os.fstat(fd)
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+            or info.st_mode & 0o022):
+        raise RuntimeError("BYTECODE_DIRECTORY_UNTRUSTED")
+
+def clear_bytecode(fd):
+    checked_directory(fd)
+    count = 0
+    for name in os.listdir(fd):
+        try:
+            info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+        except FileNotFoundError:
+            continue
+        if stat.S_ISDIR(info.st_mode):
+            child = os.open(name, FLAGS, dir_fd=fd)
+            try:
+                current = os.fstat(child)
+                if (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
+                    raise RuntimeError("BYTECODE_DIRECTORY_CHANGED")
+                count += clear_bytecode(child)
+            finally:
+                os.close(child)
+        elif stat.S_ISREG(info.st_mode) and name.endswith((".pyc", ".pyo")):
+            # unlinkat does not follow a final symlink, including a raced one.
+            try:
+                os.unlink(name, dir_fd=fd)
+                count += 1
+            except FileNotFoundError:
+                pass
+    return count
+
+# Open every path component with O_NOFOLLOW, including the prefix itself.
+descriptor = os.open("/", FLAGS)
+try:
+    for component in PREFIX.split("/")[1:]:
+        child = os.open(component, FLAGS, dir_fd=descriptor)
+        os.close(descriptor)
+        descriptor = child
+    removed = clear_bytecode(descriptor)
+finally:
+    os.close(descriptor)
+print("FRAMEBRIDGE_BYTECODE_INVALIDATED=" + str(removed))
+'''.replace("@PREFIX@", repr(prefix))
+
+
 def maintainer_postinst():
     return ("#!/bin/sh\nset -eu\ncase \"$1\" in\n  configure)\n"
+            "/usr/bin/python3 -I -S - <<'FRAMEBRIDGE_BYTECODE_CLEANUP'\n"
+            + bytecode_cleanup_source()
+            + "FRAMEBRIDGE_BYTECODE_CLEANUP\n"
             "/usr/bin/python3 -I -S /usr/lib/framebridge-expanded/expanded/framebridge_expanded/package_upgrade.py schedule\n"
             "    ;;\nesac\n")
 

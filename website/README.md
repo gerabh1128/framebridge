@@ -27,9 +27,23 @@ identities before a ready build:
 - framebridge-preview-0.3.1-original-r4.jpg:
   2e867d4b6a22f81ecbefa293a88799b9e3c93f02aa7d1090c7f0a0dbfe44dc9f
 
-The homepage features the approved 80-second English 0.3.4 conceptual animation
-with the original FrameBridge music. It is not a live screen recording. Copy its
-assets into the same directory before a ready build:
+The homepage features the approved 40-second English film with lowercase
+framebridge wordmarks, real ASUS console capture, an illustrative request,
+animated diagrams, synthetic narration and the original music. The vertical
+1080x1920 player keeps its 9:16 ratio and a bounded width on the homepage. The
+homepage versions its stylesheet URL so returning visitors load the matching
+portrait layout.
+Copy these exact approved assets into the same directory before a ready build:
+
+- framebridge-chatgpt-mcp-en-20261031.mp4:
+  83b4b579a8fbadffd0a4bc026c312cf72ba82194ed581f47b55ed0465c69fe82
+- framebridge-chatgpt-mcp-en-20261031.jpg:
+  21a185c056461c58e064047e9543a8c4384fe736dd6c17b95928bec3d82d5699
+
+The earlier 80-second English 0.3.4 conceptual animation and original 0.3.1
+preview remain unchanged and linked below the current film. The conceptual
+animations are retained separately from the real console capture. Their
+existing assets are also required before a ready build:
 
 - framebridge-preview-0.3.4-en.mp4:
   61fd8eaa38f928ffd2cc9d60d8fa051821fb569fd58583a0d42ad201d2e04563

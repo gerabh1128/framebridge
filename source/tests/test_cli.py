@@ -13,6 +13,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CliTests(unittest.TestCase):
+    def setUp(self):
+        preference_home = tempfile.TemporaryDirectory(prefix="cli-preferences-")
+        self.addCleanup(preference_home.cleanup)
+        home = Path(preference_home.name)
+        patch = mock.patch.object(cli.profiles, "_home", return_value=home)
+        patch.start()
+        self.addCleanup(patch.stop)
+
     def directory(self):
         return tempfile.TemporaryDirectory(prefix="cli-test-", dir=ROOT / "qa")
 

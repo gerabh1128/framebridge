@@ -1,12 +1,12 @@
 {
   "product": "FrameBridge",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "guide_schema": 1,
   "topics": {
     "start": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "guide_schema": 1,
       "topic": "start",
       "title": "Start with FrameBridge",
@@ -63,12 +63,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "e2e7a61e9ba53021c155f3fc4d8ffad95ffbdb6e5ac253b171b6ce21a5dd42b4"
+      "guide_sha256": "c0f4e4dd674cffe42d3b71614fcc143bcecbd37ab64ecac58931a4197f34e8e4"
     },
     "commands": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "guide_schema": 1,
       "topic": "commands",
       "title": "Command reference",
@@ -89,6 +89,15 @@
             "fb setup",
             "fb console",
             "fb help"
+          ]
+        },
+        {
+          "heading": "Selected local profile",
+          "body": "An explicit --state-dir has first priority, followed by FRAMEBRIDGE_EXPANDED_STATE or FRAMEBRIDGE_STATE_DIR, then the private saved profile reference, and finally the legacy default directory. Successful setup, connection and managed startup can retain the selected profile without copying connection secrets. A validated upgrade can migrate one previously running native profile. Multiple profiles require an explicit selection; an invalid saved reference reports an error rather than silently showing a different empty profile. profile show reads the preference, select records the explicitly chosen configured profile and clear removes only that reference.",
+          "commands": [
+            "fb profile show",
+            "fb --state-dir /path/to/profile profile select",
+            "fb profile clear"
           ]
         },
         {
@@ -136,12 +145,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "d218df5cdc9e9053f461e4a3807e5e9fa45b6194e4b45bf05b6fc2e6258d5d0d"
+      "guide_sha256": "7ce0248cc204a1bb7e30cc2d027df9dea220811b1d9f81c13c0dbdecabc06de7"
     },
     "connection": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "guide_schema": 1,
       "topic": "connection",
       "title": "Connect and disconnect ChatGPT",
@@ -190,12 +199,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "418bad3914a250d4c734e0d0a60fcbfcd7e52cd6c5d4dfacc9da236cc4d45e53"
+      "guide_sha256": "ba9e36ead6a0c2bf64e0d16b171594b17cd1d60313d542dc79ac76e5e7f8b43d"
     },
     "lifecycle": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "guide_schema": 1,
       "topic": "lifecycle",
       "title": "Services, connection intent and boot policy",
@@ -256,12 +265,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "943322bb685d2dd37fd306bff8b6aed6c85fb54f95af95b986c3448a45dd96b7"
+      "guide_sha256": "bf2612b67aceed0c1dd4004b41b23768ef73aaa193e9e84723934b32da75dd96"
     },
     "nodes": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "guide_schema": 1,
       "topic": "nodes",
       "title": "Central and node operation",
@@ -310,12 +319,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "79f6875d2d2486557092cbc5e5a4888f8661f00eddb13d93437737893eb343a5"
+      "guide_sha256": "3195a47b555bc223055c85a551fe9e50f414ef9ed9a926a0ec8fcd3c37509611"
     },
     "terminals": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "guide_schema": 1,
       "topic": "terminals",
       "title": "Persistent Bash terminals",
@@ -360,6 +369,14 @@
             "fb console",
             "fb status console"
           ]
+        },
+        {
+          "heading": "Automatic read-only FBTERM viewer",
+          "body": "When an execution job needs the original FBTERM activity viewer, a current validated X11 session of the same Linux user can open the FrameBridge Expanded window automatically. Its tmux attachment is read-only and remains separate from the interactive work console. A service that started before graphical login discovers the current desktop and session bus when opening the viewer. Only the viewer subprocess receives the graphical environment; existing shells and jobs retain theirs. Without an available desktop, text execution remains available and no visible window is claimed.",
+          "commands": [
+            "fb console",
+            "fb status console"
+          ]
         }
       ],
       "topics": [
@@ -376,12 +393,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "41e9e1c93bb6c8cc2d84c55d33d70d71693ddf835b5d4c199810db59af932139"
+      "guide_sha256": "7dc60afaa0a4d4b29348052756739ac6a2f13ca0b8ac99a6e0b5a468983b5fdc"
     },
     "screens": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "guide_schema": 1,
       "topic": "screens",
       "title": "Authentic screen observation and input",
@@ -431,12 +448,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "506c7fcba592ccc473774a809871871285a199e8a8f72b9e230eb23481fd8a85"
+      "guide_sha256": "760325cf7388576b6b51cdc712b6eb67fa77100757b1e99c49cbe667f64e7abc"
     },
     "diagnostics": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "guide_schema": 1,
       "topic": "diagnostics",
       "title": "Status and diagnosis",
@@ -489,12 +506,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "6f91c71b82e945767d98f113ae1b958f2222939bf94c0657d1ada047b43d6932"
+      "guide_sha256": "8a892ec00b60eeefa3f86ea86dbce2841d042642eb44c3481184557e5ff7c9af"
     },
     "security": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "guide_schema": 1,
       "topic": "security",
       "title": "Authorization, distribution and safe operation",
@@ -529,12 +546,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "0b7c6e55958911306a71f0d0ea5a504df7b1447967b424b5e8a03b4b53275211"
+      "guide_sha256": "375dc05b16c21203725539c36ba4fe226dc606afca800e53d61134513aa09bda"
     },
     "compatibility": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "guide_schema": 1,
       "topic": "compatibility",
       "title": "Compatibility with earlier commands",
@@ -577,8 +594,8 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "970ed8c5f509e78adc6fd9d99fd14a3edc93fc597184e9de54723763d7807544"
+      "guide_sha256": "b52230ec51c0cf4381f3fdb52b056f61958448c52148cb96e601afe1cfe64c51"
     }
   },
-  "guide_sha256": "aecf94c39b17d53be24aecd67089ed5cfa52e3b0499e6a615b3a4e04cfb6e319"
+  "guide_sha256": "aecca2a0780bc8b9ea15b1d5f9eaaf47f513f697b1a60cab9aa7eab4e5dcd0d7"
 }

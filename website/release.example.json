@@ -20,9 +20,9 @@
       "signature_url": "/downloads/FrameBridge-0.3.1-tunnel-client-dependency-sources.tar.gz.asc"
     }
   ],
-  "version": "0.3.4",
+  "version": "0.3.5",
   "state": "preparing",
-  "release_date": "2026-10-29",
+  "release_date": "2026-10-31",
   "distribution": "Debian 13 \u00b7 Ubuntu 24.04 \u00b7 Linux Mint 22.x",
   "architecture": "amd64",
   "site_url": "https://framebridge.betancourt.one",

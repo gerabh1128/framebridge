@@ -26,6 +26,15 @@ MAX_LINE = 64 * 1024
 MAX_LOG = 2 * 1024 * 1024
 LOG_COPIES = 3
 POLL_FRESH_SECONDS = 75
+METRICS_SCAN_BYTES = 2 * 1024 * 1024
+METRICS_LINE_BYTES = 16 * 1024
+METRICS_BODY_SECONDS = 0.6
+_POLL_METRIC = b"commands_poll_last_successful_timestamp_seconds"
+_METRIC_NAME = re.compile(rb"[a-zA-Z_:][a-zA-Z0-9_:]*")
+_LABEL = rb'[a-zA-Z_][a-zA-Z0-9_]*[ \t]*=[ \t]*"(?:[^"\\\r\n]|\\["\\n])*"'
+_LABELS = rb'\{[ \t]*(?:' + _LABEL + rb'(?:[ \t]*,[ \t]*' + _LABEL + rb')*[ \t]*,?)?[ \t]*\}'
+_POLL_SAMPLE = re.compile(_POLL_METRIC + rb'(?:' + _LABELS + rb')?[ \t]+([^ \t\r\n]+)(?:[ \t]+[+-]?\d+)?[ \t]*')
+_METRIC_NUMBER = re.compile(rb'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?')
 _ANSI = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))")
 
 
@@ -218,6 +227,73 @@ def _get(endpoint, path, limit):
         connection.close()
 
 
+def _poll_timestamp(response):
+    """Scan a bounded Prometheus metric group without retaining the whole body.
+
+    Prometheus text exposition groups all samples of a metric together. Once
+    this group ends, unrelated metrics cannot improve the polling evidence.
+    read1() and a body deadline also bound a response with slowly arriving lines.
+    """
+    deadline = time.monotonic() + METRICS_BODY_SECONDS
+    pending = bytearray()
+    scanned = 0
+    recent = None
+
+    def sample(line):
+        nonlocal recent
+        if len(line) > METRICS_LINE_BYTES:
+            raise ConnectionMonitorError("A tunnel metric line is too large.")
+        line = line.strip(b" \t\r")
+        if not line or line.startswith(b"#"):
+            return False
+        name = _METRIC_NAME.match(line)
+        if not name:
+            raise ConnectionMonitorError("The tunnel metrics have an unexpected format.")
+        if name.group() != _POLL_METRIC:
+            return recent is not None
+        match = _POLL_SAMPLE.fullmatch(line)
+        if not match or not _METRIC_NUMBER.fullmatch(match.group(1)):
+            raise ConnectionMonitorError("The polling metric has an unexpected format.")
+        value = float(match.group(1))
+        if not math.isfinite(value):
+            raise ConnectionMonitorError("The polling metric is not finite.")
+        recent = value if recent is None else max(recent, value)
+        return False
+
+    while True:
+        if time.monotonic() >= deadline:
+            raise ConnectionMonitorError("The tunnel metrics took too long.")
+        chunk = response.read1(min(4096, METRICS_SCAN_BYTES - scanned + 1))
+        if time.monotonic() >= deadline:
+            raise ConnectionMonitorError("The tunnel metrics took too long.")
+        if not chunk:
+            if pending:
+                sample(bytes(pending))
+            return recent
+        scanned += len(chunk)
+        if scanned > METRICS_SCAN_BYTES:
+            raise ConnectionMonitorError("The polling metric was not found within the scan limit.")
+        pending.extend(chunk)
+        while (ending := pending.find(b"\n")) >= 0:
+            line = bytes(pending[:ending])
+            del pending[:ending + 1]
+            if sample(line):
+                return recent
+        if len(pending) > METRICS_LINE_BYTES:
+            raise ConnectionMonitorError("A tunnel metric line is too large.")
+
+
+def _get_poll_timestamp(endpoint):
+    # Same direct literal-loopback contract as _get(): no proxy or redirect.
+    connection = http.client.HTTPConnection(*endpoint, timeout=0.6)
+    try:
+        connection.request("GET", "/metrics", headers={"Connection": "close"})
+        with connection.getresponse() as response:
+            return response.status, _poll_timestamp(response) if response.status == 200 else None
+    finally:
+        connection.close()
+
+
 def probe(health_file, expected_tunnel, expected_mcp, started, *, now=None):
     """Return a public state and private detail from the pinned client contract."""
     now = time.time() if now is None else now
@@ -254,19 +330,11 @@ def probe(health_file, expected_tunnel, expected_mcp, started, *, now=None):
             return "access", "Tunnel metadata request failed: " + detail
         if metadata.get("ID") != expected_tunnel:
             return "access", "Waiting for authenticated tunnel metadata."
-        code, body = _get(endpoint, "/metrics", 256 * 1024)
+        code, recent = _get_poll_timestamp(endpoint)
         if code != 200:
             return "access", "Waiting for authenticated polling evidence."
-        values = []
-        for line in body.decode("ascii", errors="replace").splitlines():
-            if line.startswith("#"):
-                continue
-            match = re.fullmatch(r"commands_poll_last_successful_timestamp_seconds(?:\{[^\n]*\})?\s+([0-9.eE+-]+)(?:\s+\d+)?", line)
-            if match:
-                values.append(float(match.group(1)))
-        if not values or not all(math.isfinite(v) for v in values):
+        if recent is None:
             return "access", "Waiting for authenticated polling evidence."
-        recent = max(values)
         if recent < started - 5 or recent > now + 5 or now - recent > POLL_FRESH_SECONDS:
             return "access", "A successful authenticated poll has not been confirmed recently."
         return "ready", "Local MCP initialization, tunnel identity, metadata and recent authenticated polling verified."

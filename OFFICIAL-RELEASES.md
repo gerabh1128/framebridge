@@ -21,3 +21,5 @@ Signing does not encrypt the software, prohibit source modification, or guarante
 An agent using FrameBridge should treat installed program files as the application, use its documented CLI and MCP tools, and keep task data separate. Routine task execution should not rewrite the application or create an unofficial replacement binary. When the owner explicitly requests development, use a separate checkout and present reviewable changes.
 
 This is operational guidance for reliable use, not a restriction on a recipient's GPL rights or an additional owner-device/phone pairing mechanism.
+
+See the [reviewed source and release workflow](docs/RELEASE-WORKFLOW.md) and the [0.3.5 source-to-artifact record](docs/RELEASE-SOURCE-0.3.5.md). A later documentation commit does not redefine the frozen source used for an existing signed package.

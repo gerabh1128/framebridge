@@ -12,16 +12,21 @@ import socket
 import sys
 import shlex
 
-from .config import default_config, load_config, save_config
+from .config import default_config, load_config, save_config, state_path
+from . import profiles
 from . import tunnel, __version__
 
 _EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+\Z")
 
 
 def resolve_state(value=None):
-    return Path(value or os.environ.get("FRAMEBRIDGE_EXPANDED_STATE")
-                or os.environ.get("FRAMEBRIDGE_STATE_DIR")
-                or Path.home() / ".local/share/framebridge-expanded").expanduser().absolute()
+    return state_path(value)
+
+
+def _remember_profile(state):
+    config = Path(state) / "config.json"
+    if config.exists() or config.is_symlink():
+        profiles.select(state)
 
 
 def _module(name):
@@ -166,13 +171,14 @@ def setup(state, *, ask=None):
     save_config(state, config)
     if certificate_plan is not None:
         _show(_module("tls").create_certificates(state, **certificate_plan))
+    _remember_profile(state)
     print("Configuration saved. No service or ChatGPT connection was started.")
     if config["role"] == "node":
         print("Next: framebridge doctor, framebridge nodes enroll, ask the central operator to approve, then framebridge nodes poll.")
         print("After approval is confirmed, run fb service start.")
     else:
         print("Next: fb connect. This starts the managed tools and connection.")
-    print("Use the same --state-dir option with every command when using a custom profile.")
+    print("This is now the default profile for this Linux account. Explicit --state-dir options retain priority.")
     return 0
 
 
@@ -487,6 +493,10 @@ def _service_command(args, state):
                 if not lifecycle.status(state).get("boot", {}).get("configured"):
                     return _interaction_required("fb service start")
         result = getattr(lifecycle, "service_" + action)(state)
+    if (result.get("ok") is not False and
+            ((action == "boot" and args.boot_action == "enable")
+             or (action == "start" and result.get("initial_configuration") is True))):
+        _remember_profile(state)
     if args.json:
         _show(result)
     elif result.get("ok") is False:
@@ -539,7 +549,7 @@ def build_parser():
     parser = argparse.ArgumentParser(prog="framebridge",
         description="One command-line interface for human operators and authorized agents. fb is the short name for framebridge.",
         epilog="Normal first use: fb connect. Advanced setup is optional. Read fb help for the guide and fb help compatibility for older commands.")
-    parser.add_argument("--state-dir", help="Profile directory; defaults to ~/.local/share/framebridge-expanded.")
+    parser.add_argument("--state-dir", help="Explicit profile directory; overrides the saved default profile.")
     parser.set_defaults(json=False, non_interactive=False)
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
     connect = sub.add_parser("connect", help="Connect or resume ChatGPT; normal first use needs no separate setup/start.")
@@ -554,6 +564,11 @@ def build_parser():
     sub.add_parser("doctor", help="Diagnose prerequisites and problems; does not repair or connect.")
     sub.add_parser("health", help="Read one local profile's health, identity and prerequisites; no repair or connection.")
     sub.add_parser("setup", help="Optional advanced role/profile setup; does not start services or connect.")
+    profile = sub.add_parser("profile", help="Select or inspect this Linux account's default profile reference.")
+    profile_actions = profile.add_subparsers(dest="profile_action", required=True)
+    profile_actions.add_parser("select", help="Select a configured profile without copying its credentials.")
+    profile_actions.add_parser("show", help="Inspect the saved default profile reference.")
+    profile_actions.add_parser("clear", help="Remove only the default reference; retain profiles and credentials.")
     help_parser = sub.add_parser("help", help="Read the installed, versioned English guide.")
     help_parser.add_argument("topic", nargs="?", default="start", help="Guide topic; use all for the complete reference.")
     service = sub.add_parser("service", help="Manage current services separately from future startup policy.")
@@ -666,12 +681,19 @@ def main(argv=None):
                "explicit_state": str(resolve_state(args.state_dir)) if args.command != "screen-access" and (args.state_dir or os.environ.get("FRAMEBRIDGE_EXPANDED_STATE") or os.environ.get("FRAMEBRIDGE_STATE_DIR")) else None}
     try:
         return _dispatch(parser, args)
+    except (OSError, ValueError, RuntimeError) as exc:
+        # Profile resolution happens before normal command dispatch. A broken
+        # explicit preference must be diagnosed, never replaced by an empty one.
+        if args.json:
+            _show({"ok": False, "error": "PROFILE_UNAVAILABLE", "message": str(exc)})
+        else:
+            print("Error: " + str(exc), file=sys.stderr)
+        return 2
     finally:
         _OUTPUT = previous
 
 
 def _dispatch(parser, args):
-    state = None if args.command == "screen-access" else resolve_state(args.state_dir)
     if args.command is None:
         if args.json or args.non_interactive or not sys.stdin.isatty():
             if args.json:
@@ -691,8 +713,27 @@ def _dispatch(parser, args):
         if action is None:
             print("Choose one of the listed actions.", file=sys.stderr)
             return 2
-        return main(["--state-dir", str(state)] + action)
+        prefix = ["--state-dir", args.state_dir] if args.state_dir else []
+        return main(prefix + action)
+    # Help and reference recovery remain available when the saved profile is
+    # missing, ambiguous or unsafe. None of these reads creates a profile.
+    state = None if args.command in {"screen-access", "help", "tutorial", "profile"} else resolve_state(args.state_dir)
     try:
+        if args.command == "profile":
+            if args.profile_action == "select":
+                explicit = args.state_dir or os.environ.get("FRAMEBRIDGE_EXPANDED_STATE") or os.environ.get("FRAMEBRIDGE_STATE_DIR")
+                if not explicit:
+                    raise ValueError("Choose the intended profile with fb --state-dir PROFILE profile select.")
+                result = profiles.select(resolve_state(explicit))
+            else:
+                result = getattr(profiles, args.profile_action)()
+            if args.json:
+                _show(result)
+            elif args.profile_action == "clear":
+                print("Default profile reference removed. Profiles and credentials are retained.")
+            else:
+                print("Default profile: " + (result.get("state_dir") or "not selected"))
+            return 0
         if args.command == "screen-access":
             value = _module("screen_access").command(args)
             _show(value)
@@ -718,9 +759,14 @@ def _dispatch(parser, args):
                     value = _module("lifecycle").status(state)
                     if code:
                         value = dict(value, ok=False, error="CONNECTION_NOT_READY")
+                    else:
+                        _remember_profile(state)
                     _show(value)
                     return code
-            return connect_chatgpt(state, foreground=args.foreground, replace=args.replace)
+            code = connect_chatgpt(state, foreground=args.foreground, replace=args.replace)
+            if code == 0:
+                _remember_profile(state)
+            return code
         if args.command == "status":
             return _status_command(args, state)
         if args.command == "doctor":
@@ -750,6 +796,9 @@ def _dispatch(parser, args):
                 if not value.get("configured") or not value.get("linger"):
                     return _interaction_required("fb service boot enable")
             result = getattr(autostart, args.autostart_action)(state)
+            if (args.autostart_action == "enable" and result.get("ok") is not False
+                    and result.get("configured") is True and result.get("enabled") is True):
+                _remember_profile(state)
             if args.json or args.autostart_action == "status":
                 _show(result)
                 return _result_code(result)

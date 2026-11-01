@@ -1,5 +1,9 @@
 # FrameBridge release notes
 
+## 0.3.5
+
+Reliability update for the existing three Linux profiles: concurrent bounded TLS handshakes, automatic read-only FBTERM viewer discovery after graphical login, persistent default profile selection, bounded streaming tunnel metrics and safe package bytecode invalidation. See [the complete 0.3.5 notes](docs/RELEASE-NOTES-0.3.5.md). Artifact signatures, native lifecycle acceptance and publication status belong to the external release record.
+
 ## 0.3.4
 
 Native persistent startup improvements, lower idle disk writes, local health reporting and confirmed Fleet destinations. The release has three amd64 distribution profiles and matching source with both Python ABIs. See [the complete 0.3.4 notes](docs/RELEASE-NOTES-0.3.4.md); signatures and actual lifecycle results are recorded with the release artifacts.

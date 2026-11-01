@@ -973,7 +973,7 @@
     "original-geranas/.local/share/framebridge/tool-adapter/bin/framebridge_tool_adapter.py": "2afb9bf8f789f42732a6aa6e50b5897174bfa1522ff032bc83533679c37551ec",
     "original-asus/tool-adapter/bin/framebridge_tool_client.py": "1d1514f08653c31f6b67ebcdcf61686947321bec96752a692b7e46cee6285f6e",
     "original-asus/tool-adapter/bin/framebridge_tool_adapter.py": "dca9bf3dfbae7881aa6824ca79a2922fb4ec7ab1b61b5696b39cb64630c4d86b",
-    "original-asus/fbterm/bin/fbterm_engine.py": "9408aa2dfba2ceecf1bcc4d9e6b1d52fec1f8971183f5baa7145f2d6357c7635",
+    "original-asus/fbterm/bin/fbterm_engine.py": "e3c2798d886919b67321b79b3233d6989b7f618c83190e390794ddb9a9053128",
     "original-asus/fbterm/bin/fbx": "84589ad19ea0eab7cfc766ef4dba736be05c509c3918f572f4054585ee4c5efb",
     "original-asus/fbterm/bin/fbterm-run": "bbfc19c878746518e482adbe61cd6f8ae8560dca75a1e3db9921e1cb40b42e71",
     "original-asus/fbterm/bin/fbterm-prompt-ready": "276f657e23ff26c75f5e430731fdf5b095d777eabcbaad86e11c69b0919c691c",
@@ -989,5 +989,18 @@
   "created": "2026-10-21",
   "base_deb_sha256_role": "Historical pre-RC7 input package; not this community candidate",
   "community_version": "0.3.1~community.20261026.7",
-  "community_derivative": true
+  "community_derivative": true,
+  "reviewed_source_changes": [
+    {
+      "version": "0.3.5",
+      "date": "2026-10-31",
+      "path": "original-asus/fbterm/bin/fbterm_engine.py",
+      "previous_sha256": "9408aa2dfba2ceecf1bcc4d9e6b1d52fec1f8971183f5baa7145f2d6357c7635",
+      "reviewed_sha256": "e3c2798d886919b67321b79b3233d6989b7f618c83190e390794ddb9a9053128",
+      "provenance": "provenance/FBTERM-VIEWER-0.3.5-REVIEW.json",
+      "patch": "provenance/patches/fbterm-viewer-0.3.5.patch",
+      "patch_sha256": "ed174250804384f6444af576e54cf79aa35452d9401456fba47438b28276a337",
+      "reason": "Restore automatic read-only FBTERM viewer opening after text-mode startup and later X11 login."
+    }
+  ]
 }

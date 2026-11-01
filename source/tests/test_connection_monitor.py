@@ -29,6 +29,8 @@ class HTTPFixture:
         self.tunnel = ID
         self.mcp = MCP
         self.hits = []
+        self.metrics = None
+        self.metrics_code = 200
         fixture = self
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
@@ -43,12 +45,17 @@ class HTTPFixture:
                                        "tunnel_metadata": {"ID": fixture.tunnel},
                                        "tunnel_metadata_error": fixture.metadata_error}).encode()
                 else:
-                    code, data = 200, ("commands_poll_last_successful_timestamp_seconds " + str(fixture.poll) + "\n").encode()
+                    code = fixture.metrics_code
+                    data = fixture.metrics if fixture.metrics is not None else ("commands_poll_last_successful_timestamp_seconds " + str(fixture.poll) + "\n").encode()
                 self.send_response(code)
                 if code == 302:
                     self.send_header("Location", "http://192.0.2.1/forbidden")
                 self.end_headers()
-                self.wfile.write(data)
+                try:
+                    self.wfile.write(data)
+                except (BrokenPipeError, ConnectionResetError):
+                    # A successful streaming scan deliberately closes before the tail.
+                    pass
             def log_message(self, *args):
                 pass
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -118,6 +125,88 @@ class ReadinessTests(unittest.TestCase):
         self.fixture.file.symlink_to(Path(self.temp.name) / "missing")
         with self.assertRaises(OSError):
             monitor.health_endpoint(self.fixture.file)
+
+
+    def test_large_metrics_document_before_or_after_poll_group_is_ready(self):
+        poll = ("commands_poll_last_successful_timestamp_seconds " + str(self.fixture.poll) + "\n").encode()
+        prefix = b'unrelated_metric{label="synthetic"} 1\n' * 9000
+        self.assertGreater(len(prefix), 256 * 1024)
+        self.fixture.metrics = prefix + poll
+        self.assertEqual(self.fixture.probe()[0], "ready")
+        # A large, even malformed tail is outside the completed target group.
+        self.fixture.metrics = poll + b'next_metric 1\n' + b'x' * (monitor.METRICS_SCAN_BYTES + 1)
+        self.assertEqual(self.fixture.probe()[0], "ready")
+
+    def test_metrics_scan_and_line_limits_do_not_report_ready(self):
+        for body in [b'unrelated_metric 1\n' * (monitor.METRICS_SCAN_BYTES // 19 + 1),
+                     b'#' + b'x' * monitor.METRICS_LINE_BYTES + b'\n']:
+            with self.subTest(bytes=len(body)):
+                self.fixture.metrics = body
+                self.assertEqual(self.fixture.probe()[0], "checking")
+
+    def test_malformed_or_nonfinite_poll_group_cannot_hide_after_valid_sample(self):
+        good = ("commands_poll_last_successful_timestamp_seconds{node=\"a\"} " + str(self.fixture.poll) + "\n").encode()
+        for bad in [b'NaN', b'+Inf', b'-Inf', b'1e309', b'1_000', b'not-a-number']:
+            with self.subTest(value=bad):
+                self.fixture.metrics = good + b'commands_poll_last_successful_timestamp_seconds{node="b"} ' + bad + b'\n'
+                self.assertNotEqual(self.fixture.probe()[0], "ready")
+        self.fixture.metrics = good + b'commands_poll_last_successful_timestamp_seconds{broken} 1\n'
+        self.assertNotEqual(self.fixture.probe()[0], "ready")
+
+    def test_only_exact_metric_and_latest_sample_freshness_count(self):
+        name = b'commands_poll_last_successful_timestamp_seconds'
+        current = str(self.fixture.poll).encode()
+        self.fixture.metrics = name + b'_suffix ' + current + b'\nprefix_' + name + b' ' + current + b'\n'
+        self.assertEqual(self.fixture.probe()[0], "access")
+        for offset, wanted in [(-200, "ready"), (200, "access")]:
+            with self.subTest(offset=offset):
+                other = str(self.fixture.poll + offset).encode()
+                self.fixture.metrics = name + b'{node="a"} ' + current + b'\n' + name + b'{node="b"} ' + other + b'\n'
+                self.assertEqual(self.fixture.probe()[0], wanted)
+
+    def test_metrics_http_errors_do_not_follow_redirects_or_use_proxy(self):
+        for code in [302, 403]:
+            with self.subTest(code=code):
+                self.fixture.metrics_code = code
+                self.fixture.hits.clear()
+                with mock.patch.dict(os.environ, {"HTTP_PROXY": "http://192.0.2.2:1", "NO_PROXY": ""}):
+                    self.assertEqual(self.fixture.probe()[0], "access")
+                self.assertEqual(self.fixture.hits, ["/readyz", "/api/status", "/metrics"])
+
+
+class StreamingMetricsTests(unittest.TestCase):
+    def test_fragmented_samples_labels_and_eof_without_newline(self):
+        data = (b'  # TYPE commands_poll_last_successful_timestamp_seconds gauge\n'
+                b'\tcommands_poll_last_successful_timestamp_seconds{node="a", path="a\\\\b\\\"c\\n"} 1700\n'
+                b'commands_poll_last_successful_timestamp_seconds{node="b"} 1701')
+        class Fragmented(io.BytesIO):
+            def read1(self, size):
+                return super().read1(min(size, 7))
+        self.assertEqual(monitor._poll_timestamp(Fragmented(data)), 1701)
+
+    def test_completed_group_does_not_consume_unbounded_tail(self):
+        class Counted(io.BytesIO):
+            def __init__(self, data):
+                super().__init__(data)
+                self.bytes_read = 0
+            def read1(self, size):
+                result = super().read1(size)
+                self.bytes_read += len(result)
+                return result
+        stream = Counted(b'commands_poll_last_successful_timestamp_seconds 1700\nnext_metric 1\n' + b'x' * monitor.METRICS_SCAN_BYTES)
+        self.assertEqual(monitor._poll_timestamp(stream), 1700)
+        self.assertLessEqual(stream.bytes_read, 4096)
+
+    def test_slow_fragments_hit_body_deadline_without_waiting_for_newline(self):
+        class Slow(io.BytesIO):
+            def read1(self, size):
+                clock[0] += 0.1
+                return super().read1(1)
+        clock = [0.0]
+        with mock.patch.object(monitor.time, "monotonic", side_effect=lambda: clock[0]):
+            with self.assertRaises(monitor.ConnectionMonitorError):
+                monitor._poll_timestamp(Slow(b'#' + b'x' * 1000))
+        self.assertLessEqual(clock[0], monitor.METRICS_BODY_SECONDS + 0.1)
 
 
 class PrivateLogTests(unittest.TestCase):

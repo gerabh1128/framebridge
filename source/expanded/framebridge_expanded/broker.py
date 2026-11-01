@@ -481,11 +481,50 @@ def make_server(host="127.0.0.1", port=20878, state_dir=None):
             else:
                 self.send_json(404, {"ok": False, "error": "ENDPOINT_NOT_AVAILABLE"})
 
-    if ":" in host:
-        class Server(ThreadingHTTPServer):
-            address_family = socket.AF_INET6
-    else:
-        Server = ThreadingHTTPServer
+    class Server(ThreadingHTTPServer):
+        """Bound workers and negotiate TLS outside the accept loop."""
+
+        daemon_threads = True
+        max_workers = 128
+        tls_handshake_timeout = 5.0
+        address_family = socket.AF_INET6 if ":" in host else socket.AF_INET
+
+        def __init__(self, *args, **kwargs):
+            self._worker_slots = threading.BoundedSemaphore(self.max_workers)
+            super().__init__(*args, **kwargs)
+
+        def process_request(self, request, client_address):
+            # Never wait for a worker in the accept loop. Excess connections
+            # close immediately and may retry through the existing client policy.
+            if not self._worker_slots.acquire(blocking=False):
+                self.shutdown_request(request)
+                return
+            try:
+                super().process_request(request, client_address)
+            except BaseException:
+                self._worker_slots.release()
+                raise
+
+        def process_request_thread(self, request, client_address):
+            try:
+                if isinstance(request, ssl.SSLSocket):
+                    previous_timeout = request.gettimeout()
+                    try:
+                        request.settimeout(self.tls_handshake_timeout)
+                        request.do_handshake()
+                        # HTTP and node long-poll retain their previous timeout.
+                        request.settimeout(previous_timeout)
+                    except (OSError, ValueError):
+                        return
+                try:
+                    self.finish_request(request, client_address)
+                except Exception:
+                    self.handle_error(request, client_address)
+            finally:
+                try:
+                    self.shutdown_request(request)
+                finally:
+                    self._worker_slots.release()
     server = Server((host, port), Handler)
     server.daemon_threads = True
     server.expanded_store = store
@@ -496,7 +535,8 @@ def make_server(host="127.0.0.1", port=20878, state_dir=None):
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.load_cert_chain(str(tls_cert), str(tls_key))
-        server.socket = context.wrap_socket(server.socket, server_side=True)
+        server.socket = context.wrap_socket(
+            server.socket, server_side=True, do_handshake_on_connect=False)
     return server
 
 

@@ -187,7 +187,7 @@ class PackageUpgradeTests(unittest.TestCase):
              mock.patch.object(upgrade, '_start_manual', return_value='framebridge-profile-' + 'a' * 20 + '.service'), \
              mock.patch.object(upgrade.subprocess, 'run') as run:
             self.assertEqual(upgrade.resume()['phase'], 'COMPLETE')
-        self.assertEqual([c.args[1] for c in owner.call_args_list], ['user-desktop', 'user-stop', 'user-ready'])
+        self.assertEqual([c.args[1] for c in owner.call_args_list], ['user-profile', 'user-desktop', 'user-stop', 'user-ready'])
         run.assert_not_called()
 
 
@@ -340,13 +340,65 @@ class PackageUpgradeTests(unittest.TestCase):
 
     def test_background_identity_failure_is_refused_without_signaling(self):
         from framebridge_expanded import connection_background as background
+        alive_pid = 54321
+        original_exists = Path.exists
         with mock.patch.object(background, '_directory', return_value=self.state), \
-             mock.patch.object(background, '_read', return_value={'pid': os.getpid()}), \
+             mock.patch.object(background, '_read', return_value={'pid': alive_pid}), \
              mock.patch.object(background, '_valid_identity', return_value=False), \
+             mock.patch.object(Path, 'exists', autospec=True,
+                 side_effect=lambda path: True if str(path) == '/proc/' + str(alive_pid) else original_exists(path)), \
              mock.patch.object(background, 'disconnect') as disconnect:
             with self.assertRaisesRegex(RuntimeError, 'BACKGROUND_IDENTITY_UNVERIFIED'):
                 upgrade._background(self.state)
         disconnect.assert_not_called()
+
+    def test_upgrade_migrates_one_reference_per_owner_and_marks_multiple_captures(self):
+        rows = []
+        for number in (1234, 1235):
+            rows.append({'uid': 1000, 'user': 'owner', 'home': '/home/owner',
+                         'state': str(self.state) + '-' + str(number),
+                         'pid': number, 'birth': '99', 'config_sha256': 'a' * 64,
+                         'unit': 'framebridge-autostart-' + format(number, '016x') + '.service',
+                         'phase': 'CAPTURED'})
+        self.write(self.root / 'pending.json', {'schema': 1, 'phase': 'SCHEDULED', 'profiles': rows})
+        by_pid = {str(row['pid']): row for row in rows}
+        with mock.patch.object(upgrade, 'ROOT', self.root), \
+             mock.patch.object(upgrade, '_root'), \
+             mock.patch.object(upgrade, '_read', side_effect=self.root_read), \
+             mock.patch.object(upgrade, '_wait_dpkg', return_value=nullcontext()), \
+             mock.patch.object(upgrade, '_resume_lock', return_value=nullcontext()), \
+             mock.patch.object(upgrade, 'identify', side_effect=lambda proc: by_pid[proc.name]), \
+             mock.patch.object(upgrade, '_owner', return_value={'ok': True, 'ready': True}) as owner, \
+             mock.patch.object(upgrade, '_unit', return_value=['/usr/bin/systemctl', '--user']), \
+             mock.patch.object(upgrade.subprocess, 'run', return_value=SimpleNamespace(returncode=0)):
+            value = upgrade.resume()
+        self.assertEqual(value['phase'], 'COMPLETE')
+        selections = [call for call in owner.call_args_list if call.args[1] == 'user-profile']
+        self.assertEqual(len(selections), 1)
+        self.assertTrue(selections[0].args[0]['default_profile_ambiguous'])
+        self.assertEqual([row['phase'] for row in value['profiles']], ['READY', 'READY'])
+
+    def test_default_reference_failure_is_recorded_without_blocking_runtime_recovery(self):
+        row = {'uid': 1000, 'user': 'owner', 'home': '/home/owner',
+               'state': str(self.state), 'pid': 1234, 'birth': '99',
+               'config_sha256': 'a' * 64, 'unit': None, 'phase': 'CAPTURED'}
+        self.write(self.root / 'pending.json', {'schema': 1, 'phase': 'SCHEDULED', 'profiles': [row]})
+        def owner(profile, operation):
+            if operation == 'user-profile':
+                raise RuntimeError('Default profile directory is unsafe')
+            return {'ok': True, 'ready': True}
+        with mock.patch.object(upgrade, 'ROOT', self.root), \
+             mock.patch.object(upgrade, '_root'), \
+             mock.patch.object(upgrade, '_read', side_effect=self.root_read), \
+             mock.patch.object(upgrade, '_wait_dpkg', return_value=nullcontext()), \
+             mock.patch.object(upgrade, '_resume_lock', return_value=nullcontext()), \
+             mock.patch.object(upgrade, 'identify', return_value=row), \
+             mock.patch.object(upgrade, '_owner', side_effect=owner), \
+             mock.patch.object(upgrade, '_start_manual', return_value='framebridge-profile-' + 'a' * 20 + '.service'):
+            value = upgrade.resume()
+        self.assertEqual(value['phase'], 'COMPLETE')
+        self.assertEqual(value['profiles'][0]['phase'], 'READY')
+        self.assertFalse(value['profiles'][0]['default_profile']['ok'])
 
     def test_verified_background_connection_is_retained_without_reading_credentials(self):
         from framebridge_expanded import connection_background as background

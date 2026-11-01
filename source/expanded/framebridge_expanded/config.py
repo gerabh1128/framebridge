@@ -15,7 +15,11 @@ ROLES = ("standalone", "central", "node")
 DEFAULT_STATE = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "framebridge-expanded"
 
 def state_path(state=None):
-    return Path(state or os.environ.get("FRAMEBRIDGE_EXPANDED_STATE", DEFAULT_STATE)).expanduser().absolute()
+    value = state or os.environ.get("FRAMEBRIDGE_EXPANDED_STATE") or os.environ.get("FRAMEBRIDGE_STATE_DIR")
+    if not value:
+        from .profiles import selected
+        value = selected() or DEFAULT_STATE
+    return Path(value).expanduser().absolute()
 
 def private_dir(path):
     path = Path(path)
