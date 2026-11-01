@@ -1,6 +1,6 @@
 # Claims and evidence boundaries
 
-The latest signed release is **FrameBridge 0.3.4**, with separate amd64 packages for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. The [official download page](https://framebridge.betancourt.one/download/) identifies the actual artifacts, signatures and corresponding source. A later default-branch documentation change does not rewrite the signed tag or an installed package.
+The **FrameBridge 0.3.5** reliability update targets the same three release profiles, with separate amd64 packages for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. The [official download page](https://framebridge.betancourt.one/download/) identifies the actual artifacts, signatures and corresponding source. A later default-branch documentation change does not rewrite the signed tag or an installed package.
 
 ## Current release scope
 

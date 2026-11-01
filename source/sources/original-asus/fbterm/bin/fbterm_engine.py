@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
+# Modified for FrameBridge 0.3.5 on 2026-10-31:
+# select the validated graphical session for the read-only FBTERM viewer.
+# Original FrameBridge material remains GPL-3.0-only; see the project LICENSE.
 
 import fcntl
 import hashlib
 import os
+import pwd
+import stat
 from pathlib import Path
 import re
 import subprocess
@@ -47,6 +52,51 @@ class FBTerm:
             ["tmux", "has-session", "-t", self.session]
         )
         return p.returncode == 0
+
+    @staticmethod
+    def _viewer_environment():
+        """Select the current desktop for the read-only viewer, never for jobs."""
+        env = os.environ.copy()
+        try:
+            from framebridge_expanded import display_context as display
+        except ImportError:
+            # Preserve standalone Original behavior outside the expanded package.
+            if env.get("FRAMEBRIDGE_EXPANDED_STATE"):
+                return None
+            return env if env.get("DISPLAY") else None
+        try:
+            # A service may start before graphical login. Refresh only this copy;
+            # the adapter's CUA binding and existing tmux shell stay unchanged.
+            display.prepare(env)
+            context = display.check(env)
+            if not isinstance(context, dict):
+                return None
+            if context.get("kind") == "virtual-x11":
+                return env if context.get("explicit") is True else None
+            uid = os.getuid()
+            if (context.get("kind") != "physical-x11"
+                    or type(context.get("uid")) is not int
+                    or context["uid"] != uid):
+                return None
+            runtime = Path("/run/user") / str(uid)
+            info = runtime.lstat()
+            if (not stat.S_ISDIR(info.st_mode) or info.st_uid != uid
+                    or info.st_mode & 0o077):
+                return None
+            bus = runtime / "bus"
+            info = bus.lstat()
+            if not stat.S_ISSOCK(info.st_mode) or info.st_uid != uid:
+                return None
+            env.update({
+                "HOME": pwd.getpwuid(uid).pw_dir,
+                "XDG_RUNTIME_DIR": str(runtime),
+                "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + str(bus),
+            })
+            return env
+        except (OSError, ValueError, TypeError, KeyError, display.DisplayContextError):
+            # No verified graphical session: retain text execution without a
+            # guessed display, another user's bus, or a fabricated visible state.
+            return None
 
     def ensure(self, visible=True):
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -154,33 +204,44 @@ class FBTerm:
 
             time.sleep(0.5)
 
-        if visible and not self.visible_window():
-            subprocess.Popen(
-                [
-                    "gnome-terminal",
-                    "--title=" + self.title,
-                    "--",
-                    "bash",
-                    "-lc",
-                    (
-                        "exec tmux attach-session -r -t "
-                        + subprocess.list2cmdline([self.session])
-                    ),
-                ],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
+        viewer_env = self._viewer_environment() if visible else None
+        if viewer_env is not None and not self.visible_window(viewer_env):
+            try:
+                subprocess.Popen(
+                    [
+                        "gnome-terminal",
+                        "--title=" + self.title,
+                        "--",
+                        "bash",
+                        "-lc",
+                        (
+                            "exec tmux attach-session -r -t "
+                            + subprocess.list2cmdline([self.session])
+                        ),
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                    env=viewer_env,
+                )
+            except OSError:
+                return self.status()
 
             for _ in range(40):
-                if self.visible_window():
+                if self.visible_window(viewer_env):
                     break
                 time.sleep(0.1)
 
         return self.status()
 
-    def visible_window(self):
-        p = self._run(["wmctrl", "-l"])
+    def visible_window(self, viewer_env=None):
+        env = self._viewer_environment() if viewer_env is None else viewer_env
+        if env is None:
+            return False
+        try:
+            p = self._run(["wmctrl", "-l"], env=env)
+        except OSError:
+            return False
         return (
             p.returncode == 0
             and self.title in p.stdout

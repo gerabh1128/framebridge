@@ -1,6 +1,6 @@
 # FrameBridge — Debian, Ubuntu and Linux Mint installation and first use
 
-Version: 0.3.4 | Guide schema: 1
+Version: 0.3.5 | Guide schema: 1
 
 This reference is generated from the shared CLI/MCP guide. Use the matching installed version.
 
@@ -83,6 +83,16 @@ fb health
 fb setup
 fb console
 fb help
+~~~
+
+### Selected local profile
+
+An explicit --state-dir has first priority, followed by FRAMEBRIDGE_EXPANDED_STATE or FRAMEBRIDGE_STATE_DIR, then the private saved profile reference, and finally the legacy default directory. Successful setup, connection and managed startup can retain the selected profile without copying connection secrets. A validated upgrade can migrate one previously running native profile. Multiple profiles require an explicit selection; an invalid saved reference reports an error rather than silently showing a different empty profile. profile show reads the preference, select records the explicitly chosen configured profile and clear removes only that reference.
+
+~~~sh
+fb profile show
+fb --state-dir /path/to/profile profile select
+fb profile clear
 ~~~
 
 ### Services and boot
@@ -286,6 +296,15 @@ fb tty sudo --help
 ### Work console panels
 
 console combines an ordinary Bash pane with a read-only FBTERM activity dashboard. The dashboard is not a second interactive shell. The tmux prefix is Ctrl+B: release both keys, then press lowercase z to enlarge/restore a pane, or lowercase o to switch panes. The release accepts common zoom-key variants within its dedicated console. Closing a viewer normally leaves its tmux session alive; leaving Bash, killing its server or rebooting is different. In a desktop terminal the shared work view is horizontal with FBTERM on the left and Bash on the right. Explicit TTY mode is vertical with a short FBTERM monitor above Bash. The layout belongs to the shared tmux window and follows the last requested view mode; it is not isolated per viewer.
+
+~~~sh
+fb console
+fb status console
+~~~
+
+### Automatic read-only FBTERM viewer
+
+When an execution job needs the original FBTERM activity viewer, a current validated X11 session of the same Linux user can open the FrameBridge Expanded window automatically. Its tmux attachment is read-only and remains separate from the interactive work console. A service that started before graphical login discovers the current desktop and session bus when opening the viewer. Only the viewer subprocess receives the graphical environment; existing shells and jobs retain theirs. Without an available desktop, text execution remains available and no visible window is claimed.
 
 ~~~sh
 fb console

@@ -4,9 +4,9 @@
 
 Use a central gateway and enrolled nodes to administer Linux computers you control. Run commands and return to persistent Bash terminals; an existing X11 desktop adds optional graphical tools. ChatGPT remains hosted; FrameBridge runs the tools on your Linux computers.
 
-> **FrameBridge 0.3.4.** Release builds cover Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. Choose the exact distribution profile on the [official download page](https://framebridge.betancourt.one/download/). Verify the matching release record, package signatures and signed APT metadata before installation.
+> **FrameBridge 0.3.5.** Release builds cover Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. Choose the exact distribution profile on the [official download page](https://framebridge.betancourt.one/download/). Verify the matching release record, package signatures and signed APT metadata before installation.
 
-This release adds `fb health` / `fb --json health`, confirmed destination identity in Fleet results, native persistent startup improvements and reduced disk writes while idle. The source archive, release packages and external acceptance record identify the exact released code. See the [0.3.4 release notes](docs/RELEASE-NOTES-0.3.4.md).
+This release fixes blocked TLS acceptance, restores the automatic read-only FBTERM viewer after graphical login, remembers an explicitly selected native profile, and removes stale packaged Python bytecode during upgrades. It also fixes readiness checks for large tunnel metrics. The source archive, release packages and external acceptance record identify the exact released code. See the [0.3.5 release notes](docs/RELEASE-NOTES-0.3.5.md).
 
 ## Start here
 
@@ -32,10 +32,10 @@ Version-specific signed APT update and managed-service lifecycle results belong 
 
 Verify the signing-key fingerprint, package checksum and detached signature using the instructions on the [official download page](https://framebridge.betancourt.one/download/). Historical release records remain in [Official releases](OFFICIAL-RELEASES.md). A checksum identifies a file; the release signature authenticates it with the independently trusted project key.
 
-For example, with the **Mint** 0.3.4 package downloaded into the current directory:
+For example, with the **Mint** 0.3.5 package downloaded into the current directory:
 
 ~~~bash
-sudo apt install ./FrameBridge-0.3.4-mint22-amd64-py312.deb
+sudo apt install ./FrameBridge-0.3.5-mint22-amd64-py312.deb
 ~~~
 
 Use the corresponding profile filename on Debian or Ubuntu. Review APT's proposed changes for the actual computer. Installation places the software on disk; it does not establish a ChatGPT connection or replace the system Python.
@@ -114,7 +114,7 @@ The [claims and evidence boundaries](docs/CLAIMS-AND-LIMITS.md) distinguish pack
 
 Project home: https://framebridge.betancourt.one/
 
-The public Git repository is `https://framebridge.betancourt.one/git/gerardo/framebridge.git`. For the exact 0.3.4 release, use the signed `v0.3.4` tag or its signed corresponding-source archive from the download page. The repositories, package downloads and source archive are published; normal owner authentication and connection setup are still required on a newly installed computer.
+The public Git repository is `https://framebridge.betancourt.one/git/gerardo/framebridge.git`. For the exact 0.3.5 release, use the signed `v0.3.5` tag or its signed corresponding-source archive from the download page. The repositories, package downloads and source archive are published; normal owner authentication and connection setup are still required on a newly installed computer.
 
 Programming: **ChatGPT**.  
 Original concept and project coordination: **Gerardo Betancourt**.

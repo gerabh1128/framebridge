@@ -1,9 +1,9 @@
-# Sources accompanying FrameBridge 0.3.4
+# Sources accompanying FrameBridge 0.3.5
 
 The matching release set is intended to be delivered together through the project download area. This record identifies the required assets; it does not assert that external access has already been opened.
 
-- FrameBridge-0.3.4-debian13-amd64-py313.deb, FrameBridge-0.3.4-ubuntu24.04-amd64-py312.deb and FrameBridge-0.3.4-mint22-amd64-py312.deb; Debian package version 0.3.4.
-- FrameBridge-0.3.4-source.tar.gz and its matching SOURCE-ARCHIVE-MANIFEST.json: the corresponding FrameBridge implementation, reviewed cp313 and cp312 vendor inputs, build scripts, tests and legal records.
+- FrameBridge-0.3.5-debian13-amd64-py313.deb, FrameBridge-0.3.5-ubuntu24.04-amd64-py312.deb and FrameBridge-0.3.5-mint22-amd64-py312.deb; Debian package version 0.3.5.
+- FrameBridge-0.3.5-source.tar.gz and its matching SOURCE-ARCHIVE-MANIFEST.json: the corresponding FrameBridge implementation, reviewed cp313 and cp312 vendor inputs, build scripts, tests and legal records.
 - FrameBridge-0.3.1-Community-Preview1-dependency-sources.tar.gz: immutable shared Python/Rust dependency source asset, 82,606,998 bytes, SHA-256 64540a85bd65eac3f394d8c0a967cacbc00e112676d57d644dcd1bb691c1926a. The historical filename is deliberately retained; verify bytes rather than inferring the current project version from that name.
 - FrameBridge-0.3.1-tunnel-client-dependency-sources.tar.gz: exact source module archives for the 47 Go dependencies embedded in the retained OpenAI tunnel executable, plus retained notices and provenance records. Its release hash is recorded in the adjacent release checksum manifest and TUNNEL-DEPENDENCY-SOURCES.json.
 
