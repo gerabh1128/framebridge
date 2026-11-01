@@ -17,6 +17,39 @@ The observed Windows preview checks that its interactive agent's session equals
 is actionable evidence of that mismatch. `SCREEN_EXEC_FAILED` alone is a broader
 failure and must not be diagnosed as RDP without checking the actual sessions.
 
+## Select the Windows observation route first
+
+For the Windows private preview, use the native CUA route with a normal `ROOT`
+capture scope. For example, with an already confirmed Windows target and existing
+owner authorization:
+
+```json
+{
+  "action": "OBSERVE",
+  "authorized": true,
+  "target": "WINDOWS",
+  "capture_scope": "ROOT",
+  "preview_width": 1280,
+  "preview_height": 800,
+  "timeout_s": 30
+}
+```
+
+Do not use `capture_scope: "node:WINDOWS"` (or the `node:ALIAS` scope form) for
+this Windows preview. That scope selects the Linux real-screen client path and
+can produce `SCREEN_EXEC_FAILED` by trying to run the Linux screen RPC, including
+`/usr/bin/python3`, on Windows. The same error can persist after a successful
+console handoff. Use the native `ROOT` route before deciding that another session
+transfer is needed.
+
+Correct routing retains the Windows console-session and capture-linked input
+guards. It is not native RDP capture. If the native route reports a console-session
+mismatch, continue with the owner-operated handoff below. This routing correction
+has been checked with authentic physical-console observation; it does not establish
+that clicks or typed input have been accepted. Verify each operation separately.
+
+## Check the session before handoff
+
 Before changing anything:
 
 1. Confirm the enrolled Windows node and the intended computer.

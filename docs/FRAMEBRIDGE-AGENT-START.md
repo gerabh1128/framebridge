@@ -107,7 +107,9 @@ Normal first connection needs no separate `fb setup` or `fb service start`. Adva
 The public release matrix above covers Linux. If a separately deployed Windows
 private preview is part of the authorized task, consult the
 [Windows RDP-to-console runbook](WINDOWS-RDP-CONSOLE.md) before diagnosing graphical
-CUA from a Remmina/RDP session. A connected FBEXEC service can work in session 0
+CUA from a Remmina/RDP session. Start Windows observation with the native `ROOT`
+capture scope; `node:WINDOWS` selects the Linux screen path and can itself cause
+`SCREEN_EXEC_FAILED`, even after a successful handoff. A connected FBEXEC service can work in session 0
 while the browser is in RDP and the screen backend requires the physical console.
 Check the actual session and executing identity; do not reuse a historical session
 ID or weaken the console-session guard. The runbook describes the owner's normal
