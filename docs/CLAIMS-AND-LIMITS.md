@@ -1,6 +1,6 @@
 # Claims and evidence boundaries
 
-The **FrameBridge 0.3.5** reliability update targets the same three release profiles, with separate amd64 packages for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. The [official download page](https://framebridge.betancourt.one/download/) identifies the actual artifacts, signatures and corresponding source. A later default-branch documentation change does not rewrite the signed tag or an installed package.
+The **FrameBridge 0.3.5** reliability update targets the same three release profiles, with separate amd64 packages for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. The [official download page](https://framebridge.betancourt.one/download/) identifies the actual artifacts, signatures and corresponding source. A later default-branch documentation change does not rewrite the frozen release source or an installed package.
 
 ## Current release scope
 
@@ -8,8 +8,8 @@ The **FrameBridge 0.3.5** reliability update targets the same three release prof
 | --- | --- |
 | Distribution profiles | Debian 13 / CPython 3.13, Ubuntu 24.04 / CPython 3.12 and Mint 22.x / CPython 3.12, all amd64. Ubuntu 26.04, LMDE 7, other architectures and other distributions are outside this release's validated scope. |
 | Signed APT updates | Actual update and managed-service lifecycle checks passed on Debian 13, Ubuntu 24.04 and Mint 22.3 VMs. This is not acceptance of every physical installation or every future package. |
-| Release identity | The signed tag and release record identify released source and bytes. A source checkout, successful build or checksum alone does not establish an official signed release. |
-| Source tests | Run `python3 tools/run_tests.py` from a source checkout. A test result applies to the source revision and environment actually tested; historical test counts are not current results. |
+| Release identity | The signed corresponding-source archive, manifest, package signatures and release record identify released source and bytes. A Git tag is a separate record; no v0.3.5 tag is implied. A source checkout, successful build or checksum alone does not establish an official signed release. |
+| Source tests | The previously documented `tools/run_tests.py` helper is absent from the frozen 0.3.5 tree; the historical 1,011-case harness is not supplied here. See the directly runnable focused tests in [CONTRIBUTING.md](../CONTRIBUTING.md#run-focused-source-tests). A test result applies to the source revision and environment actually tested; historical counts are not current results. |
 | Installed documentation | Read the guide matching the installed version. A newer repository README cannot update an older installed manual. Report contradictory release labels with the package version and file path. |
 
 ## Operation results

@@ -114,7 +114,7 @@ The [claims and evidence boundaries](docs/CLAIMS-AND-LIMITS.md) distinguish pack
 
 Project home: https://framebridge.betancourt.one/
 
-The public Git repository is `https://framebridge.betancourt.one/git/gerardo/framebridge.git`. For the exact 0.3.5 release, use the signed `v0.3.5` tag or its signed corresponding-source archive from the download page. The repositories, package downloads and source archive are published; normal owner authentication and connection setup are still required on a newly installed computer.
+The public Git repository is `https://framebridge.betancourt.one/git/gerardo/framebridge.git`, with a [GitHub mirror](https://github.com/gerabh1128/framebridge). For the exact 0.3.5 release, use the signed corresponding-source archive from the download page and its [source-to-artifact record](docs/RELEASE-SOURCE-0.3.5.md). A repository branch can contain later documentation or development; it is not a substitute for that frozen source. Git tags and repository integration are recorded separately and are not implied by artifact signatures. Normal owner authentication and connection setup are still required on a newly installed computer.
 
 Programming: **ChatGPT**.  
 Original concept and project coordination: **Gerardo Betancourt**.
