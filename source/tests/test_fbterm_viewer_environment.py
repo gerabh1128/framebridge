@@ -2,6 +2,7 @@
 """Isolated viewer launch tests; no desktop, jobs, or real user state. Set FBTERM_TEST_REAL_BUS=1 for temporary real UNIX sockets."""
 from pathlib import Path
 import ast
+import copy
 import hashlib
 import importlib.util
 import json
@@ -231,16 +232,40 @@ class ViewerEnvironment(unittest.TestCase):
                             semantic_ast_digest(ast.parse("False")))
 
     def test_viewer_patch_preserves_preexisting_job_and_shell_methods(self):
-        # Fingerprints of semantic 0.3.4 ASTs bind this viewer-only change to
-        # existing execution semantics without shipping a duplicate engine.
+        # Preserve the existing execution fingerprints after normalizing only
+        # the reviewed 0.3.6 full-history audit implementation. Its exact
+        # semantic AST is pinned separately; public R4 tests compare behavior.
         # Our serializer, rather than ast.dump's version-dependent defaults,
         # handles the two supported CPython ABIs (3.12 and 3.13).
         expected = {'__init__': 'ec60f92a1d737961d23e1250bd04df0683978db55385a019fdbe67391a76cb89', '_run': '1200a06bb7c164d34464fe884aca06d16d257d780f37124ea4a3a2492a7f63ea', 'has_session': 'd938d8aac50a140a2838b1223ab14ff8e6a69847a7c1b1d1346b2aedb0dfde48', 'status': 'a4f3185627fbc1fb36174d055dd4421254776ebcdc73a087fb4124e086bcafa6', 'execute': '4a562e7a0cb75d3c7a84b5945044b63df16296da6e766f24c0430bde2684313c'}
         tree = ast.parse(ENGINE_SOURCE.read_text())
         klass = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'FBTerm')
         methods = {n.name: n for n in klass.body if isinstance(n, ast.FunctionDef)}
+        old_source = ENGINE_SOURCE.parents[4] / 'tests/fixtures/r4-035/fbterm_engine.py'
+        self.assertEqual(hashlib.sha256(old_source.read_bytes()).hexdigest(),
+                         'e3c2798d886919b67321b79b3233d6989b7f618c83190e390794ddb9a9053128')
+        old_tree = ast.parse(old_source.read_text())
+        old_class = next(n for n in old_tree.body if isinstance(n, ast.ClassDef) and n.name == 'FBTerm')
+        old_execute = next(n for n in old_class.body if isinstance(n, ast.FunctionDef) and n.name == 'execute')
+        def audit_block(function):
+            blocks = [n for n in ast.walk(function) if isinstance(n, ast.Try)
+                      and any(isinstance(v, ast.Name) and v.id == 'incomplete_jobs'
+                              for body in n.body for v in ast.walk(body))
+                      and any(isinstance(h.type, ast.Name) and h.type.id == 'OSError'
+                              for h in n.handlers)]
+            self.assertEqual(len(blocks), 1)
+            return blocks[0]
+        normalized_execute = copy.deepcopy(methods['execute'])
+        current_audit = audit_block(normalized_execute)
+        self.assertEqual(semantic_ast_digest(current_audit), '2c4de8d9450348a3deaa3379b9b0a039ce74599d2d41a0c2965c07a4c8c6a379')
+        old_audit = audit_block(old_execute)
+        class NormalizeReviewedAudit(ast.NodeTransformer):
+            def visit_Try(self, node):
+                return copy.deepcopy(old_audit) if node is current_audit else self.generic_visit(node)
+        normalized_execute = NormalizeReviewedAudit().visit(normalized_execute)
         for name, expected_hash in expected.items():
-            self.assertEqual(semantic_ast_digest(methods[name]), expected_hash, name)
+            method = normalized_execute if name == 'execute' else methods[name]
+            self.assertEqual(semantic_ast_digest(method), expected_hash, name)
         # Creation/initialization of tmux and Bash precedes the viewer branch.
         self.assertEqual(semantic_ast_digest(methods['ensure'].body[2]), '0aecdc60e1a1647fa9ce02ff56d21c3fe082148227029112d259d99de42ef150')
 

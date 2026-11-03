@@ -31,6 +31,26 @@ def _require(condition: object, code: str) -> None:
         raise FleetError(code)
 
 
+def _require_transport_ready(node):
+    if node.get("operational_transport_ready") is True:
+        return
+    if node.get("operational_transport_busy") is True:
+        raise FleetError("NODE_BUSY_HEARTBEAT_STALE")
+    raise FleetError("NODE_OFFLINE")
+
+
+def _routing_error(exc, fallback, *public_types):
+    if isinstance(exc, (FleetError, *public_types)):
+        return str(exc)
+    try:
+        from . import broker
+    except ImportError:
+        return fallback
+    if isinstance(exc, broker.BrokerError) and str(exc) in {"NODE_BUSY_HEARTBEAT_STALE", "NODE_OFFLINE"}:
+        return str(exc)
+    return fallback
+
+
 def original_paths() -> tuple[Path, Path]:
     root = Path(__file__).resolve().parents[2]
     choices = [
@@ -129,6 +149,10 @@ def _remote_descriptors(config: dict[str, Any]) -> list[dict[str, Any]]:
             "capability_profile": "original-readonly",
             "source": "confirmed_pairing",
             "operational_transport_ready": item.get("ready") is True,
+            "operational_transport_busy": item.get("busy") is True,
+            "heartbeat_fresh": item.get("heartbeat_fresh") is True,
+            "last_seen_age_seconds": item.get("last_seen_age_seconds"),
+            "activity_state": item.get("activity_state", "idle" if item.get("ready") is True else "offline"),
         })
     return result
 
@@ -205,7 +229,7 @@ def node_read(alias: str, capability: str, args: dict[str, Any]) -> dict[str, An
         if node["transport"] == "local":
             result = read_local(capability, normalized)
         else:
-            _require(node["operational_transport_ready"], "NODE_OFFLINE")
+            _require_transport_ready(node)
             from . import broker
             result = broker.request(node["node_id"], capability, normalized, timeout_s=30)
         _require(type(result) is dict, "NODE_READ_RESPONSE_INVALID")
@@ -213,7 +237,7 @@ def node_read(alias: str, capability: str, args: dict[str, Any]) -> dict[str, An
         response.update(_target_identity(alias, node))
         return response
     except Exception as exc:
-        response = {"ok": False, "error": str(exc) if isinstance(exc, FleetError) else "NODE_READ_FAILED"}
+        response = {"ok": False, "error": _routing_error(exc, "NODE_READ_FAILED")}
         if node is not None:
             response.update(_target_identity(alias, node))
         return response
@@ -249,7 +273,7 @@ def execute_node(alias: str, script: str, authorized: bool, timeout_s: int = 120
             from .runtime import adapter_request
             result = adapter_request(payload)
         else:
-            _require(node["operational_transport_ready"], "NODE_OFFLINE")
+            _require_transport_ready(node)
             from . import broker
             result = broker.request(node["node_id"], "admin.exec", payload, timeout_s=payload["timeout_s"])
         _require(type(result) is dict, "NODE_EXEC_RESPONSE_INVALID")
@@ -266,7 +290,7 @@ def execute_node(alias: str, script: str, authorized: bool, timeout_s: int = 120
             response.pop("stdout", None)
         return response
     except Exception as exc:
-        response = {"ok": False, "error": str(exc) if isinstance(exc, FleetError) else "NODE_EXEC_FAILED"}
+        response = {"ok": False, "error": _routing_error(exc, "NODE_EXEC_FAILED")}
         if node is not None:
             response.update(_target_identity(alias, node))
         return response
@@ -287,7 +311,7 @@ def execute_screen_node(alias: str, script: str, authorized: bool, timeout_s: in
             from .runtime import adapter_request
             result = adapter_request(payload)
         else:
-            _require(node["operational_transport_ready"], "NODE_OFFLINE")
+            _require_transport_ready(node)
             from . import broker
             result = broker.request(node["node_id"], "admin.exec", payload, timeout_s=payload["timeout_s"])
         _require(type(result) is dict, "NODE_EXEC_RESPONSE_INVALID")
@@ -307,7 +331,7 @@ def execute_screen_node(alias: str, script: str, authorized: bool, timeout_s: in
                         mcp_script_sha256=payload["sha256"])
         return response
     except Exception as exc:
-        response = {"ok": False, "error": str(exc) if isinstance(exc, (FleetError, ScreenTransportError)) else "SCREEN_RPC_FAILED"}
+        response = {"ok": False, "error": _routing_error(exc, "SCREEN_RPC_FAILED", ScreenTransportError)}
         if node is not None:
             response.update(_target_identity(alias, node))
         return response
@@ -335,7 +359,7 @@ def cua_node(alias: str, payload: dict[str, Any], authorized: bool,
             from .runtime import adapter_request
             result = adapter_request(request)
         else:
-            _require(node["operational_transport_ready"], "NODE_OFFLINE")
+            _require_transport_ready(node)
             from . import broker
             result = broker.request(node["node_id"], "admin.cua", request, timeout_s=timeout)
         _require(type(result) is dict, "NODE_CUA_RESPONSE_INVALID")
@@ -345,7 +369,7 @@ def cua_node(alias: str, payload: dict[str, Any], authorized: bool,
         response.update(_target_identity(alias, node))
         return response
     except Exception as exc:
-        response = {"ok": False, "error": str(exc) if isinstance(exc, FleetError) else "NODE_CUA_FAILED"}
+        response = {"ok": False, "error": _routing_error(exc, "NODE_CUA_FAILED")}
         if node is not None:
             response.update(_target_identity(alias, node))
         return response

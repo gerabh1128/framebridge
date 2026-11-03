@@ -111,6 +111,46 @@ def _port(port):
         probe.settimeout(0.2)
         return probe.connect_ex(("127.0.0.1", port)) == 0
 
+def _observation_environment(state, config):
+    """Refresh only an observation copy, never the worker's pinned binding.
+
+    This performs desktop discovery and an X11 root query. It does not capture
+    pixels, send input, or establish functional CUA acceptance.
+    """
+    env = dict(environment(state, config))
+    if config.get("headless", "auto") == "auto":
+        from .display_context import configure, describe, bind_text
+        configure(env, "auto", state, refresh=True)
+        if describe(env).get("kind") == "physical-x11" and not _display_ok(env):
+            bind_text(env, state, reason="PHYSICAL_X11_UNAVAILABLE_TEXT_TOOLS_ACTIVE")
+    return env
+
+
+def _node_connection(state, config, children):
+    """Report only observations belonging to the currently running node worker."""
+    if config.get("role") != "node":
+        return None
+    workers = [r for r in children if r.get("role") == "node" and r.get("alive")]
+    row = _read(state / "node-runtime-status.json")
+    if not isinstance(row, dict):
+        row = {}
+    matches = bool(len(workers) == 1 and type(row.get("schema")) is int and row.get("schema") == 1
+                   and row.get("node_id") == config.get("node_id")
+                   and type(row.get("worker_pid")) is int
+                   and row.get("worker_pid") == workers[0].get("pid")
+                   and row.get("worker_birth") == workers[0].get("birth"))
+    stamp = row.get("last_broker_acceptance_unix")
+    now = time.time()
+    valid_stamp = type(stamp) in (int, float) and 0 <= stamp <= now
+    fresh = bool(matches and valid_stamp and now - stamp <= 15)
+    operation = row.get("last_accepted_operation")
+    return {"broker_acceptance_fresh": fresh,
+            "last_broker_acceptance_unix": stamp if matches and valid_stamp else None,
+            "heartbeat_v1": matches and row.get("heartbeat_v1") is True,
+            "last_accepted_operation": operation if matches and type(operation) is str and
+                operation in {"node.poll", "node.heartbeat", "node.result"} else None}
+
+
 def status(state):
     state = state_path(state)
     config = load_config(state)
@@ -122,11 +162,9 @@ def status(state):
                  and _read(state / "ready.json").get("ready"))
     context = _read(state / "ready.json").get("display_context", {"kind": "not_started"})
     if running and config.get("headless", "auto") == "auto":
-        from .display_context import describe, bind_text
+        from .display_context import describe
         try:
-            current_env = environment(state, config)
-            if not _display_ok(current_env):
-                bind_text(current_env, state, reason="PHYSICAL_X11_UNAVAILABLE_TEXT_TOOLS_ACTIVE")
+            current_env = _observation_environment(state, config)
             context = describe(current_env)
         except (OSError, ValueError, RuntimeError):
             context = {"kind": "text", "physical": False, "reason": "DISPLAY_DETECTION_UNAVAILABLE"}
@@ -135,6 +173,7 @@ def status(state):
             "state_dir": str(state), "mcp_url": None if config["role"] == "node" else
             "http://127.0.0.1:" + str(config["ports"]["mcp"]) + "/mcp",
             "processes": children, "manual_chatgpt_connection": True,
+            "node_connection": _node_connection(state, config, children),
             "display_context": context,
             "capabilities": {"fbexec": ready, "fbterm": ready, "cua_tty_module": ready,
                              "graphical_cua": ready and context.get("kind") in ("physical-x11", "virtual-x11")},
@@ -152,7 +191,7 @@ def _display_ok(env):
 def doctor(state):
     state = state_path(state)
     config = load_config(state)
-    env = environment(state, config)
+    env = _observation_environment(state, config)
     commands = ["bash", "tmux", "tee", "flock", "awk", "sha256sum", "timeout",
                 "dbus-run-session", "ip", "lsblk", "systemctl", "systemd-run", "sudo", "uptime"]
     missing = [x for x in commands if not shutil.which(x, path=env.get("PATH"))]

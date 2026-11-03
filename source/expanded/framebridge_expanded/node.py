@@ -10,6 +10,7 @@ import logging
 import os
 import socket
 import ssl
+import threading
 import time
 import uuid
 import urllib.error
@@ -20,6 +21,38 @@ from . import broker
 
 _LOG = logging.getLogger(__name__)
 _RETRY_MAX_SECONDS = 30
+_HEARTBEAT_FEATURE = "node-heartbeat-v1"
+_HEARTBEAT_INTERVAL_SECONDS = 1
+_HEARTBEAT_TIMEOUT_SECONDS = 2
+_STATUS_WRITE_INTERVAL_SECONDS = 5
+
+
+class _BrokerContact:
+    """A bounded local observation, never an authorization or pairing source."""
+
+    def __init__(self, state, node_id):
+        self.path = state / "node-runtime-status.json"
+        self.node_id = node_id
+        self.pid = os.getpid()
+        fields = Path("/proc/self/stat").read_text().rsplit(") ", 1)[1].split()
+        self.birth = fields[19]
+        self.written_at = None
+
+    def accepted(self, operation, *, heartbeat_v1):
+        moment = time.monotonic()
+        if self.written_at is not None and moment - self.written_at < _STATUS_WRITE_INTERVAL_SECONDS:
+            return
+        try:
+            _write_json(self.path, {"schema": 1, "node_id": self.node_id,
+                "worker_pid": self.pid, "worker_birth": self.birth,
+                "last_broker_acceptance_unix": time.time(),
+                "last_accepted_operation": operation,
+                "heartbeat_v1": heartbeat_v1 is True})
+        except OSError:
+            # Diagnostics failing must not discard the result of an action.
+            _LOG.warning("NODE_CONTACT_STATUS_WRITE_UNAVAILABLE")
+        else:
+            self.written_at = moment
 
 
 class NodeError(ValueError):
@@ -234,6 +267,74 @@ def _post_with_recovery(url, operation, payload, *, ctx, state, outbound, recove
             return result
 
 
+def _heartbeat_supported(poll):
+    features = poll.get("protocol_features")
+    return type(features) is list and _HEARTBEAT_FEATURE in features
+
+
+def _dispatch_with_heartbeat(request, *, url, ctx, state, outbound, contact=None):
+    """Execute once while the signing thread reports liveness, without polling.
+
+    The worker is the only dispatcher; it never signs envelopes or starts the
+    next request. A failed heartbeat does not imply that input was not sent and
+    therefore must not cancel/replay the action or discard its eventual result.
+    """
+    finished = threading.Event()
+    outcome = []
+
+    def execute():
+        try:
+            outcome.append((True, dispatch_request(request, state_dir=state)))
+        except BaseException as exc:
+            # Preserve cancellation/failure propagation from the original direct
+            # call, including SystemExit, without leaving the waiter blocked.
+            outcome.append((False, exc))
+        finally:
+            finished.set()
+
+    worker = threading.Thread(target=execute, name="framebridge-node-dispatch", daemon=True)
+    worker.start()
+    heartbeat_enabled = True
+    unavailable_reported = False
+    while not finished.wait(_HEARTBEAT_INTERVAL_SECONDS):
+        if not heartbeat_enabled:
+            continue
+        try:
+            envelope = outbound._signed_envelope(ctx, "node.heartbeat",
+                                                 {"request_id": request["request_id"]})
+            reply = broker.post_json(url + "/fbpair/v1/node/heartbeat", envelope,
+                                     state_dir=state, timeout=_HEARTBEAT_TIMEOUT_SECONDS)
+        except broker.BrokerError as exc:
+            # Do not retry an uncertain heartbeat envelope or log its contents.
+            # A later attempt has a new nonce and never dispatches another job.
+            if not unavailable_reported:
+                _LOG.warning("NODE_HEARTBEAT_UNAVAILABLE")
+                unavailable_reported = True
+            if not _retryable_broker_failure(exc):
+                heartbeat_enabled = False
+        except Exception:
+            # A signing/format failure is not evidence that input was absent.
+            _LOG.warning("NODE_HEARTBEAT_PREPARATION_FAILED")
+            heartbeat_enabled = False
+        else:
+            if not (type(reply) is dict and reply.get("ok") is True
+                    and reply.get("busy") is True
+                    and reply.get("request_id") == request["request_id"]):
+                _LOG.warning("NODE_HEARTBEAT_REJECTED")
+                heartbeat_enabled = False
+            elif contact is not None:
+                contact.accepted("node.heartbeat", heartbeat_v1=True)
+            if heartbeat_enabled and unavailable_reported:
+                _LOG.warning("NODE_HEARTBEAT_RECOVERED")
+                unavailable_reported = False
+    # Event publication happens after the value/exception is appended; a join is
+    # unnecessary and cannot prolong shutdown after a completed dispatcher.
+    successful, value = outcome[0]
+    if not successful:
+        raise value
+    return value
+
+
 def run(state_dir=None, once=False):
     state, config, ctx, identity = _context(state_dir)
     url = broker.validate_endpoint(config.get("broker_url", ""))
@@ -243,15 +344,24 @@ def run(state_dir=None, once=False):
     if pairing.get("node_id") != identity["node_id"] or pairing.get("broker_base_url", "").rstrip("/") != url:
         raise NodeError("PAIRING_BINDING_MISMATCH")
     outbound = _original("outbound_agent")
+    contact = _BrokerContact(state, identity["node_id"])
     while True:
         poll = _post_with_recovery(url + "/fbpair/v1/node/poll", "node.poll", {},
                                    ctx=ctx, state=state, outbound=outbound, recover=not once)
         if poll.get("ok") is not True:
             raise NodeError("NODE_POLL_REJECTED")
+        supports_heartbeat = _heartbeat_supported(poll)
+        contact.accepted("node.poll", heartbeat_v1=supports_heartbeat)
         req = poll.get("request")
         result = {"ok": True, "idle": True}
         if isinstance(req, dict):
-            value = dispatch_request(req, state_dir=state)
+            if supports_heartbeat:
+                value = _dispatch_with_heartbeat(req, url=url, ctx=ctx,
+                                                 state=state, outbound=outbound, contact=contact)
+            else:
+                # Compatibility with a frozen central: never invent another
+                # poll while executing or downgrade a signed request to shell.
+                value = dispatch_request(req, state_dir=state)
             # Original put_result only records this request's result; repeating
             # that acknowledgement cannot execute the command. Keep the value
             # here and never return to dispatch/poll while its delivery is pending.
@@ -260,6 +370,7 @@ def run(state_dir=None, once=False):
                                          ctx=ctx, state=state, outbound=outbound, recover=not once)
             if posted.get("ok") is not True:
                 raise NodeError("NODE_RESULT_REJECTED")
+            contact.accepted("node.result", heartbeat_v1=supports_heartbeat)
             result = {"ok": True, "idle": False, "request_id": req.get("request_id")}
         if once:
             return result

@@ -556,6 +556,8 @@ def _cua_frame_fields(frame_output: str) -> dict:
             "TYPE_MODE","WIDTH","HEIGHT","SOURCE_X","SOURCE_Y","SOURCE_WIDTH",
             "SOURCE_HEIGHT","DISPLAY_WIDTH","DISPLAY_HEIGHT","CAPTURE_SCOPE",
             "COORD_SPACE_DEFAULT","COORD_SPACE_AVAILABLE","WINDOW_X","WINDOW_Y",
+            "WINDOW_FULL_X","WINDOW_FULL_Y","WINDOW_FULL_WIDTH","WINDOW_FULL_HEIGHT",
+            "WINDOW_CAPTURE_CLIPPED","VISUAL_CAPTURE_BACKEND",
             "WINDOW_WIDTH","WINDOW_HEIGHT","ACTIVE_WINDOW_ID","ACTIVE_WINDOW_ID_BEFORE",
             "ACTIVE_WINDOW_ID_AFTER","WINDOW_TITLE","ACTIVE_WINDOW_TITLE_BEFORE",
             "ACTIVE_WINDOW_TITLE_AFTER","CURSOR_X","CURSOR_Y","SHA256","BYTES","MIME",
@@ -693,7 +695,7 @@ def framebridge_cua(
     coord_space: str = "ROOT",
     capture_scope: str = "ROOT",
     observe_after: bool = False,
-    observe_scope: str = "WINDOW",
+    observe_scope: str = "ROOT",
     x: int = -1,
     y: int = -1,
     button: str = "left",
@@ -774,24 +776,62 @@ def framebridge_cua(
             "button":str(button).lower(),"steps":int(steps),"duration_ms":int(duration_ms),
         })
 
-    result=dispatch_cua_request(payload,True,timeout_s,job_id,target)
+    # Allocate once, before dispatch: a generated ID inside the node router
+    # cannot bind the separate follow-up observation to this action.
+    action_job_id=str(job_id) if job_id else "cua-"+uuid.uuid4().hex
+    result=dispatch_cua_request(payload,True,timeout_s,action_job_id,target)
     if bool(observe_after) and action!="OBSERVE" and bool(result.get("ok")):
-        post=dict(payload)
-        post.clear()
         post={"action":"OBSERVE","capture_scope":observe_scope}
-        if expected_window_id:
-            post["expected_window_id"]=str(expected_window_id)
-        post_id=(str(job_id or "cua")[:72]+"-post")[:80]
-        post_result=dispatch_cua_request(post,True,timeout_s,post_id,target)
+        if preview_width>0: post["preview_width"]=int(preview_width)
+        if preview_height>0: post["preview_height"]=int(preview_height)
+        # Hash the entire action ID; truncating its prefix aliases long IDs.
+        # Reusing an explicit action ID still reaches the durable replay guard.
+        post_id="cua-post-"+hashlib.sha256(action_job_id.encode("utf-8")).hexdigest()
+        try:
+            post_result=dispatch_cua_request(post,True,timeout_s,post_id,target)
+        except Exception:
+            # The action may already have completed. Expose follow-up failure
+            # without replaying input or leaking exception/transport details.
+            post_result={"ok":False,"error":"POST_OBSERVATION_TRANSPORT_FAILED"}
+        result["post_job_id"]=post_id
         result["post_ok"]=bool(post_result.get("ok"))
-        result["post_resultado_final"]=post_result.get("resultado_final")
-        for key_name in (
-            "image_base64","image_mime","source_width","source_height",
-            "display_width","display_height","capture_scope","active_window_id",
-            "window_title","sha256","bytes"
-        ):
-            if key_name in post_result:
-                result[key_name]=post_result[key_name]
+        final=post_result.get("resultado_final")
+        result["post_resultado_final"]=sanitize_text(final)[:2048] if isinstance(final,str) else None
+        error=post_result.get("error")
+        code=error.get("code") if isinstance(error,dict) else error
+        result["post_error"]=(code if isinstance(code,str) and
+            re.fullmatch(r"[A-Z][A-Z0-9_]{0,100}",code) else
+            "POST_OBSERVATION_FAILED") if not result["post_ok"] else None
+        capture_keys=(
+            "image_base64","mime","image_mime","width","height",
+            "image_width","image_height","source_x","source_y",
+            "source_width","source_height","display_width","display_height",
+            "origin_x","origin_y","capture_scope","coord_space_default",
+            "coord_space_available","window_x","window_y","window_width",
+            "window_height","window_full_x","window_full_y","window_full_width",
+            "window_full_height","window_capture_clipped","visual_capture_backend",
+            "full_screen","authentic_pixels","capture_available","control_available",
+            "control_error","input_available","raw_input_backend_available",
+            "pixel_source_verified","synthetic","source","screen_type",
+            "platform","cursor_included","cursor_x","cursor_y","image_resized",
+            "transport_resized","image_byte_limit","active_window_id",
+            "active_window_title","window_title","sha256","bytes","capture_id",
+            "session","session_id","user_sid","display_context","timestamp",
+            "completed_at","target_display","max_chunk_bytes","visual_capture_gate",
+            "cua_protocol_version","frame_output","node","node_id","hostname",
+            "requested_target","resolved_target","target","transport",
+            "requested_node","transport_node",
+        )
+        if result["post_ok"] and isinstance(post_result.get("image_base64"),str) and post_result["image_base64"]:
+            # The displayed bytes and every top-level capture field must refer
+            # to the same observation. Keep the action's evidence separately,
+            # without duplicating either base64 image in the response.
+            result["action_capture"]={name:result[name] for name in capture_keys
+                if name in result and name!="image_base64"}
+            for name in capture_keys:
+                result.pop(name,None)
+            result.update({name:post_result[name] for name in capture_keys
+                if name in post_result})
 
     image_b64=result.get("image_base64")
     mime=str(result.get("image_mime") or "")
@@ -876,7 +916,7 @@ def _screen_exec_request(
 from framebridge_expanded.real_screen.screen_frontdoor import register_framebridge_screen_tools, resolve_profile_node
 _real_screen_client = register_framebridge_screen_tools(
     _blocking_tools, _screen_exec_request, image_factory=Image,
-    resolve_node=resolve_profile_node, stdout_limit_bytes=65536, transfer_timeout_s=45,
+    resolve_node=resolve_profile_node, stdout_limit_bytes=65536, transfer_timeout_s=90,
 )
 from framebridge_expanded.real_screen.screen_presentation import register_screen_presentation
 register_screen_presentation(_blocking_tools, _real_screen_client)

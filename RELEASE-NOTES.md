@@ -1,5 +1,9 @@
 # FrameBridge release notes
 
+## 0.3.6
+
+Reliability update for authenticated node heartbeats during active work, fresh graphical status, verified visible WINDOW capture and coherent post-action metadata. The complete FBTERM audit is retained with less directory-scanning overhead. Original-PNG transfers use a 90-second budget. See [the 0.3.6 change notes](docs/RELEASE-NOTES-0.3.6.md). Package assembly, per-OS acceptance, signatures and publication are separate release records.
+
 ## 0.3.5
 
 Reliability update for the existing three Linux profiles: concurrent bounded TLS handshakes, automatic read-only FBTERM viewer discovery after graphical login, persistent default profile selection, bounded streaming tunnel metrics and safe package bytecode invalidation. See [the complete 0.3.5 notes](docs/RELEASE-NOTES-0.3.5.md). Artifact signatures, native lifecycle acceptance and publication status belong to the external release record.

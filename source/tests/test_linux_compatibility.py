@@ -168,12 +168,15 @@ class LinuxCompatibilityTests(unittest.TestCase):
         self.assertFalse(virtual["native_wayland_cua"])
 
     def test_doctor_uses_profile_result_and_start_stops_before_creating_files(self):
+        # Keep this ABI-rejection fixture independent of the host desktop.
+        # Observation refresh itself is exercised by test_r4_observation_refresh.
         rejected = dict(ok=False, profile_id="ubuntu24.04-amd64-py312", issues=["ABI mismatch"], warnings=[])
         with patch.object(runtime, "state_path", return_value=self.prefix), \
              patch.object(runtime, "load_config", return_value={"role": "node", "headless": "auto"}), \
              patch.object(runtime, "environment", return_value={"XDG_SESSION_TYPE": "wayland"}), \
              patch.object(runtime.shutil, "which", return_value="/fixture/command"), \
              patch.object(compat, "assess", return_value=rejected), \
+             patch.object(display_context, "configure", side_effect=lambda env, *a, **kw: env), \
              patch.object(display_context, "missing_graphical_commands", return_value=[]), \
              patch.object(display_context, "describe", return_value={"kind": "text"}), \
              patch.object(network, "inspect", return_value={}), \

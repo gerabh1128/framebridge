@@ -141,7 +141,9 @@ class CommunityCliContractTests(unittest.TestCase):
 
     def test_noninteractive_service_start_does_not_invent_authentication_gate(self):
         life=SimpleNamespace(service_start=mock.Mock(return_value={"ok":True,"state":"started","scope":"local_tools"}))
-        code,text,_=self.call(["service","start","--json"],{"lifecycle":life})
+        with tempfile.TemporaryDirectory() as td:
+            save_config(Path(td),default_config("standalone"))
+            code,text,_=self.call(["--state-dir",td,"service","start","--json"],{"lifecycle":life})
         self.assertEqual(code,0)
         self.assertEqual(json.loads(text)["result"]["scope"],"local_tools")
         life.service_start.assert_called_once()
