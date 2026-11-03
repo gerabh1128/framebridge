@@ -1389,6 +1389,7 @@ def _action_context(msg):
     space = _coord_space(msg)
 
     window_rect = None
+    full_window_rect = None
     source_width = width
     source_height = height
 
@@ -1396,11 +1397,8 @@ def _action_context(msg):
         "WINDOW",
         "WINDOW_PREVIEW",
     }:
-        window_rect = (
-            _window_geometry(
-                before_id
-            )
-        )
+        full_window_rect = _window_geometry(before_id)
+        window_rect = _visible_window_rect(full_window_rect, width, height)
 
         msg[
             "_resolved_window_rect"
@@ -1433,6 +1431,7 @@ def _action_context(msg):
         "geometry_gate": geometry_gate,
         "window_gate": window_gate,
         "window_rect": window_rect,
+        "window_full_rect": full_window_rect,
         "coord_space": space,
     }
 
@@ -1482,6 +1481,13 @@ def _evidence_lines(ctx):
             ]
         )
 
+    full_rect = ctx.get("window_full_rect")
+    if full_rect is not None:
+        for field in ("x", "y", "width", "height"):
+            lines.append("WINDOW_FULL_" + field.upper() + "=" + str(full_rect[field]))
+        lines.append("WINDOW_CAPTURE_CLIPPED=" +
+                     str(full_rect != rect).lower())
+
     lines.extend(
         [
             "ACTIVE_WINDOW_ID_BEFORE="
@@ -1504,6 +1510,51 @@ def _evidence_lines(ctx):
     )
 
     return lines
+
+
+def _visual_png_geometry(path):
+    result = _run(["identify", "-format", "%w %h", str(path)], timeout=5)
+    if result.returncode != 0:
+        raise CuaTransportError("VISUAL_CAPTURE_GEOMETRY_FAILED")
+    try:
+        width, height = [int(value) for value in result.stdout.strip().split()]
+    except (TypeError, ValueError):
+        raise CuaTransportError("VISUAL_CAPTURE_GEOMETRY_INVALID") from None
+    if width <= 0 or height <= 0:
+        raise CuaTransportError("VISUAL_CAPTURE_GEOMETRY_INVALID")
+    return width, height
+
+
+def _visible_window_rect(rect, display_width, display_height):
+    # WINDOW coordinates describe only the visible intersection returned as
+    # pixels. Preserve the full client rectangle separately for race checks.
+    try:
+        x, y, width, height = (rect[key] for key in ("x", "y", "width", "height"))
+    except (KeyError, TypeError):
+        raise CuaTransportError("WINDOW_GEOMETRY_INVALID") from None
+    if (any(type(value) is not int for value in
+            (x, y, width, height, display_width, display_height))
+            or width <= 0 or height <= 0
+            or display_width <= 0 or display_height <= 0):
+        raise CuaTransportError("WINDOW_GEOMETRY_INVALID")
+    left, top = max(0, x), max(0, y)
+    right = min(display_width, x + width)
+    bottom = min(display_height, y + height)
+    if right <= left or bottom <= top:
+        raise CuaTransportError("WINDOW_CAPTURE_OUTSIDE_DISPLAY")
+    return {"x": left, "y": top, "width": right - left, "height": bottom - top}
+
+
+def _check_window_capture_state(window_id, rect, display_geometry):
+    # A crop is meaningful only while its target, mapping and display stay fixed.
+    # The adapter's surrounding display/session checks still apply as well.
+    if _geometry() != display_geometry:
+        raise CuaTransportError("VISUAL_CAPTURE_CONTEXT_CHANGED")
+    current_id, _ = _active_window()
+    if current_id != window_id:
+        raise CuaTransportError("ACTIVE_WINDOW_CHANGED")
+    if _window_geometry(window_id) != rect:
+        raise CuaTransportError("WINDOW_GEOMETRY_CHANGED")
 
 
 def _capture_visual_jpeg(msg=None):
@@ -1550,13 +1601,12 @@ def _capture_visual_jpeg(msg=None):
     source_width = display_width
     source_height = display_height
     window_rect = None
+    full_window_rect = None
 
     if capture_scope == "WINDOW":
-        window_rect = (
-            _window_geometry(
-                window_id
-            )
-        )
+        full_window_rect = _window_geometry(window_id)
+        window_rect = _visible_window_rect(full_window_rect,
+                                            display_width, display_height)
 
         source_x = int(
             window_rect["x"]
@@ -1577,6 +1627,10 @@ def _capture_visual_jpeg(msg=None):
         source_height,
     )
 
+    if window_rect is not None:
+        _check_window_capture_state(window_id, full_window_rect,
+                                    (display_width, display_height))
+
     with tempfile.TemporaryDirectory(
         prefix="framebridge-cua-"
     ) as td:
@@ -1585,11 +1639,10 @@ def _capture_visual_jpeg(msg=None):
         png = td / "screen.png"
         jpg = td / "screen.jpg"
 
-        capture_target = (
-            "root"
-            if capture_scope == "ROOT"
-            else str(window_id)
-        )
+        # A direct import of a decorated window can return frame/client pixels
+        # with different dimensions from xwininfo's client rectangle. ROOT then
+        # exact crop keeps authentic visible pixels and the coordinate contract.
+        capture_target = "root"
 
         p = _run(
             [
@@ -1609,39 +1662,25 @@ def _capture_visual_jpeg(msg=None):
                 "VISUAL_CAPTURE_FAILED"
             )
 
-        q = _run(
-            [
-                "identify",
-                "-format",
-                "%w %h",
-                str(png),
-            ],
-            timeout=5,
-        )
+        actual_w, actual_h = _visual_png_geometry(png)
+        if (actual_w, actual_h) != (display_width, display_height):
+            raise CuaTransportError("VISUAL_CAPTURE_GEOMETRY_MISMATCH")
 
-        if q.returncode != 0:
-            raise CuaTransportError(
-                "VISUAL_CAPTURE_GEOMETRY_FAILED"
-            )
-
-        try:
-            actual_w, actual_h = [
-                int(v)
-                for v
-                in q.stdout.strip().split()
-            ]
-        except Exception:
-            raise CuaTransportError(
-                "VISUAL_CAPTURE_GEOMETRY_INVALID"
-            )
-
-        if (
-            actual_w != source_width
-            or actual_h != source_height
-        ):
-            raise CuaTransportError(
-                "VISUAL_CAPTURE_GEOMETRY_MISMATCH"
-            )
+        if window_rect is not None:
+            _check_window_capture_state(window_id, full_window_rect,
+                                        (display_width, display_height))
+            cropped = td / "window.png"
+            geometry = "%dx%d+%d+%d" % (source_width, source_height,
+                                         source_x, source_y)
+            crop = _run(["convert", str(png), "-crop", geometry,
+                         "+repage", str(cropped)], timeout=15)
+            if crop.returncode != 0 or not cropped.is_file():
+                raise CuaTransportError("VISUAL_WINDOW_CROP_FAILED")
+            if _visual_png_geometry(cropped) != (source_width, source_height):
+                raise CuaTransportError("VISUAL_CAPTURE_GEOMETRY_MISMATCH")
+            _check_window_capture_state(window_id, full_window_rect,
+                                        (display_width, display_height))
+            png = cropped
 
         p = _run(
             [
@@ -1665,6 +1704,9 @@ def _capture_visual_jpeg(msg=None):
             )
 
         data = jpg.read_bytes()
+        if window_rect is not None:
+            _check_window_capture_state(window_id, full_window_rect,
+                                        (display_width, display_height))
 
     encoded = base64.b64encode(
         data
@@ -1721,6 +1763,8 @@ def _capture_visual_jpeg(msg=None):
         + str(display_height),
         "CAPTURE_SCOPE="
         + capture_scope,
+        "VISUAL_CAPTURE_BACKEND="
+        + ("X11_ROOT_CROP" if window_rect is not None else "X11_ROOT"),
         "COORD_SPACE_DEFAULT="
         + coord_default,
         "COORD_SPACE_AVAILABLE="
@@ -1756,6 +1800,13 @@ def _capture_visual_jpeg(msg=None):
                 ),
             ]
         )
+
+    if full_window_rect is not None:
+        for field in ("x", "y", "width", "height"):
+            lines.append("WINDOW_FULL_" + field.upper() + "=" +
+                         str(full_window_rect[field]))
+        lines.append("WINDOW_CAPTURE_CLIPPED=" +
+                     str(full_window_rect != window_rect).lower())
 
     lines.append(
         "BASE64=" + encoded

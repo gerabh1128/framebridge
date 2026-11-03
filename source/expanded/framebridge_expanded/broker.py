@@ -6,6 +6,8 @@ import importlib
 import importlib.util
 import ipaddress
 import json
+import math
+import copy
 import os
 import re
 import secrets
@@ -78,6 +80,153 @@ def validate_endpoint(url):
     if parsed.scheme == "http" and not _loopback(parsed.hostname):
         raise BrokerError("BROKER_HTTP_LOOPBACK_REQUIRED")
     return url.rstrip("/")
+
+
+NODE_HEARTBEAT_FEATURE = "node-heartbeat-v1"
+NODE_HEARTBEAT_PATH = "/fbpair/v1/node/heartbeat"
+
+
+class _NodeHeartbeatStore:
+    """Observe liveness during a single dispatched request without dequeuing more."""
+
+    def _node_verification_lock(self, envelope):
+        if not isinstance(envelope, dict):
+            return None
+        node_id = str(envelope.get("node_id") or "")
+        # Unknown public callers must not grow a per-node lock cache.
+        if self._paired_node(node_id) is None:
+            return None
+        with self.lock:
+            if not hasattr(self, "_node_verifier_locks"):
+                self._node_verifier_locks = {}
+            return self._node_verifier_locks.setdefault(node_id, threading.Lock())
+
+    def verify_node_envelope(self, envelope):
+        guard = self._node_verification_lock(envelope)
+        if guard is None:
+            if not isinstance(envelope, dict):
+                return False, "invalid_envelope"
+            known = self._discovery_node(str(envelope.get("node_id") or ""))
+            return False, ("node_revoked" if isinstance(known, dict)
+                           and known.get("state") == "revoked" else "node_not_paired")
+        # The original verifier releases Store.lock while checking SSHSIG.
+        # Serialize each node's verification through nonce check and commit,
+        # without holding the global store lock across subprocess verification.
+        with guard:
+            return super().verify_node_envelope(envelope)
+
+    def next_read(self, node_id):
+        item = super().next_read(node_id)
+        if item is not None:
+            with self.lock:
+                if not hasattr(self, "_heartbeat_dispatched"):
+                    self._heartbeat_dispatched = {}
+                self._heartbeat_dispatched.setdefault(str(node_id), {})[item["request_id"]] = item["expires_at"]
+        return item
+
+    def put_result(self, node_id, request_id, result):
+        saved = super().put_result(node_id, request_id, result)
+        if saved:
+            with self.lock:
+                getattr(self, "_heartbeat_dispatched", {}).get(str(node_id), {}).pop(str(request_id), None)
+        return saved
+
+    def _active_node_requests(self, node_id, now):
+        # Caller holds the existing store lock. A heartbeat never extends expires_at.
+        active = []
+        # Track only currently dispatched work, never rescan historical receipts.
+        dispatched = getattr(self, "_heartbeat_dispatched", {}).get(node_id, {})
+        for rid, expiry in list(dispatched.items()):
+            state = self.control_results.get(rid)
+            if (not isinstance(state, dict) or state.get("node_id") != node_id
+                    or state.get("state") != "dispatched"):
+                dispatched.pop(rid, None)
+                continue
+            request = self.control_requests.get(rid)
+            if not isinstance(request, dict) or request.get("node_id") != node_id:
+                dispatched.pop(rid, None)
+                continue
+            if (type(expiry) not in (int, float) or not math.isfinite(expiry)
+                    or request.get("expires_at") != expiry or now >= expiry):
+                dispatched.pop(rid, None)
+                continue
+            active.append(rid)
+        return active
+
+    def accept_node_heartbeat(self, envelope):
+        fields = {"schema", "kind", "node_id", "node_host_id", "timestamp", "nonce",
+                  "payload", "node_proof"}
+        if (not isinstance(envelope, dict) or set(envelope) != fields
+                or type(envelope.get("schema")) is not int or envelope["schema"] != 1
+                or envelope.get("kind") != "node.heartbeat"):
+            return False, "heartbeat_envelope_invalid"
+        payload = envelope.get("payload")
+        if (not isinstance(payload, dict) or set(payload) != {"request_id"}
+                or type(payload["request_id"]) is not str
+                or re.fullmatch(r"[A-Za-z0-9._-]{1,128}", payload["request_id"]) is None):
+            return False, "heartbeat_payload_invalid"
+        node_id, rid = envelope.get("node_id"), payload["request_id"]
+        timestamp = envelope.get("timestamp")
+        if (type(node_id) is not str or type(timestamp) not in (int, float)
+                or not math.isfinite(timestamp)):
+            return False, "heartbeat_envelope_invalid"
+        guard = self._node_verification_lock(envelope)
+        if guard is None:
+            return False, "heartbeat_node_not_paired"
+        with guard:
+            with self.lock:
+                if rid not in self._active_node_requests(node_id, time.time()):
+                    return False, "heartbeat_request_not_active"
+            # Reuse the original SSHSIG/host/timestamp/nonce verifier unchanged.
+            # Its nonce map is shared, but liveness is staged in a shadow dict:
+            # expiry or completion during crypto must not refresh real liveness.
+            shadow = copy.copy(self)
+            shadow.node_last_seen = {}
+            ok, detail = super(_NodeHeartbeatStore, shadow).verify_node_envelope(envelope)
+            if not ok:
+                return False, detail
+            with self.lock:
+                if rid not in self._active_node_requests(node_id, time.time()):
+                    return False, "heartbeat_request_not_active"
+                self.node_last_seen[node_id] = shadow.node_last_seen[node_id]
+        return True, {"ok": True, "request_id": rid, "busy": True}
+
+    def node_runtime_status(self, node_id):
+        value = super().node_runtime_status(node_id)
+        if value is None:
+            return None
+        with self.lock:
+            active = self._active_node_requests(str(node_id), time.time())
+        fresh = value.get("ready") is True
+        busy = bool(active)
+        return dict(value, heartbeat_fresh=fresh, busy=busy,
+                    active_request_count=len(active),
+                    activity_state=("busy" if fresh and busy else "idle" if fresh
+                                    else "busy-heartbeat-stale" if busy else "offline"))
+
+
+def _node_message_response(store, path, body):
+    """The new route uses the existing authenticated wire envelope, never EXEC."""
+    if path == NODE_HEARTBEAT_PATH:
+        ok, detail = store.accept_node_heartbeat(body)
+        return (200, detail) if ok else (403, {"ok": False, "error": detail})
+    # A heartbeat cannot be replayed as a poll (dequeue) or result (ack). Other
+    # legacy message kinds retain the original v1 handling for frozen clients.
+    if isinstance(body, dict) and body.get("kind") == "node.heartbeat":
+        return 403, {"ok": False, "error": "node_message_kind_mismatch"}
+    ok, detail = store.verify_node_envelope(body)
+    if not ok:
+        return 403, {"ok": False, "error": detail}
+    if path == "/fbpair/v1/node/poll":
+        item = store.next_read(body["node_id"])
+        return 200, {"ok": True, "request": item,
+                     "protocol_features": [NODE_HEARTBEAT_FEATURE]}
+    if path == "/fbpair/v1/node/result":
+        payload = body.get("payload") or {}
+        saved = store.put_result(body["node_id"], str(payload.get("request_id") or ""),
+                                 payload.get("result") or {})
+        return (200 if saved else 400), {"ok": bool(saved)}
+    raise BrokerError("ENDPOINT_NOT_AVAILABLE")
 
 
 def configure(broker_url=None, state_dir=None, control_key_path=None):
@@ -224,6 +373,8 @@ def request(node_id, capability, args, timeout_s=120):
     if node_id not in confirmed:
         raise BrokerError("NODE_NOT_CONFIRMED")
     if confirmed[node_id].get("ready") is not True:
+        if confirmed[node_id].get("busy") is True:
+            raise BrokerError("NODE_BUSY_HEARTBEAT_STALE")
         raise BrokerError("NODE_OFFLINE")
     path = {"admin.exec": "admin-exec", "admin.cua": "admin-cua"}.get(capability, "request")
     payload = {"node_id": node_id}
@@ -327,7 +478,7 @@ def make_server(host="127.0.0.1", port=20878, state_dir=None):
     public_base = validate_endpoint(public_base)
     admin_lock = threading.RLock()
 
-    class Store(original.Store):
+    class Store(_NodeHeartbeatStore, original.Store):
         def token(self, pair_id, device_code):
             result = super().token(pair_id, device_code)
             if result.get("state") == "paired":
@@ -387,6 +538,10 @@ def make_server(host="127.0.0.1", port=20878, state_dir=None):
                 except Exception:
                     self.send_json(500, {"ok": False, "error": "BROKER_INTERNAL_ERROR"})
                 return
+            if self.path in {"/fbpair/v1/node/poll", "/fbpair/v1/node/result", NODE_HEARTBEAT_PATH}:
+                status, response = _node_message_response(store, self.path, self.read_json() or {})
+                self.send_json(status, response)
+                return
             if self.path not in {"/fbpair/v1/device_authorization", "/fbpair/v1/token",
                                  "/fbpair/v1/confirm", "/fbpair/v1/cancel",
                                  "/fbpair/v1/node/poll", "/fbpair/v1/node/result"}:
@@ -441,7 +596,11 @@ def make_server(host="127.0.0.1", port=20878, state_dir=None):
                     status = store.node_runtime_status(n["node_id"])
                     nodes.append({"node_id": n["node_id"], "alias": n["node_label"],
                                   "hostname": n["node_label"], "transport": "broker_outbound",
-                                  "ready": status.get("ready") is True, "pairing_state": "paired"})
+                                  "ready": status.get("ready") is True, "pairing_state": "paired",
+                                  "busy": status.get("busy") is True,
+                                  "heartbeat_fresh": status.get("heartbeat_fresh") is True,
+                                  "last_seen_age_seconds": status.get("last_seen_age_seconds"),
+                                  "activity_state": status.get("activity_state", "offline")})
                 self.send_json(200, {"ok": True, "nodes": nodes})
             elif route == "node-status":
                 self.send_json(200, store.node_runtime_status(str(body.get("node_id", ""))))

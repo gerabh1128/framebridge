@@ -348,15 +348,19 @@ class FBTerm:
             incomplete_jobs = []
 
             try:
-                for prior in self.jobs.iterdir():
-                    if (
-                        prior.is_dir()
-                        and (
-                            not (prior / "DONE").exists()
-                            or not (prior / "result.env").exists()
-                        )
-                    ):
-                        incomplete_jobs.append(prior.name)
+                # DirEntry reuses the directory type from readdir. Preserve
+                # the full fail-closed audit and both durable-file checks;
+                # avoid a separate stat and Path allocations for every job.
+                with os.scandir(self.jobs) as prior_jobs:
+                    for prior in prior_jobs:
+                        if (
+                            prior.is_dir()
+                            and (
+                                not os.path.exists(os.path.join(prior.path, "DONE"))
+                                or not os.path.exists(os.path.join(prior.path, "result.env"))
+                            )
+                        ):
+                            incomplete_jobs.append(prior.name)
             except OSError as exc:
                 raise FBTermError(
                     "no se pudo auditar jobs previos: " + str(exc)

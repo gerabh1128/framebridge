@@ -1,0 +1,128 @@
+{
+  "acceptance_scope": "Source integration and offline regression testing are separate from package installation, OS lifecycle, signatures and publication.",
+  "build_binding_before_sha256": "4a15720277fcb31f1fd5f8131a52c05817865b4f4e168592899001a8402e7c54",
+  "build_binding_candidate_sha256": "91d1fc9f4a19339fa85877dfded8dc5d4f25e00529e19c05e59a283b36037313",
+  "candidate_version": "0.3.6",
+  "excluded": [
+    "private SMTP policy",
+    "runtime profiles",
+    "credentials",
+    "owner accounts",
+    "privileged deployment helpers",
+    "machine-specific fixtures",
+    "private receipts"
+  ],
+  "functional_source_files": [
+    {
+      "after_git_blob": "36939c8d11e2635311a7ab856144bf0a1ad4e45f",
+      "after_sha256": "504c0994c4b241eb33b20786449fbcfce699171bc5d886c152b72a1ea87ad769",
+      "before_git_blob": "609a424cc5c9fd4dd733e810b26897d924940cf3",
+      "before_sha256": "ca0667b6727e5e47bc70ea9b00aeeed01262ea046da2fe806bad0a0a0670032d",
+      "bytes_after": 32560,
+      "bytes_before": 24438,
+      "installed_path": "/usr/lib/framebridge-expanded/expanded/framebridge_expanded/broker.py",
+      "repository_path": "source/expanded/framebridge_expanded/broker.py"
+    },
+    {
+      "after_git_blob": "0ca6848c9f047b1a5e4db285b5089eeaab7958cb",
+      "after_sha256": "f974c8955f2f8f901fdf98765e38fe683f04942659087b75dad67b239df9c3d1",
+      "before_git_blob": "f05677bf45b377759c7926da63acebbaea443905",
+      "before_sha256": "ba9b64d9a87d3bd6d20a8e17690481047139bad9de16daa4610f27faccb64c53",
+      "bytes_after": 17456,
+      "bytes_before": 16740,
+      "installed_path": "/usr/lib/framebridge-expanded/expanded/framebridge_expanded/fleet.py",
+      "repository_path": "source/expanded/framebridge_expanded/fleet.py"
+    },
+    {
+      "after_git_blob": "ab12084cf52d78f09f1b6749777d29ded49ed643",
+      "after_sha256": "0da8ad7e573698c8ef907749637a39b4580669627b98cdc2a6216c4cb2baf709",
+      "before_git_blob": "fc98166bae9f54a17f6559271b511d76bca6e9af",
+      "before_sha256": "0b6fd48c11c98301784592cbc4293188f5931242b82b57bf71e579d97961f946",
+      "bytes_after": 17599,
+      "bytes_before": 12540,
+      "installed_path": "/usr/lib/framebridge-expanded/expanded/framebridge_expanded/node.py",
+      "repository_path": "source/expanded/framebridge_expanded/node.py"
+    },
+    {
+      "after_git_blob": "8c0fb124592b0560b46c0061932082f5a717370f",
+      "after_sha256": "277d1cf852317afd6263703127a6d3d38513874ded55753e3a69b022ce046c13",
+      "before_git_blob": "3bdedde57a020ae6056467ca74bdeaafdc51b37d",
+      "before_sha256": "51f6ed897e8a7b7f143052746dadb3831f4018c17b33a3209f30afc7c1f7debc",
+      "bytes_after": 27246,
+      "bytes_before": 25248,
+      "installed_path": "/usr/lib/framebridge-expanded/expanded/framebridge_expanded/runtime.py",
+      "repository_path": "source/expanded/framebridge_expanded/runtime.py"
+    },
+    {
+      "after_git_blob": "ab69c8cf9ed3521876ea26efe97c1f1bca3d5903",
+      "after_sha256": "19421995167cb6cdb0b48ce76e1fc804174f8c7d2dc29d44c64bbc6f6d2ef75f",
+      "before_git_blob": "6f2bf77804f5359fd4877651ffa2e9c826145616",
+      "before_sha256": "0d9e10532f4e9274a38b37742c69d27f35ae0e4c7a9d2f8a018a4e237d642c48",
+      "bytes_after": 39679,
+      "bytes_before": 36704,
+      "installed_path": "/usr/lib/framebridge-expanded/portable/front_door_mcp.py",
+      "repository_path": "source/portable/front_door_mcp.py"
+    },
+    {
+      "after_git_blob": "9a1f64202eef621e02e371d4d4a8bda8d231bbc5",
+      "after_sha256": "01ca3556b6e0d05ba95fa805fba70befbf765c8ae45fee75bce4131ab834a93a",
+      "before_git_blob": "e57d6774298c8596d477d7405f6ff97d86c67f37",
+      "before_sha256": "e3c2798d886919b67321b79b3233d6989b7f618c83190e390794ddb9a9053128",
+      "bytes_after": 16908,
+      "bytes_before": 16550,
+      "installed_path": "/usr/lib/framebridge-expanded/original/asus/fbterm/bin/fbterm_engine.py",
+      "repository_path": "source/sources/original-asus/fbterm/bin/fbterm_engine.py"
+    },
+    {
+      "after_git_blob": "f3a7e1f5180c9e3e776ea30f9ee87f1690a91f43",
+      "after_sha256": "be75dadacfda129109e40c56e8da488f0bdda565c4455f4c12196f3e08d08073",
+      "before_git_blob": "358f18f2cca2df210a1e48bf800df968a6b43262",
+      "before_sha256": "aed73125f88b4408bad83ef4aae220fd79bd8f57e41ff15ebc9930453bdc69a1",
+      "bytes_after": 49600,
+      "bytes_before": 45731,
+      "installed_path": "/usr/lib/framebridge-expanded/original/asus/framebridge-native/host/framebridge_cua_linux.py",
+      "repository_path": "source/sources/original-asus/framebridge-native/host/framebridge_cua_linux.py"
+    }
+  ],
+  "historical_binding_fields_preserved": [
+    "base_workspace",
+    "base_deb_sha256",
+    "source_file_count",
+    "created",
+    "base_deb_sha256_role",
+    "community_version",
+    "community_derivative"
+  ],
+  "published_base_commits": {
+    "canonical": "87ff7cb8ff582fb0c5e94a2618106b203401130e",
+    "mirror": "6920234a02509a086034391aebe9d000726f0d6f"
+  },
+  "published_base_tree": "2f62e03c1f7e89589b614cba3def37c7d8674018",
+  "published_base_version": "0.3.5",
+  "reviewed_original_source_updates": [
+    {
+      "date": "2026-11-02",
+      "patch": "provenance/patches/fbterm-audit-0.3.6.patch",
+      "patch_sha256": "6319e6234533c7a3eaa34cf68c404f278f6a228402df00491eb08aa07423efd7",
+      "path": "original-asus/fbterm/bin/fbterm_engine.py",
+      "previous_sha256": "e3c2798d886919b67321b79b3233d6989b7f618c83190e390794ddb9a9053128",
+      "provenance": "provenance/FRAMEBRIDGE-R4-0.3.6-CANDIDATE.json",
+      "reason": "Preserve the complete job audit while avoiding repeated directory-stat calls.",
+      "reviewed_sha256": "01ca3556b6e0d05ba95fa805fba70befbf765c8ae45fee75bce4131ab834a93a",
+      "version": "0.3.6"
+    },
+    {
+      "date": "2026-11-02",
+      "patch": "provenance/patches/cua-window-0.3.6.patch",
+      "patch_sha256": "5ef5b66341177d4e3f419bc52449d79ba796bc7b8a65095d9a2de06102e3c1d1",
+      "path": "original-asus/framebridge-native/host/framebridge_cua_linux.py",
+      "previous_sha256": "aed73125f88b4408bad83ef4aae220fd79bd8f57e41ff15ebc9930453bdc69a1",
+      "provenance": "provenance/FRAMEBRIDGE-R4-0.3.6-CANDIDATE.json",
+      "reason": "Capture the verified visible X11 window intersection with stable geometry and identity.",
+      "reviewed_sha256": "be75dadacfda129109e40c56e8da488f0bdda565c4455f4c12196f3e08d08073",
+      "version": "0.3.6"
+    }
+  ],
+  "schema": 1,
+  "status": "PREPARED_CANDIDATE_NOT_A_PUBLIC_RELEASE"
+}

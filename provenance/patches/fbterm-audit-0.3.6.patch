@@ -1,0 +1,33 @@
+diff --git a/source/sources/original-asus/fbterm/bin/fbterm_engine.py b/source/sources/original-asus/fbterm/bin/fbterm_engine.py
+index e57d6774298c8596d477d7405f6ff97d86c67f37..9a1f64202eef621e02e371d4d4a8bda8d231bbc5
+--- a/source/sources/original-asus/fbterm/bin/fbterm_engine.py
++++ b/source/sources/original-asus/fbterm/bin/fbterm_engine.py
+@@ -348,15 +348,19 @@
+             incomplete_jobs = []
+ 
+             try:
+-                for prior in self.jobs.iterdir():
+-                    if (
+-                        prior.is_dir()
+-                        and (
+-                            not (prior / "DONE").exists()
+-                            or not (prior / "result.env").exists()
+-                        )
+-                    ):
+-                        incomplete_jobs.append(prior.name)
++                # DirEntry reuses the directory type from readdir. Preserve
++                # the full fail-closed audit and both durable-file checks;
++                # avoid a separate stat and Path allocations for every job.
++                with os.scandir(self.jobs) as prior_jobs:
++                    for prior in prior_jobs:
++                        if (
++                            prior.is_dir()
++                            and (
++                                not os.path.exists(os.path.join(prior.path, "DONE"))
++                                or not os.path.exists(os.path.join(prior.path, "result.env"))
++                            )
++                        ):
++                            incomplete_jobs.append(prior.name)
+             except OSError as exc:
+                 raise FBTermError(
+                     "no se pudo auditar jobs previos: " + str(exc)

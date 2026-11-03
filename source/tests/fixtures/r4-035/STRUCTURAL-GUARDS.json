@@ -1,0 +1,31 @@
+{
+  "ast_serialization": "semantic_ast_v1: sorted fields, omitted optional None/empty lists, preserved nonempty-list placeholders",
+  "files": {
+    "frontdoor": "0d9e10532f4e9274a38b37742c69d27f35ae0e4c7a9d2f8a018a4e237d642c48",
+    "node": "0b6fd48c11c98301784592cbc4293188f5931242b82b57bf71e579d97961f946",
+    "runtime": "51f6ed897e8a7b7f143052746dadb3831f4018c17b33a3209f30afc7c1f7debc",
+    "window": "aed73125f88b4408bad83ef4aae220fd79bd8f57e41ff15ebc9930453bdc69a1"
+  },
+  "frontdoor": {
+    "dispatch_cua_request": "5fa9493bdd5b2ecd1aff4c7608ef76d2c8c85401f983d0fd513477eef4301b61",
+    "framebridge_exec": "becc042b36fc956ac052ecfbb64352b8d0618b355f648ae582bb3d41bb0dccdf",
+    "local_cua_request": "3fc90a638420692eea9299a44b61c79d2472b89a71a55086d3692f3537789697"
+  },
+  "node": {
+    "_context": "28cdf704d71d380b9c57e07f5ce96c62db7290b837ed2b611e9bcb296edf4947",
+    "_post_with_recovery": "b72406ef85ff4ee470ffee1ff22fd68f21c0afe20c14d41132fa0ff048465d35",
+    "_retryable_broker_failure": "320bc2076d37a8eb8f35fa6aae216e3d3da826e1499897bed631b56678e32b27",
+    "dispatch_request": "7a8ed4ff90900712356f36d9a2d404dfdbfe890871e869afbb281f29489fa807"
+  },
+  "role": "public 0.3.5 source structural guards, not runtime identities",
+  "runtime": {
+    "adapter_request": "2d59b00e43312b1fbc5296ed20cebb8f6fb05ae115dea8a3069fa5066abc0130"
+  },
+  "schema": 1,
+  "unchanged_helpers": {
+    "autostart.py": "d99392b33531d28d699ec5a6e9e942ce3696ebf29464e8e7c3d74178b2553f09",
+    "display_context.py": "464525537a1af948159a64ff27df65a1a1bf4f6f61c7d7d121f28524ff96b01a",
+    "real_screen/screen_capture.py": "a7e3bebfd3de3b952344fa7361b9d35fc70bea9ddf803ed4a8b1667b88bf1798"
+  },
+  "window_retained_sha256": "b44c78d42d7b0e41d2f75224113e2e23ddd98c708cb623002c2e6794e3f7e03c"
+}

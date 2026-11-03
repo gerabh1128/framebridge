@@ -226,6 +226,15 @@ class SudoControlTests(unittest.TestCase):
         result = self.controller.close(record)
         self.assertTrue(result["closed"])
         self.assertFalse(Path(record["tmux_socket"]).exists())
+        deadline = time.monotonic() + min(5.0, self.controller.timeout)
+        while time.monotonic() < deadline:
+            process = control._proc(record["server_pid"])
+            if process is None:
+                break
+            self.assertEqual((process["pid"], process["birth"]),
+                             (record["server_pid"], record["server_birth"]))
+            self.assertIn(process["state"], {"Z", "X"})
+            time.sleep(min(0.03, max(0.0, deadline - time.monotonic())))
         self.assertIsNone(control._proc(record["server_pid"]))
         self.records.remove(record)
 
