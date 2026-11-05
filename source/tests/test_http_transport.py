@@ -140,6 +140,28 @@ class HttpMcpTransportTests(unittest.TestCase):
         self.assertFalse((Path(self.env['FRAMEBRIDGE_TOOL_ROOT'])/'adapter.sock').exists())
         self.assertFalse(self.marker.exists())
 
+    def test_actual_frontdoor_rejects_ambiguous_routing_over_streamable_http(self):
+        self.start('frontdoor')
+        reply, _, _ = self.rpc({'jsonrpc': '2.0', 'id': 2, 'method': 'tools/list'})
+        tools = {tool['name']: tool['inputSchema'] for tool in reply['result']['tools']}
+        for name in ('framebridge_exec', 'framebridge_cua', 'framebridge_screen_observe'):
+            schema = tools[name]
+            self.assertFalse(schema['additionalProperties'])
+            self.assertTrue(schema['properties']['node']['deprecated'])
+        for request_id, selectors, expected in (
+            (3, {'target': 'LOCAL', 'node': 'ASUS'}, 'TARGET_SELECTOR_CONFLICT'),
+            (4, {'hostname': 'ASUS'}, 'hostname'),
+            (5, {'target': None}, 'target'),
+        ):
+            reply, _, _ = self.rpc({'jsonrpc': '2.0', 'id': request_id, 'method': 'tools/call',
+                'params': {'name': 'framebridge_exec',
+                           'arguments': {'script': 'true', 'authorized': True, **selectors}}})
+            result = reply['result']
+            self.assertIn(expected, json.dumps(result))
+            if request_id != 3:
+                self.assertTrue(result['isError'])
+        self.assertFalse((Path(self.env['FRAMEBRIDGE_TOOL_ROOT'])/'adapter.sock').exists())
+
 
 if __name__ == '__main__':
     unittest.main()

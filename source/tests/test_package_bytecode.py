@@ -10,7 +10,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packaging"))
-from build_expanded import bytecode_cleanup_source, maintainer_postinst
+from build_expanded import INSTALLATION, bytecode_cleanup_source, maintainer_postinst
 
 
 class PackageBytecodeTests(unittest.TestCase):
@@ -140,6 +140,7 @@ class PackageBytecodeTests(unittest.TestCase):
         stub.chmod(0o755)
         script = maintainer_postinst().replace(bytecode_cleanup_source(),
                                               bytecode_cleanup_source(prefix))
+        script = script.replace(INSTALLATION, ":")
         script = script.replace(
             "/usr/bin/python3 -I -S /usr/lib/framebridge-expanded/expanded/framebridge_expanded/package_upgrade.py schedule",
             shlex.quote(str(stub)))

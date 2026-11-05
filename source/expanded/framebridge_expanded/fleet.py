@@ -31,6 +31,17 @@ def _require(condition: object, code: str) -> None:
         raise FleetError(code)
 
 
+def select_target(target: str | None, *legacy: str | None, default: str | None = None) -> str:
+    """Select one request destination before looking it up or dispatching."""
+    supplied = [value for value in (target, *legacy) if value is not None]
+    if not supplied and default is not None:
+        return default
+    _require(supplied, "TARGET_REQUIRED")
+    _require(all(type(value) is str and value for value in supplied), "TARGET_SELECTOR_INVALID")
+    _require(all(value == supplied[0] for value in supplied), "TARGET_SELECTOR_CONFLICT")
+    return supplied[0]
+
+
 def _require_transport_ready(node):
     if node.get("operational_transport_ready") is True:
         return
@@ -121,7 +132,8 @@ def _local_descriptor(config: dict[str, Any]) -> dict[str, Any]:
     return {
         "alias": config["name"], "node_id": str(config["node_id"]),
         "hostname": socket.gethostname(), "transport": "local",
-        "target": "LOCAL", "capability_profile": "original-readonly",
+        "target": config["name"], "transport_target": "LOCAL",
+        "capability_profile": "original-readonly",
         "source": "local", "operational_transport_ready": True,
     }
 
@@ -145,7 +157,7 @@ def _remote_descriptors(config: dict[str, Any]) -> list[dict[str, Any]]:
         result.append({
             "alias": alias, "node_id": str(node_id),
             "hostname": str(item.get("hostname") or alias),
-            "transport": "broker_outbound", "target": alias,
+            "transport": "broker_outbound", "target": alias, "transport_target": alias,
             "capability_profile": "original-readonly",
             "source": "confirmed_pairing",
             "operational_transport_ready": item.get("ready") is True,
@@ -194,11 +206,22 @@ def _target_identity(requested: str, node: dict[str, Any]) -> dict[str, Any]:
         "requested_target": requested,
         "resolved_target": node["alias"],
         "node": node["alias"],
-        "target": "LOCAL" if node["transport"] == "local" else node["alias"],
+        "target": node["alias"],
+        "transport_target": "LOCAL" if node["transport"] == "local" else node["alias"],
         "node_id": node["node_id"],
         "hostname": node.get("hostname"),
         "transport": node["transport"],
     }
+
+
+def local_target_identity() -> dict[str, Any]:
+    """Resolve the receiver without making local execution depend on the broker."""
+    if os.environ.get("FRAMEBRIDGE_EXPANDED_STATE") or os.environ.get("FRAMEBRIDGE_STATE_DIR"):
+        return _target_identity("LOCAL", _local_descriptor(local_config()))
+    # The historical standalone front door can be started without a Fleet profile.
+    host = socket.gethostname()
+    return _target_identity("LOCAL", {"alias": host, "node_id": None,
+                                     "hostname": host, "transport": "local"})
 
 
 def _normalize_read(capability: str, args: dict[str, Any]) -> dict[str, Any]:

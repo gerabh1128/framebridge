@@ -104,14 +104,19 @@ def _show_autostart_enabled(result):
 def setup(state, *, ask=None):
     """Review and save public settings; never start services or a tunnel."""
     state = resolve_state(state)
-    if (state / "config.json").exists():
+    path = state / "config.json"
+    existing = path.exists() or path.is_symlink()
+    if existing:
         current = _module("runtime").status(state)
         if current.get("running") or any(p.get("alive") for p in current.get("processes", [])):
             raise RuntimeError("Stop this profile before changing setup. Run fb service stop.")
-    config = copy.deepcopy(load_config(state) if (state / "config.json").exists() else default_config())
+    config = copy.deepcopy(load_config(state) if existing else _new_profile())
     print("Set up this computer")
     print("standalone: local tools; central: local tools and a node broker; node: joins a central broker.")
-    config["role"] = _ask("Role (standalone/central/node)", config["role"], ask=ask).lower()
+    if existing or config["role"] == "standalone":
+        config["role"] = _ask("Role (standalone/central/node)", config["role"], ask=ask).lower()
+    else:
+        print("Installed LAN role: " + config["role"])
     config["name"] = _ask("Computer name", config["name"], ask=ask)
     desktop_mode = config.get("headless", "auto")
     if desktop_mode == "auto":
@@ -182,11 +187,23 @@ def setup(state, *, ask=None):
     return 0
 
 
+def _new_profile():
+    from .installation import status
+    installed = status()
+    if installed["role"] == "pending":
+        raise RuntimeError("LAN role detection is pending. See fb installation status.")
+    role = installed["role"] if installed["role"] in {"central", "node"} else "standalone"
+    config = default_config(role=role)
+    if role == "node" and installed.get("source") == "local_dns_reservation":
+        config["broker_url"] = "https://" + installed["central_hint"] + ":20878"
+    return config
+
+
 def connect_chatgpt(state, *, foreground=False, replace=False):
     config_path = Path(state) / "config.json"
-    config = load_config(state) if config_path.exists() or config_path.is_symlink() else default_config()
+    config = load_config(state) if config_path.exists() or config_path.is_symlink() else _new_profile()
     if config["role"] == "node":
-        raise RuntimeError("A node profile does not publish an MCP server. Connect ChatGPT from the central profile.")
+        raise RuntimeError("This node uses the central profile's MCP. Complete fb setup and approved enrollment first.")
     runtime = _module("runtime")
     port = config["ports"]["mcp"]
     expected_url = "http://127.0.0.1:" + str(port) + "/mcp"
@@ -563,7 +580,12 @@ def build_parser():
     status.add_argument("scope", nargs="?", choices=("connection", "runtime", "boot", "console"))
     sub.add_parser("doctor", help="Diagnose prerequisites and problems; does not repair or connect.")
     sub.add_parser("health", help="Read one local profile's health, identity and prerequisites; no repair or connection.")
-    sub.add_parser("setup", help="Optional advanced role/profile setup; does not start services or connect.")
+    sub.add_parser("setup", help="Configure the local profile for its installed role without starting services.")
+    installation = sub.add_parser("installation", help="Inspect or retry the package's initial LAN role detection.")
+    installation_actions = installation.add_subparsers(dest="installation_action", required=True)
+    installation_actions.add_parser("status", help="Read the installed LAN role and discovery evidence.")
+    installation_actions.add_parser("detect", help="Retry a pending initial role decision as root.")
+    sub.add_parser("panel", help="Open the central profile's private local supervision panel.")
     profile = sub.add_parser("profile", help="Select or inspect this Linux account's default profile reference.")
     profile_actions = profile.add_subparsers(dest="profile_action", required=True)
     profile_actions.add_parser("select", help="Select a configured profile without copying its credentials.")
@@ -717,7 +739,7 @@ def _dispatch(parser, args):
         return main(prefix + action)
     # Help and reference recovery remain available when the saved profile is
     # missing, ambiguous or unsafe. None of these reads creates a profile.
-    state = None if args.command in {"screen-access", "help", "tutorial", "profile"} else resolve_state(args.state_dir)
+    state = None if args.command in {"screen-access", "help", "tutorial", "profile", "installation"} else resolve_state(args.state_dir)
     try:
         if args.command == "profile":
             if args.profile_action == "select":
@@ -740,6 +762,16 @@ def _dispatch(parser, args):
             return _result_code(value)
         if args.command in {"help", "tutorial"}:
             return _help_command(args)
+        if args.command == "installation":
+            installation = _module("installation")
+            result = installation.status() if args.installation_action == "status" else installation.configure()
+            _show(result)
+            return 0
+        if args.command == "panel":
+            if args.json or args.non_interactive or not sys.stdin.isatty():
+                return _interaction_required("fb panel")
+            from .panel import serve
+            return serve(state)
         if args.command == "setup":
             if args.json or args.non_interactive or not sys.stdin.isatty():
                 return _interaction_required("fb setup")

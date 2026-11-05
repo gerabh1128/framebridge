@@ -28,8 +28,10 @@ sys.path.insert(0, str(WORK / "expanded"))
 sys.path.insert(0, str(VENDOR))
 import anyio
 from mcp.server.fastmcp import FastMCP, Image
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from framebridge_expanded import tty_mcp
+from framebridge_expanded.fleet import FleetError, select_target
 from framebridge_expanded.real_screen.screen_frontdoor import register_framebridge_screen_tools
 from framebridge_expanded.real_screen.screen_presentation import register_screen_presentation
 from test_screen_frontdoor import Executor, NODE_ID, SESSION_ID
@@ -54,13 +56,13 @@ class ChunkExecutor(Executor):
         return outer
 
 
-def portable(*, execute=None, screen_execute=None, threaded=True):
+def portable(*, execute=None, screen_execute=None, cua=None, threaded=True):
     """Load the actual registration statements without bootstrap/profile effects."""
     tree = ast.parse(PORTABLE.read_text())
     names = {"_BlockingToolRegistrar", "_registered_operations", "framebridge_status",
-             "framebridge_exec", "_screen_exec_request"}
+             "framebridge_exec", "framebridge_cua", "_screen_exec_request", "_close_target_tool_arguments"}
     assignments = {"_blocking_tools", "_real_screen_client"}
-    registrations = {"register_screen_presentation", "register_tty_tools"}
+    registrations = {"register_screen_presentation", "register_tty_tools", "_close_target_tool_arguments"}
     selected = []
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in names:
@@ -77,10 +79,14 @@ def portable(*, execute=None, screen_execute=None, threaded=True):
     execute = execute or (lambda *args: {"ok": True})
     screen_execute = screen_execute or (lambda *args: {"ok": False})
     namespace = dict(mcp=mcp, anyio=anyio, partial=partial, wraps=wraps, inspect=inspect,
+                     FleetError=FleetError, select_target=select_target, uuid=uuid, re=re,
+                     dispatch_cua_request=cua,
                      ToolAnnotations=ToolAnnotations, Image=Image, socket=socket,
                      ADAPTER_SOCKET=Path("/nonexistent/framebridge-test.sock"),
                      PRODUCT_VERSION="test", GUIDE_SCHEMA=1,
                      _framebridge_exec_geranas_impl=execute, expanded_execute_node=execute,
+                     local_target_identity=lambda: {"node": "central", "target": "central",
+                                                    "requested_target": "LOCAL", "transport_target": "LOCAL"},
                      expanded_execute_screen_node=screen_execute,
                      register_framebridge_screen_tools=register_framebridge_screen_tools,
                      resolve_profile_node=lambda target: target.upper(),
@@ -110,6 +116,65 @@ async def until_set(event):
 
 
 class DispatchTests(unittest.IsolatedAsyncioTestCase):
+    async def test_execution_and_graphical_cua_select_one_destination(self):
+        execute = mock.Mock(return_value={"ok": True})
+        cua = mock.Mock(return_value={"ok": True})
+        mcp, namespace = portable(execute=execute, cua=cua)
+        local = mock.Mock(side_effect=AssertionError("remote request fell back to LOCAL"))
+        namespace["_framebridge_exec_geranas_impl"] = local
+        for operation, arguments, dispatch, argument_index in (
+            ("framebridge_exec", {"script": "printf marker"}, execute, 0),
+            ("framebridge_cua", {"action": "KEY", "key": "F8"}, cua, 4),
+        ):
+            base = {"authorized": True, **arguments}
+            for selector in ({"target": "ASUS"}, {"node": "ASUS"}, {"target": "ASUS", "node": "ASUS"}):
+                reply = await mcp.call_tool(operation, {**base, **selector})
+                self.assertTrue(structured(reply)["ok"])
+                self.assertEqual(dispatch.call_args.args[argument_index], "ASUS")
+            dispatch.reset_mock()
+            for target in ("LOCAL", "GERANAS"):
+                reply = await mcp.call_tool(operation, {**base, "target": target, "node": "ASUS"})
+                self.assertEqual(structured(reply)["error"], "TARGET_SELECTOR_CONFLICT")
+            for selector in ({"target": ""}, {"node": ""}):
+                reply = await mcp.call_tool(operation, {**base, **selector})
+                self.assertEqual(structured(reply)["error"], "TARGET_SELECTOR_INVALID")
+            for selector in ({"hostname": "ASUS"}, {"target": None}, {"node": None}):
+                with self.assertRaises(ToolError):
+                    await mcp.call_tool(operation, {**base, **selector})
+            dispatch.assert_not_called()
+        local.assert_not_called()
+
+    async def test_screen_tools_use_target_and_reject_conflicting_legacy_node(self):
+        executor = ChunkExecutor()
+        mcp, _ = portable(screen_execute=lambda alias, script, authorized, timeout_s, job_id,
+                          sha256, include_stdout: executor(target=alias, script=script,
+                          authorized=authorized, timeout_s=timeout_s, job_id=job_id,
+                          sha256=sha256, include_stdout=include_stdout))
+        for selector in ({"target": "ASUS"}, {"node": "ASUS"}):
+            result = await mcp.call_tool("framebridge_screen_observe", {"authorized": True, **selector})
+            metadata = json.loads(next(item.text for item in result if item.type == "text"))
+            self.assertEqual(metadata["target"], "ASUS")
+        for name, arguments in (
+            ("framebridge_screen_observe", {}),
+            ("framebridge_screen_key", {"capture_id": "0" * 32, "key": "F8"}),
+            ("framebridge_screen_text", {"capture_id": "0" * 32, "text": "probe"}),
+            ("framebridge_screen_show", {"capture_id": "0" * 32}),
+        ):
+            result = await mcp.call_tool(name, {"authorized": True, "target": "LOCAL",
+                                               "node": "ASUS", **arguments})
+            if hasattr(result, "structuredContent"):
+                result = result.structuredContent
+            self.assertEqual(structured(result)["error"], "TARGET_SELECTOR_CONFLICT")
+
+    async def test_local_authorization_precedes_identity_resolution(self):
+        execute = mock.Mock(side_effect=AssertionError("unauthorized execution"))
+        mcp, namespace = portable(execute=execute)
+        namespace["local_target_identity"] = mock.Mock(side_effect=AssertionError("unauthorized resolution"))
+        response = await mcp.call_tool("framebridge_exec", {"script": "printf forbidden", "authorized": False})
+        self.assertEqual(structured(response)["error"], "AUTHORIZED_TRUE_REQUIRED")
+        execute.assert_not_called()
+        namespace["local_target_identity"].assert_not_called()
+
     async def test_actual_sdk_returns_status_while_exec_and_tty_capture_are_running(self):
         exec_started, capture_started, release = (threading.Event() for _ in range(3))
         fixture = ChunkExecutor()
@@ -144,6 +209,8 @@ class DispatchTests(unittest.IsolatedAsyncioTestCase):
             release.set()
             exec_result, capture_result = await asyncio.gather(slow, capture)
         self.assertEqual(structured(exec_result)["marker"], "bounded-marker")
+        self.assertEqual(structured(exec_result)["target"], "central")
+        self.assertEqual(structured(exec_result)["node"], "central")
         self.assertEqual(len(calls), 1)
         self.assertTrue(any(item.type == "image" for item in capture_result))
 

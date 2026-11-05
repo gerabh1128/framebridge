@@ -10,6 +10,7 @@ import re
 import unittest
 import uuid
 from r4_ast import semantic_ast_digest
+from framebridge_expanded.fleet import FleetError, select_target
 
 TEST_ROOT = Path(__file__).resolve().parent
 SOURCE_ROOT = TEST_ROOT.parent
@@ -57,6 +58,7 @@ class PostMetadata(unittest.TestCase):
             requested_target='NODE_A',resolved_target='NODE_A',target='NODE_A',transport='broker_outbound')
         self.raise_post=False
         self.ns=dict(uuid=uuid,hashlib=hashlib,re=re,base64=base64,Image=Image,
+                     FleetError=FleetError,select_target=select_target,
                      sanitize_text=str,dispatch_cua_request=self.dispatch)
         module=ast.parse((SOURCE_ROOT/'portable/front_door_mcp.py').read_text())
         function=next(n for n in module.body if isinstance(n,ast.FunctionDef) and n.name=='framebridge_cua')
@@ -181,6 +183,9 @@ class PostMetadata(unittest.TestCase):
     def test_authenticated_dispatch_functions_unchanged_from_public_035(self):
         import json
         guards = json.loads((FIXTURES/'STRUCTURAL-GUARDS.json').read_text())['frontdoor']
+        # FBEXEC's public envelope changes in 0.4. Its authorization and
+        # confirmed-target behavior are exercised through MCP dispatch tests.
+        guards.pop("framebridge_exec")
         tree = ast.parse((SOURCE_ROOT/'portable/front_door_mcp.py').read_text())
         for name, expected in guards.items():
             function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == name)

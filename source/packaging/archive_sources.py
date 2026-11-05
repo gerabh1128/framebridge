@@ -19,7 +19,7 @@ ROOT = BASE.parent
 EPOCH = calendar.timegm((2026, 10, 27, 0, 0, 0))
 ARCHIVE_ROOT = "FrameBridge-" + CANDIDATE_VERSION
 ARCHIVE_NAME = ARCHIVE_ROOT + "-source.tar.gz"
-SOURCE_FOLDERS = ("sources", "expanded", "portable", "packaging", "docs", "tests")
+SOURCE_FOLDERS = ("sources", "expanded", "portable", "packaging", "docs", "tests", "panel")
 ROOT_FILES = ("README.md", "LICENSE", "LICENSING.md", "COPYRIGHT.md",
               "LICENSE-STATUS.md", "OFFICIAL-RELEASES.md", "CONTRIBUTING.md", "SECURITY.md", "RELEASE-NOTES.md")
 ROOT_FOLDERS = ("docs", "provenance", "licensing")
@@ -76,6 +76,8 @@ def source_files():
 
     def add(path):
         relative = path.relative_to(ROOT)
+        if "node_modules" in relative.parts:
+            return
         if path.is_symlink():
             raise RuntimeError("Source archives must not include symbolic links: " + str(relative))
         if any(part in {"__pycache__", ".git", "build", "release", "qa"} for part in relative.parts) or path.suffix in {".pyc", ".log"}:

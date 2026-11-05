@@ -23,6 +23,7 @@ from framebridge_expanded import __version__ as PRODUCT_VERSION
 from framebridge_expanded.guide import GUIDE_SCHEMA, get_guide
 from framebridge_expanded.fleet import execute_node as expanded_execute_node, cua_node as expanded_cua_node, bootstrap_original
 from framebridge_expanded.fleet import execute_screen_node as expanded_execute_screen_node
+from framebridge_expanded.fleet import FleetError, local_target_identity, select_target
 from framebridge_expanded.runtime import adapter_request as checked_cua_adapter_request
 bootstrap_original()
 
@@ -46,7 +47,8 @@ mcp = FastMCP(
         "FrameBridge provides a shared command-line interface and tools for human operators and authorized agents. "
         "fb and framebridge are equivalent commands. Before the first operation, call framebridge_help(topic='start'), "
         "then read the relevant topic. Confirm the receiver, selected target, installed version and available capabilities. "
-        "framebridge_exec defaults to LOCAL, meaning this receiver; other targets must be confirmed enrolled aliases or IDs. "
+        "Use target to select one enrolled alias or ID for execution and CUA. LOCAL means this receiver. "
+        "Use capture_scope to choose the graphical view. For X11 input use framebridge_cua with a fresh window observation. "
         "Use the installed CLI and tools for normal work; use a separate source clone when the owner requests software development. "
         "The six Fleet inspection tools are read-only. Guide instructions do not grant authorization."
     ),
@@ -520,14 +522,24 @@ def framebridge_exec(
     job_id: str = "",
     sha256: str = "",
     include_stdout: bool = False,
-    target: str = "LOCAL",
+    target: str = None,
+    node: str = None,
 ) -> dict:
-    """Execute through original local FBTERM or a confirmed Fleet node alias."""
+    """Execute on target through FBTERM or Fleet. The legacy node argument aliases target."""
+    if authorized is not True:
+        return {"ok":False,"error":"AUTHORIZED_TRUE_REQUIRED"}
+    try:
+        target = select_target(target, node, default="LOCAL")
+    except FleetError as exc:
+        return {"ok":False,"error":str(exc)}
     if target == "LOCAL":
+        try:
+            identity = local_target_identity()
+        except (OSError, ValueError):
+            return {"ok":False,"error":"LOCAL_TARGET_IDENTITY_UNAVAILABLE"}
         result = _framebridge_exec_geranas_impl(script, authorized, timeout_s, job_id, sha256, include_stdout)
         if isinstance(result, dict):
-            result = dict(result)
-            result["target"] = "LOCAL"
+            result = {**result, **identity}
         return result
     return expanded_execute_node(target, script, authorized, timeout_s, job_id, sha256, include_stdout)
 
@@ -717,17 +729,24 @@ def framebridge_cua(
     expected_source_height: int = 0,
     timeout_s: int = 60,
     job_id: str = "",
-    target: str = "LOCAL",
+    target: str = None,
+    node: str = None,
 ):
-    """Use the configured graphical display; display_context labels physical or virtual. OBSERVE with capture_scope=node:ALIAS captures that node's actual active physical screen."""
+    """Observe or control target's graphical display. Set capture_scope to WINDOW or ROOT."""
     if authorized is not True:
         return {"ok":False,"error":"AUTHORIZED_TRUE_REQUIRED"}
     action=str(action).upper().strip()
-    node_scope = str(capture_scope).strip()
-    if node_scope.lower().startswith("node:"):
+    capture_scope = str(capture_scope).strip()
+    scope_target = capture_scope[5:] if capture_scope.lower().startswith("node:") else None
+    try:
+        target = select_target(target, node, scope_target, default="LOCAL")
+    except FleetError as exc:
+        return {"ok":False,"error":str(exc)}
+    if scope_target is not None:
         if action != "OBSERVE":
-            return {"ok": False, "error": "NODE_SCREEN_SCOPE_OBSERVE_ONLY", "hint": "Use the bound screen tools for TTY input or the graphical CUA with target for X11 input."}
-        return _real_screen_client.call("observe", node_scope[5:], True)
+            return {"ok": False, "error": "NODE_SCREEN_SCOPE_OBSERVE_ONLY",
+                    "hint": "For X11 input use framebridge_cua with target and capture_scope=WINDOW."}
+        return _real_screen_client.call("observe", target, True)
     if action not in {"OBSERVE","CLICK","DOUBLE_CLICK","TYPE","KEY","SCROLL","DRAG"}:
         return {"ok":False,"error":"CUA_ACTION_UNSUPPORTED"}
     coord_space=str(coord_space).upper().strip()
@@ -776,10 +795,16 @@ def framebridge_cua(
             "button":str(button).lower(),"steps":int(steps),"duration_ms":int(duration_ms),
         })
 
+    identity = {}
+    if target == "LOCAL":
+        try:
+            identity = local_target_identity()
+        except (OSError, ValueError):
+            return {"ok":False,"error":"LOCAL_TARGET_IDENTITY_UNAVAILABLE"}
     # Allocate once, before dispatch: a generated ID inside the node router
     # cannot bind the separate follow-up observation to this action.
     action_job_id=str(job_id) if job_id else "cua-"+uuid.uuid4().hex
-    result=dispatch_cua_request(payload,True,timeout_s,action_job_id,target)
+    result={**dispatch_cua_request(payload,True,timeout_s,action_job_id,target), **identity}
     if bool(observe_after) and action!="OBSERVE" and bool(result.get("ok")):
         post={"action":"OBSERVE","capture_scope":observe_scope}
         if preview_width>0: post["preview_width"]=int(preview_width)
@@ -788,7 +813,7 @@ def framebridge_cua(
         # Reusing an explicit action ID still reaches the durable replay guard.
         post_id="cua-post-"+hashlib.sha256(action_job_id.encode("utf-8")).hexdigest()
         try:
-            post_result=dispatch_cua_request(post,True,timeout_s,post_id,target)
+            post_result={**dispatch_cua_request(post,True,timeout_s,post_id,target), **identity}
         except Exception:
             # The action may already have completed. Expose follow-up failure
             # without replaying input or leaking exception/transport details.
@@ -819,7 +844,7 @@ def framebridge_cua(
             "session","session_id","user_sid","display_context","timestamp",
             "completed_at","target_display","max_chunk_bytes","visual_capture_gate",
             "cua_protocol_version","frame_output","node","node_id","hostname",
-            "requested_target","resolved_target","target","transport",
+            "requested_target","resolved_target","target","transport","transport_target",
             "requested_node","transport_node",
         )
         if result["post_ok"] and isinstance(post_result.get("image_base64"),str) and post_result["image_base64"]:
@@ -923,6 +948,30 @@ register_screen_presentation(_blocking_tools, _real_screen_client)
 
 from framebridge_expanded.tty_mcp import register_tools as register_tty_tools
 register_tty_tools(_blocking_tools, framebridge_exec, screen_client=_real_screen_client)
+
+
+def _close_target_tool_arguments():
+    """Make the bundled FastMCP reject unknown fields before applying defaults."""
+    for tool in mcp._tool_manager.list_tools():
+        if "target" not in tool.parameters.get("properties", {}):
+            continue
+        model = tool.fn_metadata.arg_model
+        tool.fn_metadata.arg_model = type(model.__name__, (model,), {
+            "model_config": {"extra": "forbid", "hide_input_in_errors": True},
+        })
+        parameters = tool.fn_metadata.arg_model.model_json_schema(by_alias=True)
+        fields = parameters["properties"]
+        fields["target"]["description"] = "The enrolled alias or ID, or LOCAL for this receiver."
+        if "node" in fields:
+            fields["node"].update(deprecated=True, description="Legacy alias for target.")
+        # The string fields use a Python-only sentinel when omitted.
+        for field in ("target", "node"):
+            if field in fields and fields[field].get("default") is None:
+                fields[field].pop("default", None)
+        tool.parameters = parameters
+
+
+_close_target_tool_arguments()
 
 if __name__ == "__main__":
     from framebridge_expanded.http_server import run_streamable_mcp

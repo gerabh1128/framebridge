@@ -119,7 +119,9 @@ def identify(proc):
     return {'uid': uid, 'user': account.pw_name, 'home': account.pw_dir,
             'state': str(state), 'pid': int(proc.name), 'birth': birth,
             'config_sha256': hashlib.sha256(_read(state / 'config.json', uid)).hexdigest(),
-            'node_id': config.get('node_id'), 'unit': next(iter(set(units)), None),
+            'node_id': config.get('node_id'), 'role': config['role'],
+            'broker_port': (config.get('ports') or {}).get('broker'),
+            'unit': next(iter(set(units)), None),
             'phase': 'CAPTURED'}
 
 

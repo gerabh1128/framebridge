@@ -10,9 +10,10 @@ class CanonicalScreenNodeTests(unittest.TestCase):
             self.assertEqual(resolve_profile_node(uid), "worker-1")
         resolve.assert_called_once_with(uid)
 
-    def test_receiver_identity_is_canonical_local(self):
+    def test_local_receiver_resolves_to_its_configured_alias(self):
         with patch.object(fleet, "resolve_node", return_value={"transport": "local", "alias": "central"}):
-            self.assertEqual(resolve_profile_node("central"), "LOCAL")
+            self.assertEqual(resolve_profile_node("central"), "central")
+            self.assertEqual(resolve_profile_node("LOCAL"), "central")
 
     def test_unknown_alias_has_no_hostname_or_ssh_fallback(self):
         with patch.object(fleet, "resolve_node", side_effect=fleet.FleetError("NODE_NOT_FOUND")):
