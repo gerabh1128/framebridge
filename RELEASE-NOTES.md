@@ -1,5 +1,9 @@
 # FrameBridge release notes
 
+## 0.4.0~rc3
+
+The Linux notification area can open FrameBridge status, FBConsole and FBSetup. The tray starts at graphical sign-in. It uses a StatusNotifier host when available and the GTK notification area on compatible X11 desktops. Closing the tray leaves FrameBridge services running.
+
 ## 0.3.6
 
 Reliability update for authenticated node heartbeats during active work, fresh graphical status, verified visible WINDOW capture and coherent post-action metadata. The complete FBTERM audit is retained with less directory-scanning overhead. Original-PNG transfers use a 90-second budget. See [the 0.3.6 change notes](docs/RELEASE-NOTES-0.3.6.md). Package assembly, per-OS acceptance, signatures and publication are separate release records.

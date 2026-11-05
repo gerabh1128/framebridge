@@ -284,7 +284,7 @@ def maintainer_postinst():
 def package_relationships(profile):
     """Keep the opt-in virtual window manager out of automatic APT installs."""
     return {
-        "Depends": "python3 (>= " + profile["python_minor"] + "), python3 (<< 3." + str(int(profile["python_minor"].split(".")[1]) + 1) + "), libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core, avahi-daemon, avahi-utils",
+        "Depends": "python3 (>= " + profile["python_minor"] + "), python3 (<< 3." + str(int(profile["python_minor"].split(".")[1]) + 1) + "), libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core, avahi-daemon, avahi-utils, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1",
         "Suggests": "xvfb, openbox",
     }
 
@@ -383,6 +383,15 @@ def main(argv=None):
         "Comment=Open the persistent local Bash and FBTERM activity console\n"
         "Exec=/usr/bin/fb console\nIcon=utilities-terminal\nTerminal=false\n"
         "Categories=System;TerminalEmulator;\nStartupWMClass=Gnome-terminal\n")
+    tray = BASE / "packaging/framebridge-tray"
+    shutil.copy2(tray, bindir / tray.name)
+    autostart = STAGE / "etc/xdg/autostart"
+    autostart.mkdir(parents=True)
+    for folder in (applications, autostart):
+        shutil.copy2(BASE / "packaging/framebridge-tray.desktop", folder)
+    icons = STAGE / "usr/share/icons/hicolor/scalable/apps"
+    icons.mkdir(parents=True)
+    shutil.copy2(BASE / "panel/public/favicon.svg", icons / "framebridge-tray.svg")
     docs = STAGE / "usr/share/doc" / PACKAGE
     docs.mkdir(parents=True)
     for file in sorted((BASE / "docs").glob("*")):
