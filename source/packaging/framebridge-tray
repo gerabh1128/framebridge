@@ -1,0 +1,119 @@
+#!/usr/bin/python3 -I
+"""Graphical-session launcher for the installed FrameBridge commands."""
+import os
+import subprocess
+
+ICON = "framebridge-tray"
+ICON_DIR = "/usr/share/icons/hicolor/scalable/apps"
+WATCHER = "org.kde.StatusNotifierWatcher"
+FB = "/usr/bin/fb"
+
+
+def terminal(command):
+    # Keep short status results visible in the terminal opened by the user.
+    return ["/usr/bin/gnome-terminal", "--", "/bin/bash", "-c",
+            '"$@"; printf "\\n"; read -r -p "Enter para cerrar..." _',
+            "framebridge-tray", FB, command]
+
+
+def main():
+    if os.getuid() == 0 or not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        return 0
+
+    import gi
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gio, Gtk
+
+    ready, _ = Gtk.init_check([])
+    if not ready:
+        return 0
+
+    try:
+        gi.require_version("AyatanaAppIndicator3", "0.1")
+        from gi.repository import AyatanaAppIndicator3 as indicators
+    except (ImportError, ValueError):
+        indicators = None
+
+    class Tray(Gtk.Application):
+        def __init__(self):
+            super().__init__(application_id="org.framebridge.Tray")
+            self.menu = None
+            self.legacy = None
+            self.indicator = None
+            self.watch = 0
+
+        def do_activate(self):
+            if self.menu is not None:
+                return
+            self.hold()
+            self.menu = Gtk.Menu()
+            for label, command in (
+                ("Estado de FrameBridge", terminal("status")),
+                ("Abrir FBConsole", [FB, "console", "--mode", "gui"]),
+                ("FBSetup", terminal("setup")),
+            ):
+                item = Gtk.MenuItem(label=label)
+                item.connect("activate", self.launch, command)
+                self.menu.append(item)
+            self.menu.append(Gtk.SeparatorMenuItem())
+            item = Gtk.MenuItem(label="Salir de la bandeja")
+            item.connect("activate", lambda _item: self.quit())
+            self.menu.append(item)
+            self.menu.show_all()
+            self.watch = Gio.bus_watch_name(
+                Gio.BusType.SESSION, WATCHER, Gio.BusNameWatcherFlags.NONE,
+                self.watcher_appeared, self.watcher_vanished)
+
+        def watcher_appeared(self, *_args):
+            if indicators is None:
+                self.watcher_vanished()
+                return
+            if self.indicator is None:
+                self.indicator = indicators.Indicator.new(
+                    ICON, ICON, indicators.IndicatorCategory.APPLICATION_STATUS)
+                self.indicator.set_icon_theme_path(ICON_DIR)
+                self.indicator.set_title("FrameBridge")
+                self.indicator.set_menu(self.menu)
+            if self.legacy is not None:
+                self.legacy.set_visible(False)
+            self.indicator.set_status(indicators.IndicatorStatus.ACTIVE)
+
+        def watcher_vanished(self, *_args):
+            if self.indicator is not None:
+                self.indicator.set_status(indicators.IndicatorStatus.PASSIVE)
+            if self.legacy is None:
+                self.legacy = Gtk.StatusIcon.new_from_file(f"{ICON_DIR}/{ICON}.svg")
+                self.legacy.set_title("FrameBridge")
+                self.legacy.set_tooltip_text("FrameBridge")
+                self.legacy.connect("popup-menu", self.popup)
+                self.legacy.connect("activate", self.popup)
+            self.legacy.set_visible(True)
+
+        def popup(self, icon, button=0, timestamp=0):
+            self.menu.popup(None, None, Gtk.StatusIcon.position_menu, icon,
+                            button, timestamp or Gtk.get_current_event_time())
+
+        def launch(self, _item, command):
+            try:
+                subprocess.Popen(command, stdin=subprocess.DEVNULL, start_new_session=True)
+            except OSError:
+                dialog = Gtk.MessageDialog(
+                    message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.CLOSE,
+                    text="No se pudo abrir FrameBridge.")
+                dialog.connect("response", lambda widget, _response: widget.destroy())
+                dialog.show()
+
+        def do_shutdown(self):
+            if self.watch:
+                Gio.bus_unwatch_name(self.watch)
+            if self.legacy is not None:
+                self.legacy.set_visible(False)
+            if self.indicator is not None:
+                self.indicator.set_status(indicators.IndicatorStatus.PASSIVE)
+            Gtk.Application.do_shutdown(self)
+
+    return Tray().run([])
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
