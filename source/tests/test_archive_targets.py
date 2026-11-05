@@ -73,7 +73,8 @@ class CandidateArchiveTests(unittest.TestCase):
     def test_public_archive_describes_three_profiles_without_claiming_publication(self):
         vendor = self.root / "cp312"; vendor.mkdir()
         (vendor / "module.py").write_text("# reviewed cp312 input\n")
-        output, warning = self.run_archive(["--public-release", "--vendor-cp312", str(vendor)])
+        with mock.patch.object(archive_sources, "CANDIDATE_VERSION", "0.4.0"):
+            output, warning = self.run_archive(["--public-release", "--vendor-cp312", str(vendor)])
         self.assertFalse(warning)
         manifest = json.loads((output.parent / "SOURCE-ARCHIVE-MANIFEST.json").read_text())
         self.assertEqual(manifest["status"], "RELEASE_SOURCE_ASSEMBLED")

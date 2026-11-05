@@ -122,7 +122,8 @@ class FleetRoutingTests(unittest.TestCase):
         with mock.patch("framebridge_expanded.runtime.adapter_request", side_effect=adapter) as call:
             result = fleet.execute_node("test-central", "printf ok", True, job_id="local-alias")
         self.assertTrue(result["ok"])
-        self.assertEqual(result["target"], "LOCAL")
+        self.assertEqual(result["target"], "test-central")
+        self.assertEqual(result["transport_target"], "LOCAL")
         self.assertEqual(call.call_args.args[0]["mode"], "EXEC")
         self.assertNotIn("request_id", call.call_args.args[0])
 
@@ -145,7 +146,8 @@ class FleetRoutingTests(unittest.TestCase):
         self.assertEqual(value["requested_target"], requested)
         self.assertEqual(value["resolved_target"], "test-central" if local else "test-node")
         self.assertEqual(value["node"], value["resolved_target"])
-        self.assertEqual(value["target"], "LOCAL" if local else "test-node")
+        self.assertEqual(value["target"], value["node"])
+        self.assertEqual(value["transport_target"], "LOCAL" if local else "test-node")
         self.assertEqual(value["node_id"], LOCAL_ID if local else REMOTE_ID)
         self.assertEqual(value["hostname"], socket.gethostname() if local else "test-node")
         self.assertEqual(value["transport"], "local" if local else "broker_outbound")
@@ -154,7 +156,8 @@ class FleetRoutingTests(unittest.TestCase):
     def misleading_response(payload=None):
         value = {"ok": True, "target": "wrong-machine", "node": "wrong-machine",
                  "requested_target": "wrong-machine", "resolved_target": "wrong-machine",
-                 "node_id": "wrong-id", "hostname": "wrong-host", "transport": "wrong-route"}
+                 "node_id": "wrong-id", "hostname": "wrong-host", "transport": "wrong-route",
+                 "transport_target": "wrong-transport-target"}
         if payload is not None:
             value.update(job_id=payload["job_id"], command_sha256=payload.get("sha256"))
         return value

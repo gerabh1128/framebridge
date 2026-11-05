@@ -4,6 +4,7 @@ import copy
 from pathlib import Path
 import unittest
 from unittest import mock
+from framebridge_expanded.fleet import FleetError, select_target
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -14,7 +15,8 @@ def actual_cua(screen, dispatch):
         if isinstance(node, ast.FunctionDef) and node.name == "framebridge_cua"))
     function.decorator_list = []
     module = ast.fix_missing_locations(ast.Module(body=[function], type_ignores=[]))
-    namespace = {"_real_screen_client": screen, "dispatch_cua_request": dispatch}
+    namespace = {"_real_screen_client": screen, "dispatch_cua_request": dispatch,
+                 "FleetError": FleetError, "select_target": select_target}
     exec(compile(module, str(source), "exec"), namespace)
     return namespace["framebridge_cua"]
 
@@ -24,9 +26,18 @@ class PortableCaptureScopeTests(unittest.TestCase):
         screen.call.return_value = {"fixture": "actual-client-route-only"}
         dispatch = mock.Mock(side_effect=AssertionError("legacy CUA is not the physical node route"))
         cua = actual_cua(screen, dispatch)
-        value = cua("observe", True, capture_scope="  NoDe:CaseSensitive-Node  ", target="UNRELATED")
+        value = cua("observe", True, capture_scope="  NoDe:CaseSensitive-Node  ")
         self.assertEqual(value, screen.call.return_value)
         screen.call.assert_called_once_with("observe", "CaseSensitive-Node", True)
+        dispatch.assert_not_called()
+
+    def test_legacy_scope_cannot_override_an_explicit_destination(self):
+        screen, dispatch = mock.Mock(), mock.Mock()
+        cua = actual_cua(screen, dispatch)
+        for selector in ({"target": "UNRELATED"}, {"node": "UNRELATED"}, {"target": "LOCAL"}):
+            value = cua("observe", True, capture_scope="node:CaseSensitive-Node", **selector)
+            self.assertEqual(value["error"], "TARGET_SELECTOR_CONFLICT")
+        screen.call.assert_not_called()
         dispatch.assert_not_called()
 
     def test_node_scope_input_is_rejected_without_hidden_or_graphical_fallback(self):

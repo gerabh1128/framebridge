@@ -58,6 +58,7 @@ class PrivateCandidatePrermTests(unittest.TestCase):
         self.assertNotIn(package_version, text)
         # The real dpkg is used only for its read-only version validator and
         # comparator. Every privileged cleanup command is a recording stub.
+        text = text.replace(build_expanded.INSTALLATION, ":")
         script.write_text(text.replace("/usr/bin/python3", shlex.quote(str(self.python_stub))))
         return script
 

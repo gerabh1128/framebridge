@@ -1,6 +1,6 @@
 # FrameBridge — Debian, Ubuntu and Linux Mint installation and first use
 
-Version: 0.3.6 | Guide schema: 1
+Version: 0.4.0~rc2 | Guide schema: 1
 
 This reference is generated from the shared CLI/MCP guide. Use the matching installed version.
 
@@ -68,9 +68,11 @@ fb help lifecycle
 
 ### Everyday commands
 
-connect establishes or resumes the managed ChatGPT connection. disconnect pauses that connection until an explicit connect, including across recovery and reboot. status reports runtime, connection, intended connection state and boot policy. doctor diagnoses prerequisites/problems. setup edits advanced stopped-profile settings. console opens the text work view. help reads this versioned reference.
+installation status reports the LAN role chosen by the package. panel opens the private central supervision panel. connect establishes or resumes the managed ChatGPT connection. disconnect pauses that connection until an explicit connect, including across recovery and reboot. status reports runtime, connection, intended connection state and boot policy. doctor diagnoses prerequisites/problems. setup edits advanced stopped-profile settings. console opens the text work view. help reads this versioned reference.
 
 ~~~sh
+fb installation status
+fb panel
 fb connect
 fb disconnect
 fb status
@@ -241,7 +243,7 @@ fb nodes status
 
 ### Targets
 
-LOCAL means the actual receiving machine. Use enrolled, confirmed aliases or IDs and inspect the selected target before work. Fleet results include requested_target, resolved_target, node_id, hostname and transport from the confirmed descriptor. The compatibility target field can remain LOCAL; resolved_target names the actual local computer. Unknown targets never fall back to LOCAL. Do not guess SSH identities or use historical lab hostnames as defaults. CLI tty --node can use the authenticated node transport. The interactive console command is local; run it at the destination or use an explicitly configured SSH destination.
+Use target to select one enrolled alias or ID for FBEXEC and CUA. LOCAL means the actual receiver and remains the default in the execution tools when the selector is omitted. Legacy node arguments alias target. Supply only one spelling, or identical values. Conflicting selectors, unknown fields and unknown targets are rejected. For graphical CUA, capture_scope chooses WINDOW or ROOT. Legacy node:ALIAS scope works for observation only and must agree with any explicit target. In receipts, target names the resolved computer and hostname records its system name. The older node field is retained for compatibility. Local dispatch is identified by transport_target=LOCAL. Do not guess SSH identities or use historical lab hostnames as defaults. CLI tty --node can use the authenticated node transport. The interactive console command is local; run it at the destination or use an explicitly configured SSH destination.
 
 ### Transport trust
 

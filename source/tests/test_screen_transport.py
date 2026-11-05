@@ -293,7 +293,8 @@ class TypedFleetRouteTests(unittest.TestCase):
              patch("framebridge_expanded.runtime.adapter_request", side_effect=adapter) as call:
             result = self.execute(payload)
         self.assertTrue(result["ok"])
-        self.assertEqual(result["target"], "LOCAL")
+        self.assertEqual(result["target"], "central")
+        self.assertEqual(result["transport_target"], "LOCAL")
         self.assertEqual(result["node_id"], NODE_ID)
         self.assertEqual(result["mcp_job_id"], payload["job_id"])
         self.assertEqual(result["mcp_script_sha256"], payload["sha256"])

@@ -35,6 +35,8 @@ class ScreenViewResult(BaseModel):
     ok: bool
     node: str
     requested_node: str | None = None
+    target: str | None = None
+    requested_target: str | None = None
     node_id: str | None = None
     hostname: str | None = None
     result: dict[str, Any] | None = None
@@ -161,13 +163,14 @@ def register_screen_presentation(mcp, client):
         return VIEWER_HTML
 
     @mcp.tool(annotations=dict(READ), meta=dict(TOOL_META))
-    def framebridge_screen_show(node: str, capture_id: str, authorized: bool) -> Annotated[CallToolResult, ScreenViewResult]:
+    def framebridge_screen_show(node: str = None, capture_id: str = "", authorized: bool = False,
+                                *, target: str = None) -> Annotated[CallToolResult, ScreenViewResult]:
         """Display or redisplay a saved original screen PNG, without taking a new capture.
 
-        First use framebridge_screen_observe, then pass its node and capture_id here.
+        First use framebridge_screen_observe, then pass its target and capture_id here.
         This returns the same full PNG bytes and SHA-256, and an optional ChatGPT viewer.
         It is a historical read only view; use a fresh observation before controlling a screen.
         """
-        return presentation_result(client.call("read_capture", node, authorized, capture_id=capture_id))
+        return presentation_result(client.call("read_capture", node, authorized, target=target, capture_id=capture_id))
 
     return framebridge_screen_show

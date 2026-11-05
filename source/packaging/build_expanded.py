@@ -19,6 +19,8 @@ from release_metadata import release_source
 BASE = Path(__file__).resolve().parents[1]
 ROOT = BASE.parent
 VERSION = CANDIDATE_VERSION
+ROLE_DEPLOYMENT_FLOOR = "0.4.0~rc1"
+INSTALLATION = "/usr/bin/python3 -I -S /usr/lib/framebridge-expanded/expanded/framebridge_expanded/installation.py"
 PUBLIC_RELEASE = False
 SOURCE_ARCHIVE = None
 # Oldest package retaining the privileged helper lifecycle. Candidate/release
@@ -176,11 +178,15 @@ def maintainer_prerm(version):
         "    if [ -e /etc/framebridge-expanded/screen-access.json ] || [ -L /etc/framebridge-expanded/screen-access.json ]; then\n"
         "      /usr/lib/framebridge-expanded/bin/framebridge-screen-access disable\n"
         "    fi\n"
+        "    " + INSTALLATION + " remove\n"
         "    ;;\n"
         "  upgrade)\n"
         '    /usr/bin/dpkg --validate-version "$2"\n'
         '    if /usr/bin/dpkg --compare-versions "$2" lt ' + shlex.quote(version) + "; then\n"
         "      /usr/bin/python3 -I -S -c " + shlex.quote(helper_cleanup) + "\n"
+        "    fi\n"
+        '    if /usr/bin/dpkg --compare-versions "$2" lt ' + shlex.quote(ROLE_DEPLOYMENT_FLOOR) + "; then\n"
+        "      " + INSTALLATION + " remove\n"
         "    fi\n"
         "    ;;\nesac\n"
     )
@@ -270,6 +276,7 @@ def maintainer_postinst():
             "/usr/bin/python3 -I -S - <<'FRAMEBRIDGE_BYTECODE_CLEANUP'\n"
             + bytecode_cleanup_source()
             + "FRAMEBRIDGE_BYTECODE_CLEANUP\n"
+            + "    " + INSTALLATION + ' configure "${2:-}"\n'
             "/usr/bin/python3 -I -S /usr/lib/framebridge-expanded/expanded/framebridge_expanded/package_upgrade.py schedule\n"
             "    ;;\nesac\n")
 
@@ -277,7 +284,7 @@ def maintainer_postinst():
 def package_relationships(profile):
     """Keep the opt-in virtual window manager out of automatic APT installs."""
     return {
-        "Depends": "python3 (>= " + profile["python_minor"] + "), python3 (<< 3." + str(int(profile["python_minor"].split(".")[1]) + 1) + "), libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core",
+        "Depends": "python3 (>= " + profile["python_minor"] + "), python3 (<< 3." + str(int(profile["python_minor"].split(".")[1]) + 1) + "), libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core, avahi-daemon, avahi-utils",
         "Suggests": "xvfb, openbox",
     }
 
@@ -348,6 +355,8 @@ def main(argv=None):
     (PREFIX / "release-profile.json").write_text(json.dumps(profile, indent=2, sort_keys=True) + "\n")
     for source in ("portable", "expanded", "docs"):
         shutil.copytree(BASE / source, PREFIX / source, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    from panel_payload import build_panel_payload
+    build_panel_payload(BASE / "panel", PREFIX / "panel.zip")
     (PREFIX / "bin").mkdir()
     for name in ("framebridge", "framebridge-original", "framebridge-native-expanded", "framebridge-screen-access", "framebridge-credential-helper"):
         shutil.copy2(BASE / "packaging" / name, PREFIX / "bin" / name)
@@ -415,7 +424,8 @@ def main(argv=None):
         " a shared graphical/text console, and an English Debian tutorial.\n"
         " Optional virtual displays are explicitly identified as virtual.\n"
         " No phone or Owner Device pairing. Services start after connection setup.\n"
-        " Installing the package alone does not activate a connection.\n")
+        " LAN discovery chooses a role on fresh installation. The private panel\n"
+        " is installed only on central computers. Enrollment remains explicit.\n")
     (control / "prerm").write_text(maintainer_prerm(PRIVILEGED_HELPER_FLOOR))
     (control / "prerm").chmod(0o755)
     for hook, contents in (("preinst", maintainer_preinst()), ("postinst", maintainer_postinst())):

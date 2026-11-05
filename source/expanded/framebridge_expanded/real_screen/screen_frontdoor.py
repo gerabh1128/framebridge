@@ -17,6 +17,8 @@ import time
 import uuid
 from typing import Callable
 
+from ..fleet import FleetError, select_target
+
 CHUNK_BYTES = 2100
 MAX_IMAGE_BYTES = 32 * 1024 * 1024
 MAX_STDOUT_BYTES = 4096
@@ -247,14 +249,19 @@ class ScreenClient:
         require(time.monotonic() < deadline, "SCREEN_TRANSFER_TIMEOUT")
         return self.image_factory(data=data, format="png")
 
-    def call(self, op, node, authorized, **kwargs):
-        requested_node = node
+    def call(self, op, node, authorized, *, target=None, **kwargs):
+        requested_node = target if target is not None else (node if node is not None else "")
         action_confirmed = False
         input_reply_received = False
         submitted = {}
         deadline = time.monotonic() + self.transfer_timeout_s
         try:
             require(authorized is True, "AUTHORIZED_TRUE_REQUIRED")
+            try:
+                node = select_target(target, node)
+            except FleetError as exc:
+                raise ScreenError(str(exc)) from None
+            requested_node = node
             require(valid_reference(node, NODE), "SCREEN_NODE_INVALID")
             node = self.resolve_node(node)
             require(valid_reference(node, NODE), "SCREEN_NODE_INVALID")
@@ -284,7 +291,8 @@ class ScreenClient:
                         "SCREEN_CAPTURE_REFERENCE_MISMATCH")
             image = self.image(node, manifest, deadline=deadline)
             require(time.monotonic() < deadline, "SCREEN_TRANSFER_TIMEOUT")
-            metadata = {"ok": True, "node": node, "requested_node": requested_node,
+            metadata = {"ok": True, "target": node, "requested_target": requested_node,
+                        "node": node, "requested_node": requested_node,
                         "node_id": manifest.node_id, "hostname": manifest["node"],
                         "result": dict(manifest, transport_node=node, node_id=manifest.node_id)}
             metadata["result"].pop("path", None)
@@ -313,12 +321,12 @@ class ScreenClient:
 
 def resolve_profile_node(alias):
     """Canonicalize only through the enrolled profile registry, never guessed hostnames."""
-    from ..fleet import resolve_node, FleetError
+    from ..fleet import resolve_node
     try:
         descriptor = resolve_node(alias)
     except FleetError as exc:
         raise ScreenError(str(exc)) from None
-    return "LOCAL" if descriptor["transport"] == "local" else descriptor["alias"]
+    return descriptor["alias"]
 
 
 def register_framebridge_screen_tools(mcp, exec_request, *, image_factory=None,
@@ -334,27 +342,27 @@ def register_framebridge_screen_tools(mcp, exec_request, *, image_factory=None,
                           transfer_timeout_s=transfer_timeout_s)
 
     @mcp.tool(annotations=dict(READ))
-    def framebridge_screen_observe(node: str, authorized: bool,
-                                   session_id: str = ""):
-        """Capture the node's entire active screen as real pixels, without rendering text.
+    def framebridge_screen_observe(node: str = None, authorized: bool = False,
+                                   session_id: str = "", *, target: str = None):
+        """Capture target's entire active screen as real pixels.
 
         To display or redisplay this original in ChatGPT, call framebridge_screen_show
-        with the returned node and capture_id. Do not take another capture to show it.
+        with the returned target and capture_id. Do not take another capture to show it.
         """
-        return client.call("observe", node, authorized, session_id=session_id)
+        return client.call("observe", node, authorized, target=target, session_id=session_id)
 
     @mcp.tool(annotations=dict(CHANGE))
-    def framebridge_screen_key(node: str, capture_id: str, key: str,
-                               authorized: bool, session_id: str = ""):
-        """Send a key only to the visible target bound to a previous real capture."""
-        return client.call("key", node, authorized, capture_id=capture_id,
+    def framebridge_screen_key(node: str = None, capture_id: str = "", key: str = "",
+                               authorized: bool = False, session_id: str = "", *, target: str = None):
+        """Send a key to target's visible TTY bound to a real capture. Use graphical CUA for X11."""
+        return client.call("key", node, authorized, target=target, capture_id=capture_id,
                            key=key, session_id=session_id)
 
     @mcp.tool(annotations=dict(CHANGE))
-    def framebridge_screen_text(node: str, capture_id: str, text: str,
-                                authorized: bool, session_id: str = ""):
-        """Type into the visible target bound to a previous real capture, then capture again."""
-        return client.call("text", node, authorized, capture_id=capture_id,
+    def framebridge_screen_text(node: str = None, capture_id: str = "", text: str = "",
+                                authorized: bool = False, session_id: str = "", *, target: str = None):
+        """Type into target's visible TTY bound to a real capture. Use graphical CUA for X11."""
+        return client.call("text", node, authorized, target=target, capture_id=capture_id,
                            text=text, session_id=session_id)
 
     return client

@@ -12,6 +12,8 @@ Give the assistant the computer you want to work on, the intended task, and the 
 
 Name both the computer receiving the assistant's tool call and the intended execution target. `LOCAL` means the current FrameBridge receiver, not a fixed computer called ASUS or the computer displaying the chat. Discover enrolled nodes and use their confirmed aliases or IDs. A legacy connector can have a different default target; changing endpoints does not preserve that default automatically.
 
+Select the computer with `target` in FBEXEC and CUA. The older `node` selector is an alias on the execution and screen tools that accept it. Pass one destination. For graphical input, observe with `framebridge_cua` and `capture_scope="WINDOW"`, then use the same target and the observed window ID and dimensions. The bound screen key and text tools require a visible TTY. A receipt's `hostname` records the system name.
+
 Do not put passwords, tunnel IDs, server access keys or browser codes in the prompt. The owner will enter them in the local hidden prompts. An MCP server access key is not an OpenAI API key.
 
 ## Copy this into your assistant

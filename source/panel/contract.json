@@ -1,0 +1,1 @@
+{"hosts":[],"components":["system","gpu","models","services","mcp","fleet","fbexec","installed","apt","github","private","smtp","storage","dns","tls","rdp"],"actions":["update","reboot","config"],"confidences":["confirmed","assumed","pending"],"incidentStates":["open","reviewing","closed"],"incidentCategories":["smtp","gpu","storage","dns","tls","rdp"]}
