@@ -19,7 +19,8 @@ from release_metadata import release_source
 BASE = Path(__file__).resolve().parents[1]
 ROOT = BASE.parent
 VERSION = CANDIDATE_VERSION
-ROLE_DEPLOYMENT_FLOOR = "0.4.0~rc1"
+ROLE_DEPLOYMENT_FLOOR = "0.3.7"
+RC_LINEAGE_FOR_037 = ("0.4.0~rc1", "0.4.0~rc2", "0.4.0~rc3")
 INSTALLATION = "/usr/bin/python3 -I -S /usr/lib/framebridge-expanded/expanded/framebridge_expanded/installation.py"
 PUBLIC_RELEASE = False
 SOURCE_ARCHIVE = None
@@ -194,15 +195,18 @@ def maintainer_prerm(version):
 
 
 def maintainer_preinst(version=None):
-    """Snapshot running profiles for upgrades and same-version reinstalls."""
+    """Snapshot upgrades, reinstalls and the 0.4 RC lineage transition."""
     version = version or VERSION
     if not re.fullmatch(r"[0-9][0-9A-Za-z.+:~\\-]*", version):
         raise ValueError("Invalid package upgrade version")
+    eligible = '/usr/bin/dpkg --compare-versions "$2" le ' + shlex.quote(version)
+    if version == "0.3.7":
+        eligible += "".join(f' || [ "$2" = {shlex.quote(previous)} ]' for previous in RC_LINEAGE_FOR_037)
     module = (BASE / "expanded/framebridge_expanded/package_upgrade.py").read_text()
     module = module.rsplit("if __name__ == '__main__':", 1)[0]
     return ("#!/bin/sh\nset -eu\ncase \"$1\" in\n  upgrade)\n"
             '/usr/bin/dpkg --validate-version "$2"\n'
-            'if /usr/bin/dpkg --compare-versions "$2" le ' + shlex.quote(version) + "; then\n"
+            "if " + eligible + "; then\n"
             "/usr/bin/python3 -I -S - <<'FRAMEBRIDGE_UPGRADE_SNAPSHOT'\n"
             + module + "\nraise SystemExit(main(['snapshot']))\n"
             + "FRAMEBRIDGE_UPGRADE_SNAPSHOT\nfi\n    ;;\nesac\n")
@@ -355,8 +359,6 @@ def main(argv=None):
     (PREFIX / "release-profile.json").write_text(json.dumps(profile, indent=2, sort_keys=True) + "\n")
     for source in ("portable", "expanded", "docs"):
         shutil.copytree(BASE / source, PREFIX / source, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    from panel_payload import build_panel_payload
-    build_panel_payload(BASE / "panel", PREFIX / "panel.zip")
     (PREFIX / "bin").mkdir()
     for name in ("framebridge", "framebridge-original", "framebridge-native-expanded", "framebridge-screen-access", "framebridge-credential-helper"):
         shutil.copy2(BASE / "packaging" / name, PREFIX / "bin" / name)
@@ -391,7 +393,7 @@ def main(argv=None):
         shutil.copy2(BASE / "packaging/framebridge-tray.desktop", folder)
     icons = STAGE / "usr/share/icons/hicolor/scalable/apps"
     icons.mkdir(parents=True)
-    shutil.copy2(BASE / "panel/public/favicon.svg", icons / "framebridge-tray.svg")
+    shutil.copy2(BASE / "packaging/framebridge-tray.svg", icons / "framebridge-tray.svg")
     docs = STAGE / "usr/share/doc" / PACKAGE
     docs.mkdir(parents=True)
     for file in sorted((BASE / "docs").glob("*")):
@@ -433,8 +435,8 @@ def main(argv=None):
         " a shared graphical/text console, and an English Debian tutorial.\n"
         " Optional virtual displays are explicitly identified as virtual.\n"
         " No phone or Owner Device pairing. Services start after connection setup.\n"
-        " LAN discovery chooses a role on fresh installation. The private panel\n"
-        " is installed only on central computers. Enrollment remains explicit.\n")
+        " LAN discovery chooses a role on fresh installation.\n"
+        " Enrollment remains explicit. Includes a graphical notification-area launcher.\n")
     (control / "prerm").write_text(maintainer_prerm(PRIVILEGED_HELPER_FLOOR))
     (control / "prerm").chmod(0o755)
     for hook, contents in (("preinst", maintainer_preinst()), ("postinst", maintainer_postinst())):

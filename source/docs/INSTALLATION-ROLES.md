@@ -1,4 +1,4 @@
-# FrameBridge Original Expanded 0.4 · roles and private panel
+# FrameBridge Original Expanded 0.3.7 · installation roles
 
 APT installs one package name, `framebridge-original-expanded`. Use the build
 that matches the operating system and Python ABI. The central and nodes on
@@ -10,15 +10,15 @@ During dpkg configuration the package selects one IPv4 LAN interface. It
 uses Avahi DNS-SD on the local link to look for a central. A resolved central
 selects the node role. When the browse completes without a central, a new
 central must observe its own provisional announcement and the final
-announcement before installation extracts the panel. A competing claim,
+announcement before saving the central role. A competing claim,
 ambiguous interface, or failed discovery leaves the role pending. Browse
 results describe what was observed on that link. Network partitions and
 multicast filtering can hide a central.
 
 `fb installation status` reads the saved decision. After checking the LAN,
 an administrator can retry a pending installation with
-`sudo fb installation detect`. This can announce a new central and install
-the panel. It does not authenticate or enroll any device.
+`sudo fb installation detect`. This can announce a new central. Authenticate
+and enroll devices through the explicit enrollment procedure.
 
 A central from an earlier version might not announce DNS-SD. Upgrade that
 central first, or have the LAN administrator provision a root-owned regular
@@ -37,37 +37,19 @@ before enrolling nodes. ChatGPT account authorization remains separate.
 
 ## Updates and rollback
 
-APT keeps saved profiles, TLS material, credentials, and startup policy.
-The existing package upgrade hook captures previously running profiles.
-When upgrading from 0.3.6, a captured central gets the panel and an
-announcement using its broker port. A captured node keeps node mode.
-An inactive or mixed legacy installation is preserved without automatic
-promotion. For that case, run the intended legacy profile before an
-authorized reinstall so the package can capture it.
+Package transitions retain saved profiles, TLS material, credentials, and
+startup policy. The package snapshots previously running profiles. On an
+upgrade from 0.3.6, a captured central announces its broker port and a
+captured node keeps node mode. An inactive or mixed legacy installation keeps
+its existing profiles. To capture an inactive profile, run the intended
+profile before an authorized reinstall.
 
-The central announcement can continue while the runtime is offline. The
-panel assets are local and its private journal remains in the profile.
-Downgrading to 0.3.6 removes the 0.4 advertisement and current generated
-panel assets. Preserve the original signed package, a consistent backup of
-the existing profile and journal, and the central access route before a
-production update. Use the verified 0.3.6 Deployment Kit for rollback.
-
-## Supervision panel
-
-Run `fb panel` in the central profile's local terminal. It listens on
-`127.0.0.1:29189` and uses the temporary passphrase entered in that terminal.
-Close the browser session and press Ctrl+C when done. The packaged panel
-provides no public route. A separate authenticated local-DNS access path
-requires an explicit infrastructure change.
-
-Inventory comes from the local authenticated broker when available. To
-include infrastructure outside the Linux Fleet, the profile owner can add
-a private mode-0600 `panel-inventory.json` containing a JSON list of names.
-Those entries appear as unverified until the owner records evidence. The
-panel stores incidents, checks, and approvals recorded by the owner in
-`panel-bitacora.sqlite3` inside the central profile. It can only read the
-local Fleet inventory and write its own journal. The standalone dashboard
-journal and historical evidence must be migrated separately from a backup.
+Debian orders 0.3.7 below 0.4.0~rc1 through 0.4.0~rc3. Moving from those release
+candidates to 0.3.7 is an explicit package downgrade. The 0.3.7 hook snapshots
+those profiles as a compatible transition. Back up the active profile and
+retain the matching previous DEB before installing. A rollback to 0.3.6
+withdraws the central announcement. The earlier supervision journal is user
+data in its existing profile.
 
 ## Routing response
 

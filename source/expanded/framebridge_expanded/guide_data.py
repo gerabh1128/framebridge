@@ -36,7 +36,6 @@ GUIDE = {'start': {'title': 'Start with FrameBridge',
  'commands': {'title': 'Command reference',
               'sections': [{'heading': 'Everyday commands',
                             'body': 'installation status reports the LAN role chosen by the package. '
-                                    'panel opens the private central supervision panel. '
                                     'connect establishes or resumes the managed ChatGPT '
                                     'connection. disconnect pauses that connection until an '
                                     'explicit connect, including across recovery and reboot. '
@@ -45,7 +44,6 @@ GUIDE = {'start': {'title': 'Start with FrameBridge',
                                     'setup edits advanced stopped-profile settings. console opens '
                                     'the text work view. help reads this versioned reference.',
                             'commands': ['fb installation status',
-                                         'fb panel',
                                          'fb connect',
                                          'fb disconnect',
                                          'fb status',

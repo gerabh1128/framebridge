@@ -1,5 +1,18 @@
 # FrameBridge release notes
 
+## 0.3.7
+
+The Linux package carries forward the 0.4.0~rc3 tray, automatic LAN role
+selection, target routing, CUA and FBEXEC. The tray opens FrameBridge status,
+FBConsole and FBSetup. The central and nodes use the same package per Linux
+profile. This package excludes the administrative Site, its launcher and
+its web assets.
+
+Debian treats a move from a 0.4.0 release candidate to 0.3.7 as a downgrade.
+The package snapshots active profiles from the three compatible candidates
+for that transition. See the installation role guide for deployment and
+rollback.
+
 ## 0.4.0~rc3
 
 The Linux notification area can open FrameBridge status, FBConsole and FBSetup. The tray starts at graphical sign-in. It uses a StatusNotifier host when available and the GTK notification area on compatible X11 desktops. Closing the tray leaves FrameBridge services running.

@@ -585,7 +585,6 @@ def build_parser():
     installation_actions = installation.add_subparsers(dest="installation_action", required=True)
     installation_actions.add_parser("status", help="Read the installed LAN role and discovery evidence.")
     installation_actions.add_parser("detect", help="Retry a pending initial role decision as root.")
-    sub.add_parser("panel", help="Open the central profile's private local supervision panel.")
     profile = sub.add_parser("profile", help="Select or inspect this Linux account's default profile reference.")
     profile_actions = profile.add_subparsers(dest="profile_action", required=True)
     profile_actions.add_parser("select", help="Select a configured profile without copying its credentials.")
@@ -767,11 +766,6 @@ def _dispatch(parser, args):
             result = installation.status() if args.installation_action == "status" else installation.configure()
             _show(result)
             return 0
-        if args.command == "panel":
-            if args.json or args.non_interactive or not sys.stdin.isatty():
-                return _interaction_required("fb panel")
-            from .panel import serve
-            return serve(state)
         if args.command == "setup":
             if args.json or args.non_interactive or not sys.stdin.isatty():
                 return _interaction_required("fb setup")

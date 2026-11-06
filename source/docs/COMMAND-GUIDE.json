@@ -1,12 +1,12 @@
 {
   "product": "FrameBridge",
-  "version": "0.4.0~rc2",
+  "version": "0.3.7",
   "guide_schema": 1,
   "topics": {
     "start": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.4.0~rc2",
+      "version": "0.3.7",
       "guide_schema": 1,
       "topic": "start",
       "title": "Start with FrameBridge",
@@ -63,22 +63,21 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "63426ff450babfa43377fc67ca8a9d0054af6e79455425e200eed799c795687f"
+      "guide_sha256": "01fec3c9854708e783c87a591d9ed2933fae30523f76367517045cd83cbc3752"
     },
     "commands": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.4.0~rc2",
+      "version": "0.3.7",
       "guide_schema": 1,
       "topic": "commands",
       "title": "Command reference",
       "sections": [
         {
           "heading": "Everyday commands",
-          "body": "installation status reports the LAN role chosen by the package. panel opens the private central supervision panel. connect establishes or resumes the managed ChatGPT connection. disconnect pauses that connection until an explicit connect, including across recovery and reboot. status reports runtime, connection, intended connection state and boot policy. doctor diagnoses prerequisites/problems. setup edits advanced stopped-profile settings. console opens the text work view. help reads this versioned reference.",
+          "body": "installation status reports the LAN role chosen by the package. connect establishes or resumes the managed ChatGPT connection. disconnect pauses that connection until an explicit connect, including across recovery and reboot. status reports runtime, connection, intended connection state and boot policy. doctor diagnoses prerequisites/problems. setup edits advanced stopped-profile settings. console opens the text work view. help reads this versioned reference.",
           "commands": [
             "fb installation status",
-            "fb panel",
             "fb connect",
             "fb disconnect",
             "fb status",
@@ -147,12 +146,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "a91ad7f83db045b322a8f452589436de652a44583586f264c04ad62ec49ea452"
+      "guide_sha256": "5bd9cd8c173ecfb02cf6e5fdb47234ac1e74cf9dce4c1374b32b9d0620d4e0fc"
     },
     "connection": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.4.0~rc2",
+      "version": "0.3.7",
       "guide_schema": 1,
       "topic": "connection",
       "title": "Connect and disconnect ChatGPT",
@@ -201,12 +200,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "7477b2a553719b04545e64acd5249c6444b01f59087fa9b5cbfdf00f7ad10a0a"
+      "guide_sha256": "83d0de3084bd2968c8904bdcd9f8f3a41aa17d17d37d06427e4a210f82e8e868"
     },
     "lifecycle": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.4.0~rc2",
+      "version": "0.3.7",
       "guide_schema": 1,
       "topic": "lifecycle",
       "title": "Services, connection intent and boot policy",
@@ -267,12 +266,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "06e4ceb16a88c3180d437a78d0252a23f11a71f63bf835901be5ac49f9249982"
+      "guide_sha256": "8d4193301a71ff0156b0ed6aa77c7e693d750d7b6db3ed03d56be5a6ffcf4a99"
     },
     "nodes": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.4.0~rc2",
+      "version": "0.3.7",
       "guide_schema": 1,
       "topic": "nodes",
       "title": "Central and node operation",
@@ -321,12 +320,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "125a4b9e18dc5c7b2976ae22376f02d4bf7558b9044d6bae4523a57778271285"
+      "guide_sha256": "2ca370e0684d0f752db46192c447dd68a600279edbb969f7d282b9da0db418ea"
     },
     "terminals": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.4.0~rc2",
+      "version": "0.3.7",
       "guide_schema": 1,
       "topic": "terminals",
       "title": "Persistent Bash terminals",
@@ -395,12 +394,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "373bbdf974e3b59432e359e4314e1b0fba88b544af8a36be023a917f3356eee6"
+      "guide_sha256": "1889c69f72fe581b83136a57b6e31df649c69186043f8a0d5dc6d0aad3698c33"
     },
     "screens": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.4.0~rc2",
+      "version": "0.3.7",
       "guide_schema": 1,
       "topic": "screens",
       "title": "Authentic screen observation and input",
@@ -450,12 +449,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "22d171c2b294c02a98cd13b95de9c459a649b6f9f75113de8837ea5c73fcfa9c"
+      "guide_sha256": "14c4763e8bb2f59aaa203156d7f12c51085cb48876ffa5961620fdeb1addebfc"
     },
     "diagnostics": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.4.0~rc2",
+      "version": "0.3.7",
       "guide_schema": 1,
       "topic": "diagnostics",
       "title": "Status and diagnosis",
@@ -508,12 +507,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "480b0ff302754c9832c5533e87263d28c8665706b245ffa4566f4b25f033abce"
+      "guide_sha256": "b6b9679fad96b0af6cac966dddb8ce6e26aea891c9bfb5b582e6640dafbd5bf5"
     },
     "security": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.4.0~rc2",
+      "version": "0.3.7",
       "guide_schema": 1,
       "topic": "security",
       "title": "Authorization, distribution and safe operation",
@@ -548,12 +547,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "025974b6eda62b3e5557d1e761e0758e517fd6773554bba20f5b2b655c265e46"
+      "guide_sha256": "271fc0c21f64216d4c26e5be0e1502a57ab5cb85d13e19c743d7756803e140a0"
     },
     "compatibility": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.4.0~rc2",
+      "version": "0.3.7",
       "guide_schema": 1,
       "topic": "compatibility",
       "title": "Compatibility with earlier commands",
@@ -596,8 +595,8 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "7bfb2246220b6ad56107b4083219f44aca3871fa5ace939da1b19549d67709b8"
+      "guide_sha256": "a4b65ac6fbcf43b25d30a6a3f526289b2831a251d5a3869e12243b387337396c"
     }
   },
-  "guide_sha256": "109f18360621111a07ed0f742ab9dec699b94c5dfb60d10ba4171de417f45513"
+  "guide_sha256": "ef1c324732781464ff253df04775ab9057b9943b79f2000bcd1c6ffaa796c82b"
 }
