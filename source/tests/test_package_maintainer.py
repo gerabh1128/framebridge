@@ -119,6 +119,19 @@ class MaintainerScriptTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(calls, [])
 
+    def test_037_snapshots_the_compatible_rc_lineage(self):
+        for previous in ("0.4.0~rc1", "0.4.0~rc2", "0.4.0~rc3"):
+            with self.subTest(previous=previous):
+                self.trace.unlink(missing_ok=True)
+                result, calls = self.run_preinst(["upgrade", previous], version="0.3.7")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(calls, [["-I", "-S", "-"]])
+
+    def test_037_leaves_unrelated_downgrades_out_of_snapshot(self):
+        result, calls = self.run_preinst(["upgrade", "0.4.0~rc4"], version="0.3.7")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls, [])
+
     def test_failed_reinstall_snapshot_blocks_package_replacement(self):
         result, calls = self.run_preinst(["upgrade", "0.3.4~dev.20261029.4"], fail=17)
         self.assertEqual(result.returncode, 17)

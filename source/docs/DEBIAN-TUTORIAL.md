@@ -1,6 +1,6 @@
 # FrameBridge — Debian, Ubuntu and Linux Mint installation and first use
 
-Version: 0.4.0~rc2 | Guide schema: 1
+Version: 0.3.7 | Guide schema: 1
 
 This reference is generated from the shared CLI/MCP guide. Use the matching installed version.
 
@@ -68,11 +68,10 @@ fb help lifecycle
 
 ### Everyday commands
 
-installation status reports the LAN role chosen by the package. panel opens the private central supervision panel. connect establishes or resumes the managed ChatGPT connection. disconnect pauses that connection until an explicit connect, including across recovery and reboot. status reports runtime, connection, intended connection state and boot policy. doctor diagnoses prerequisites/problems. setup edits advanced stopped-profile settings. console opens the text work view. help reads this versioned reference.
+installation status reports the LAN role chosen by the package. connect establishes or resumes the managed ChatGPT connection. disconnect pauses that connection until an explicit connect, including across recovery and reboot. status reports runtime, connection, intended connection state and boot policy. doctor diagnoses prerequisites/problems. setup edits advanced stopped-profile settings. console opens the text work view. help reads this versioned reference.
 
 ~~~sh
 fb installation status
-fb panel
 fb connect
 fb disconnect
 fb status

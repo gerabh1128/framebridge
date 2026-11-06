@@ -19,7 +19,7 @@ ROOT = BASE.parent
 EPOCH = calendar.timegm((2026, 10, 27, 0, 0, 0))
 ARCHIVE_ROOT = "FrameBridge-" + CANDIDATE_VERSION
 ARCHIVE_NAME = ARCHIVE_ROOT + "-source.tar.gz"
-SOURCE_FOLDERS = ("sources", "expanded", "portable", "packaging", "docs", "tests", "panel")
+SOURCE_FOLDERS = ("sources", "expanded", "portable", "packaging", "docs", "tests")
 ROOT_FILES = ("README.md", "LICENSE", "LICENSING.md", "COPYRIGHT.md",
               "LICENSE-STATUS.md", "OFFICIAL-RELEASES.md", "CONTRIBUTING.md", "SECURITY.md", "RELEASE-NOTES.md")
 ROOT_FOLDERS = ("docs", "provenance", "licensing")

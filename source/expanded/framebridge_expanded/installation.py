@@ -9,29 +9,21 @@ import os
 from pathlib import Path
 import re
 import shlex
-import shutil
 import stat
 import subprocess
 import sys
 import tempfile
 import time
 import uuid
-from zipfile import ZipFile
 
 DIRECTORY = Path("/var/lib/framebridge-expanded-deployment")
 SERVICE = Path("/etc/avahi/services/framebridge-original-expanded-role.service")
 RESERVATION = Path("/etc/framebridge-expanded/lan-central")
-PREFIX = Path(__file__).resolve().parents[2]
 SERVICE_TYPE = "_framebridge-central._tcp"
 MANAGED = b"<!-- FrameBridge Original Expanded managed role -->"
 LOCAL_NETWORKS = tuple(map(ipaddress.ip_network, ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")))
 DNS_NAME = re.compile(r"(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?")
 IDENTITY = re.compile(r"[a-f0-9]{32}")
-PANEL_FILES = (
-    "server.py", "schema.sql", "contract.json", "THIRD-PARTY-NOTICES.txt",
-    "public/index.html", "public/panel.css", "public/panel.js", "public/favicon.svg",
-    "vendor/waitress-3.0.2-py3-none-any.whl",
-)
 
 
 class DiscoveryPending(ValueError):
@@ -232,38 +224,9 @@ def status():
     result = json.loads(path.read_text(encoding="utf-8"))
     if result.get("schema") != 1 or result.get("role") not in {"central", "node", "pending", "legacy"}:
         raise ValueError("INSTALLATION_RECORD_INVALID")
-    if result["role"] == "central":
-        result["panel_installed"] = (panel_path() / "server.py").is_file()
+    # A role record from the 0.4 candidates can still carry the retired field.
+    result.pop("panel_installed", None)
     return result
-
-
-def panel_path():
-    from . import __version__
-    return DIRECTORY / ("panel-" + __version__)
-
-
-def materialize_panel():
-    target = panel_path()
-    if target.exists() or target.is_symlink():
-        _checked(target, directory=True)
-        if all((target / name).is_file() for name in PANEL_FILES):
-            return
-        raise ValueError("INSTALLED_PANEL_INCOMPLETE")
-    staging = Path(tempfile.mkdtemp(prefix=".panel-", dir=DIRECTORY))
-    try:
-        with ZipFile(PREFIX / "panel.zip") as archive:
-            if sorted(archive.namelist()) != sorted(PANEL_FILES):
-                raise ValueError("PANEL_PAYLOAD_INVALID")
-            for name in PANEL_FILES:
-                dest = staging / name
-                dest.parent.mkdir(exist_ok=True)
-                dest.write_bytes(archive.read(name))
-                dest.chmod(0o644)
-        staging.chmod(0o755)
-        os.replace(staging, target)
-    finally:
-        if staging.exists():
-            shutil.rmtree(staging)
 
 
 def _existing_role():
@@ -314,19 +277,12 @@ def configure(previous_version=""):
                 reason = str(exc) if isinstance(exc, DiscoveryPending) else "LAN_DISCOVERY_CONFIGURATION_UNAVAILABLE"
                 result = _decision("pending", "lan_detection_incomplete", reason=reason)
         if result["role"] == "central":
-            try:
-                materialize_panel()
-            except (OSError, ValueError):
-                if current["role"] not in {"central", "legacy"}:
-                    _withdraw()
-                raise
             # An already authorized central keeps its role through offline upgrades.
             try:
                 _announce(result["identity"], "central", result["broker_port"])
                 result["advertisement"] = "configured"
             except (DiscoveryPending, FileNotFoundError):
                 result["advertisement"] = "daemon_unavailable"
-            result["panel_installed"] = True
         _replace(DIRECTORY / "role.json", (json.dumps(result, sort_keys=True) + "\n").encode())
         return result
 
@@ -334,10 +290,6 @@ def configure(previous_version=""):
 def remove():
     with _installer_lock():
         _withdraw()
-        target = panel_path()
-        if target.exists() or target.is_symlink():
-            _checked(target, directory=True)
-            shutil.rmtree(target)
 
 
 def main():
