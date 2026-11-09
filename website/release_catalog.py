@@ -1,5 +1,8 @@
 """Validated release catalog and download content for the original website."""
 import html
+import copy
+import hashlib
+import json
 import re
 from urllib.parse import urlsplit
 
@@ -18,6 +21,41 @@ POSTER_SHA256 = "2e867d4b6a22f81ecbefa293a88799b9e3c93f02aa7d1090c7f0a0dbfe44dc9
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+def guide_digest(value):
+    raw = json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(",", ":")).encode()
+    return hashlib.sha256(raw).hexdigest()
+
+def publication_guide(raw):
+    """Correct a release-label erratum in a web copy, never in frozen sources."""
+    original = json.loads(raw)
+    if original.get("version") != "0.3.7":
+        return original
+    original_digest = original.get("guide_sha256")
+    require(original_digest == guide_digest({k: v for k, v in original.items() if k != "guide_sha256"}),
+            "Frozen guide export digest mismatch")
+    published = copy.deepcopy(original)
+    topic = published["topics"]["diagnostics"]
+    require(topic.get("guide_sha256") == guide_digest({k: v for k, v in topic.items() if k != "guide_sha256"}),
+            "Frozen diagnostics topic digest mismatch")
+    matches = [section for section in topic["sections"] if section.get("heading") == "Doctor"]
+    require(len(matches) == 1, "Expected one Doctor section for the publication erratum")
+    before = "The published 0.3.3 scope is Debian 13 with cp313 and Ubuntu 24.04/Mint 22.x with cp312."
+    after = "The 0.3.7 release profiles are Debian 13 with cp313 and Ubuntu 24.04/Mint 22.x with cp312."
+    require(matches[0]["body"].count(before) == 1, "Frozen Doctor text changed; review the publication erratum")
+    matches[0]["body"] = matches[0]["body"].replace(before, after, 1)
+    topic["guide_sha256"] = guide_digest({k: v for k, v in topic.items() if k != "guide_sha256"})
+    published["publication"] = {
+        "kind": "web-documentation-erratum",
+        "revision": "0.3.7-web-20261109-r1",
+        "topic": "diagnostics",
+        "section": "Doctor",
+        "frozen_guide_file_sha256": hashlib.sha256(raw).hexdigest(),
+        "frozen_guide_sha256": original_digest,
+        "scope": "Release-profile label only; packaged CLI/MCP guide and release artifacts are unchanged.",
+    }
+    published["guide_sha256"] = guide_digest({k: v for k, v in published.items() if k != "guide_sha256"})
+    return published
 
 def project_url(value, prefix=None):
     require(isinstance(value, str), "Artifact URL must be text")

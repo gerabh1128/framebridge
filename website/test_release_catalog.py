@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """Catalog guards and rendered shell syntax; no signing or installation."""
 import copy
+import hashlib
 import json
 from pathlib import Path
 import runpy
@@ -68,6 +69,48 @@ class CatalogTests(unittest.TestCase):
         meta["profiles"][2]["sha256"] = ""
         with self.assertRaisesRegex(ValueError, "SHA-256"):
             catalog["validate"](meta, True)
+
+class PublicGuideTests(unittest.TestCase):
+    def setUp(self):
+        self.path = BASE.parent / "source/docs/COMMAND-GUIDE.json"
+        self.raw = self.path.read_bytes()
+        self.original = json.loads(self.raw)
+
+    def test_erratum_is_a_distinct_web_copy_without_mutating_frozen_guide(self):
+        published = catalog["publication_guide"](self.raw)
+        doctor = next(s for s in published["topics"]["diagnostics"]["sections"] if s["heading"] == "Doctor")
+        self.assertIn("The 0.3.7 release profiles are", doctor["body"])
+        self.assertNotIn("published 0.3.3", doctor["body"])
+        self.assertEqual(self.path.read_bytes(), self.raw)
+        self.assertEqual(published["publication"]["frozen_guide_file_sha256"], hashlib.sha256(self.raw).hexdigest())
+        self.assertEqual(published["publication"]["frozen_guide_sha256"], self.original["guide_sha256"])
+        self.assertNotEqual(published["guide_sha256"], self.original["guide_sha256"])
+        for name, topic in self.original["topics"].items():
+            if name != "diagnostics":
+                self.assertEqual(published["topics"][name], topic)
+
+    def test_publication_digests_match_the_modified_content(self):
+        published = catalog["publication_guide"](self.raw)
+        for value in (published, published["topics"]["diagnostics"]):
+            self.assertEqual(value["guide_sha256"], catalog["guide_digest"]({k: v for k, v in value.items() if k != "guide_sha256"}))
+
+    def test_invalid_frozen_export_digest_is_rejected(self):
+        self.original["guide_sha256"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "export digest"):
+            catalog["publication_guide"](json.dumps(self.original).encode())
+
+    def test_unexpected_doctor_text_requires_review(self):
+        doctor = next(s for s in self.original["topics"]["diagnostics"]["sections"] if s["heading"] == "Doctor")
+        doctor["body"] = doctor["body"].replace("published 0.3.3", "published 0.3.7")
+        topic = self.original["topics"]["diagnostics"]
+        topic["guide_sha256"] = catalog["guide_digest"]({k: v for k, v in topic.items() if k != "guide_sha256"})
+        self.original["guide_sha256"] = catalog["guide_digest"]({k: v for k, v in self.original.items() if k != "guide_sha256"})
+        with self.assertRaisesRegex(ValueError, "Doctor text changed"):
+            catalog["publication_guide"](json.dumps(self.original).encode())
+
+    def test_other_versions_are_not_relabelled(self):
+        self.original["version"] = "0.3.5"
+        self.assertEqual(catalog["publication_guide"](json.dumps(self.original).encode()), self.original)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

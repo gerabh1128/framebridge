@@ -88,7 +88,7 @@ if not guide_path.exists():
 guides={}
 guide_data={}
 if guide_path.exists():
-    guide_data=json.loads(guide_path.read_text())
+    guide_data=CAT['publication_guide'](guide_path.read_bytes())
     guides=guide_data.get('topics',{})
     assert isinstance(guides,dict) and all(isinstance(v,dict) for v in guides.values())
     assert guide_data.get('version')==META['version'],'Guide and release versions must match.'
@@ -113,7 +113,10 @@ for topic in order:
         article+='<h2>'+E(section.get('heading',''))+'</h2>'+paragraphs(section.get('body',''))
         for command in section.get('commands',[]):
             article+=code(command if isinstance(command,str) else json.dumps(command,indent=2))
-    article+='<p class="aside-note">This page is generated from the same versioned guide used by the CLI and MCP help tool. Use <code>fb help '+E(topic)+'</code> for the local reference.</p></article>'
+    if guide_data.get('publication',{}).get('topic')==topic:
+        article+='<p class="aside-note">This web copy corrects the release-profile label in the frozen 0.3.7 guide. The packaged CLI/MCP guide and signed release artifacts remain unchanged. The <a href="/assets/command-guide.json">published guide data</a> records the source digest and documentation revision. Use <code>fb help '+E(topic)+'</code> for the installed reference.</p></article>'
+    else:
+        article+='<p class="aside-note">This page is generated from the same versioned guide used by the CLI and MCP help tool. Use <code>fb help '+E(topic)+'</code> for the local reference.</p></article>'
     dest=DIST/'docs'/topic;dest.mkdir(parents=True,exist_ok=True)
     (dest/'index.html').write_text(page(guide.get('title',topic),'<main id="content" class="wrap docs-layout">'+docs_nav(topic)+article+'</main>','docs',True))
 hub='<article class="prose"><p class="section-label">FrameBridge '+E(META['version'])+' / Documentation</p><h1>The command guide.</h1><p>One reference for human operators and authorized ChatGPT agents. The commands <code>fb</code> and <code>framebridge</code> use the same interface.</p><p>Start with the normal connection flow. Use advanced setup only when you need to change roles or profile settings.</p>'+code('fb connect\nfb status\nfb help')+'<div class="topic-links">'

@@ -62,7 +62,15 @@ Run:
     python3 -I -S test_release_catalog.py
 
 The generator reads ../source/docs/COMMAND-GUIDE.json and requires its version
-to match the release. QA checks local links/assets, loopback HTTP, the guarded
+to match the release. For 0.3.7, it corrects only the obsolete 0.3.3 release-profile
+label in the published Doctor paragraph. This is an explicitly labelled web
+documentation erratum: the frozen source export, packaged CLI/MCP guide, DEBs
+and corresponding-source archive are not edited or rebuilt. The published JSON
+records the original export file digest, original guide digest and documentation
+revision, and recalculates the modified topic and export digests. Unexpected
+input text or an invalid original digest stops the build for review.
+
+QA checks local links/assets, loopback HTTP, the guarded
 ready renderer with a disposable synthetic inventory, and syntax of all three
 APT setup blocks. The test fixtures never sign, publish or install anything.
 Perform final HTTPS, Gitea clone and isolated APT verification through the
