@@ -4,7 +4,7 @@ This is a setup and verification workflow for an assistant that **already has au
 
 The currently tested connection is the manual ChatGPT workflow. A coding assistant can help prepare it through the CLI; this document does not claim drop-in integration with every AI client.
 
-Latest signed release: **0.3.3**, published for Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. Use the exact profile, signatures and source record from the [official download page](https://framebridge.betancourt.one/download/). A later source checkout can contain unreleased changes; it is not evidence that a new package has been built, signed or published. Historical compatibility-candidate checks remain separate from validation of the actual release artifacts.
+Current release: **0.3.7**, for Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. Use the exact profile, signatures and source record from the [official download page](https://framebridge.betancourt.one/download/). A version label or later source checkout is not evidence that a package has been built, signed, published or accepted on the target computer; verify the actual release artifacts. Historical compatibility-candidate checks remain separate from validation of this release.
 
 ## Before handing over
 
