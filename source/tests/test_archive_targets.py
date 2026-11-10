@@ -34,6 +34,14 @@ class CandidateArchiveTests(unittest.TestCase):
         directory = "public-source" if "--public-release" in args else "candidate-source"
         return self.base / "release" / directory / archive_sources.ARCHIVE_NAME, stderr.getvalue()
 
+    def test_source_selection_includes_required_agent_instructions(self):
+        selected = archive_sources.source_files()
+        self.assertEqual(selected["AGENTS.md"].read_bytes(),
+                         (archive_sources.ROOT / "AGENTS.md").read_bytes())
+        for relative in ("docs/FRAMEBRIDGE-AGENT-START.md", "docs/FRAMEBRIDGE-SCREEN-PROCEDURE.md"):
+            self.assertEqual(selected[relative].read_bytes(),
+                             (archive_sources.ROOT / relative).read_bytes())
+
     def test_default_archive_declares_missing_alternate_abis(self):
         output, warning = self.run_archive([])
         self.assertIn("cp312", warning)

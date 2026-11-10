@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import re
 import sys
 import tarfile
 import tempfile
@@ -12,6 +13,31 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packaging"))
 import build_expanded
 from release_metadata import release_source
+
+
+class InstalledAgentGuideTests(unittest.TestCase):
+    def test_installed_agent_links_resolve_to_reviewed_guide_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            prefix = root / "usr/lib/framebridge-expanded"
+            docs = root / "usr/share/doc/framebridge-original-expanded"
+            build_expanded.install_user_guides(prefix, docs)
+            reviewed = build_expanded.ROOT
+            for installed_root in (prefix, docs):
+                agents = installed_root / "AGENTS.md"
+                self.assertEqual(agents.read_bytes(), (reviewed / "AGENTS.md").read_bytes())
+                links = re.findall(r"\]\(([^)]+)\)", agents.read_text())
+                self.assertTrue(links)
+                for relative in links:
+                    self.assertEqual((agents.parent / relative).read_bytes(),
+                                     (reviewed / relative).read_bytes())
+            for flat in (prefix / "docs", docs):
+                start = flat / "FRAMEBRIDGE-AGENT-START.md"
+                self.assertEqual(start.read_bytes(),
+                                 (reviewed / "docs/FRAMEBRIDGE-AGENT-START.md").read_bytes())
+                self.assertIn("](" + "FRAMEBRIDGE-SCREEN-PROCEDURE.md" + ")", start.read_text())
+                self.assertEqual((start.parent / "FRAMEBRIDGE-SCREEN-PROCEDURE.md").read_bytes(),
+                                 (reviewed / "docs/FRAMEBRIDGE-SCREEN-PROCEDURE.md").read_bytes())
 
 
 class PublicReleaseSourceTests(unittest.TestCase):

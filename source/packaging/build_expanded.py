@@ -101,6 +101,29 @@ def legal_preflight():
                 raise RuntimeError("Local path found in legal input: " + str(path.relative_to(ROOT)))
     return index
 
+def install_user_guides(prefix, docs):
+    """Keep installed entry points and their relative screen-guide links intact."""
+    user_guides = {"README.md": ROOT / "README.md",
+                   "FRAMEBRIDGE-AGENT-START.md": ROOT / "docs/FRAMEBRIDGE-AGENT-START.md",
+                   "FRAMEBRIDGE-SCREEN-PROCEDURE.md": ROOT / "docs/FRAMEBRIDGE-SCREEN-PROCEDURE.md"}
+    agents = ROOT / "AGENTS.md"
+    for source in (*user_guides.values(), agents):
+        if not source.is_file() or source.is_symlink():
+            raise RuntimeError("Required user guide is missing or not a regular file: " + str(source))
+    for name, source in user_guides.items():
+        for destination in (prefix / "docs", docs):
+            destination.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination / name)
+    # AGENTS retains the repository's docs/ links, alongside both installed roots.
+    for destination in (prefix, docs):
+        destination.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(agents, destination / "AGENTS.md")
+    for name in ("FRAMEBRIDGE-AGENT-START.md", "FRAMEBRIDGE-SCREEN-PROCEDURE.md"):
+        destination = docs / "docs"
+        destination.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(user_guides[name], destination / name)
+
+
 def install_legal_material(docs):
     for relative in LEGAL_FILES:
         shutil.copy2(ROOT / relative, docs / relative)
@@ -400,14 +423,7 @@ def main(argv=None):
         if file.is_file():
             shutil.copy2(file, docs / file.name)
     # Ship the same owner/agent entry points as the reviewed source repository.
-    user_guides = {"README.md": ROOT / "README.md",
-                   "FRAMEBRIDGE-AGENT-START.md": ROOT / "docs/FRAMEBRIDGE-AGENT-START.md"}
-    for name, source in user_guides.items():
-        if not source.is_file() or source.is_symlink():
-            raise RuntimeError("Required user guide is missing or not a regular file: " + str(source))
-        for destination in (PREFIX / "docs", docs):
-            destination.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination / name)
+    install_user_guides(PREFIX, docs)
     readme = (BASE / "docs/DEBIAN-TUTORIAL.md").read_bytes()
     (docs / "README.Debian.gz").write_bytes(gzip.compress(readme, mtime=EPOCH))
     install_legal_material(docs)
