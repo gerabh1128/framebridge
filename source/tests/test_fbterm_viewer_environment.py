@@ -195,14 +195,36 @@ class ViewerEnvironment(unittest.TestCase):
 
     def test_ensure_launches_only_readonly_viewer_with_copy_environment(self):
         env=self.term._viewer_environment();before=dict(os.environ)
-        with patch.object(self.term,'has_session',return_value=True),patch.object(self.term,'_viewer_environment',return_value=env),patch.object(self.term,'visible_window',side_effect=[False,True]) as visible,patch.object(self.term,'status',return_value={'visible':True,'session':True}),patch.object(engine.subprocess,'Popen') as popen:
+        with (
+            patch.object(self.term, 'has_session', return_value=True),
+            patch.object(self.term, '_viewer_environment', return_value=env),
+            patch.object(self.term, 'visible_window', side_effect=[False, True]) as visible,
+            patch.object(self.term, 'status', return_value={'visible': True, 'session': True}),
+            patch.object(self.term, '_set_viewer_header') as header,
+            patch.object(engine.subprocess, 'Popen') as popen,
+        ):
             self.assertTrue(self.term.ensure()['visible'])
+        header.assert_called_once_with()
         args,kw=popen.call_args
         self.assertEqual(args[0][0],'gnome-terminal')
         self.assertIn('tmux attach-session -r -t',args[0][-1])
         self.assertIn(self.term.session,args[0][-1]);self.assertIs(kw['env'],env)
         self.assertEqual(visible.call_args_list[0].args,(env,));self.assertEqual(visible.call_args_list[1].args,(env,))
         self.assertEqual(dict(os.environ),before)
+
+    def test_viewer_header_uses_runtime_version_and_window_local_options(self):
+        sys.modules['framebridge_expanded'].__version__ = '0.4.0~rc3'
+        with patch.object(self.term, '_run') as run:
+            self.term._set_viewer_header()
+        args, kwargs = run.call_args
+        target = self.term.session + ':0'
+        command = args[0]
+        self.assertEqual(command[:6], ['tmux', 'set-option', '-w', '-t', target, 'pane-border-format'])
+        self.assertIn('FrameBridge 0.4.0~rc3', command[6])
+        self.assertIn('#{e|>=:#{pane_width},56}', command[6])
+        self.assertIn('GNU GPL v3 only | Copyleft,GPL-3.0-only', command[6])
+        self.assertEqual(command[7:], [';', 'set-option', '-w', '-t', target, 'pane-border-status', 'top'])
+        self.assertEqual(kwargs, {'timeout': 2})
 
     def test_viewer_launch_failure_does_not_destroy_or_fake_session(self):
         env=self.term._viewer_environment()
