@@ -98,6 +98,27 @@ class FBTerm:
             # guessed display, another user's bus, or a fabricated visible state.
             return None
 
+    def _set_viewer_header(self):
+        """Place the release identity in the original viewer's pane border."""
+        try:
+            from framebridge_expanded import __version__
+        except ImportError:
+            return
+        target = self.session + ":0"
+        header = (
+            f" #[bold,fg=colour25]FrameBridge {__version__}#[default] | "
+            "#{?#{e|>=:#{pane_width},56},GNU GPL v3 only | Copyleft,GPL-3.0-only} "
+        )
+        try:
+            self._run(
+                ["tmux", "set-option", "-w", "-t", target, "pane-border-format", header,
+                 ";", "set-option", "-w", "-t", target, "pane-border-status", "top"],
+                timeout=2,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            # The viewer is usable even when tmux cannot set its pane border.
+            pass
+
     def ensure(self, visible=True):
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.jobs.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -206,6 +227,7 @@ class FBTerm:
 
         viewer_env = self._viewer_environment() if visible else None
         if viewer_env is not None and not self.visible_window(viewer_env):
+            self._set_viewer_header()
             try:
                 subprocess.Popen(
                     [
