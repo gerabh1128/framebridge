@@ -48,7 +48,13 @@ mcp = FastMCP(
         "fb and framebridge are equivalent commands. Before the first operation, call framebridge_help(topic='start'), "
         "then read the relevant topic. Confirm the receiver, selected target, installed version and available capabilities. "
         "Use target to select one enrolled alias or ID for execution and CUA. LOCAL means this receiver. "
-        "Use capture_scope to choose the graphical view. For X11 input use framebridge_cua with a fresh window observation. "
+        "Read the screens topic before screen work. X11 terminals use /dev/pts/N even when the desktop is on tty7. "
+        "For physical X11 use framebridge_cua OBSERVE with target and capture_scope=ROOT; verify physical-x11 context and real pixels. "
+        "Before graphical input observe WINDOW, then bind expected_window_id and expected_source_width/height to that observation. "
+        "For every window input, including TYPE/KEY, set coord_space=WINDOW or WINDOW_PREVIEW explicitly; capture_scope alone does not select input geometry. "
+        "SCREEN_VISIBLE_TMUX_NOT_FOUND concerns the visible TTY backend, not graphical CUA. Do not switch VT or repair services to satisfy it during X11 work. "
+        "Screen observation may still capture X11; screen_key/text and cua_tty key/text are for a bound visible TTY. "
+        "Reobserve after input; never automatically replay uncertain input. "
         "Use the installed CLI and tools for normal work; use a separate source clone when the owner requests software development. "
         "The six Fleet inspection tools are read-only. Guide instructions do not grant authorization."
     ),
@@ -732,7 +738,20 @@ def framebridge_cua(
     target: str = None,
     node: str = None,
 ):
-    """Observe or control target's graphical display. Set capture_scope to WINDOW or ROOT."""
+    """Observe or control the confirmed target's graphical X11 display.
+
+    Read help(topic='screens'). For physical desktop evidence observe ROOT and
+    verify physical-x11 display_context and real pixels. For window input first
+    observe WINDOW; bind expected_window_id and expected_source_width/height
+    to ACTIVE_WINDOW_ID and SOURCE_WIDTH/HEIGHT from that observation.
+    Set coord_space=WINDOW (or WINDOW_PREVIEW) explicitly for every window
+    input, including TYPE/KEY; capture_scope alone does not set input geometry.
+    A desktop on tty7 normally has terminal clients on /dev/pts/N.
+    SCREEN_VISIBLE_TMUX_NOT_FOUND belongs to visible TTY control, not this
+    graphical route. Do not switch VT, change permissions or restart services
+    just to satisfy that TTY check. Reobserve after input; never replay an
+    uncertain action automatically. Observation alone does not prove input.
+    """
     if authorized is not True:
         return {"ok":False,"error":"AUTHORIZED_TRUE_REQUIRED"}
     action=str(action).upper().strip()

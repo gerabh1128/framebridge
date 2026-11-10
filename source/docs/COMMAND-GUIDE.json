@@ -410,6 +410,11 @@
           "commands": []
         },
         {
+          "heading": "Choose graphical X11 or visible TTY control",
+          "body": "Choose the control route from the actual session, not the VT number. A Cinnamon or other supported X11 desktop can run on tty7 while its terminal emulator and tmux client use /dev/pts/N; that is normal. For graphical work use framebridge_cua with an explicit confirmed target. Begin with OBSERVE and capture_scope=ROOT, verify the real image and display_context kind=physical-x11 with physical=true when the task requires the physical desktop. Observe WINDOW immediately before window input and pass the observed ACTIVE_WINDOW_ID, SOURCE_WIDTH and SOURCE_HEIGHT as expected_window_id, expected_source_width and expected_source_height. For every window input call, including TYPE/KEY, explicitly set coord_space=WINDOW or WINDOW_PREVIEW; capture_scope=WINDOW alone does not select input geometry and the default ROOT can cause DISPLAY_GEOMETRY_CHANGED with window dimensions. Keep the target and coordinate space consistent; preview WIDTH/HEIGHT are not source dimensions. Verify the result with a new observation. The visible-tmux backend in screen_control.py instead requires a tmux client directly attached to /dev/<active VT>. SCREEN_VISIBLE_TMUX_NOT_FOUND and control_available=false on the real-screen route describe that TTY control contract, not overall graphical CUA readiness. framebridge_screen_observe can still return authentic X11 pixels; framebridge_screen_key/text and cua_tty_key_send/text_type require visible TTY binding and must not be used for graphical terminal input. Never switch VT, attach tmux to a physical console, restart services, change permissions or edit installed code merely to make a TTY check pass for an X11 task. Diagnose an X11 capture/input error on its own route before proposing a change. If input_may_have_been_sent or do_not_replay is true, reobserve and do not automatically replay input. A successful observation does not certify keyboard or mouse input. Virtual X11 and native Wayland are separate cases; virtual pixels do not certify the physical desktop.",
+          "commands": []
+        },
+        {
           "heading": "Automatic graphical discovery",
           "body": "The installer and control console stay text interfaces in both TTY and a desktop terminal. Compatible graphical CUA is discovered automatically; availability depends on the actual display/session and permissions. A loaded module is not proof that real pixel capture or input succeeded. New profiles use adaptive auto mode: without a verified active X11 session the runtime provides FBEXEC, FBTERM and CUA-TTY in text mode, without requiring a graphical login or automatically creating a private desktop. Explicit virtual-desktop settings remain advanced options and are labelled separately from physical-screen evidence. Xvfb and Openbox are optional package suggestions and are not installed for the normal connection. Only when you choose a private virtual desktop, install its tools explicitly with sudo apt install xvfb openbox xauth and rerun fb doctor. Installing Openbox can register it as the generic window-manager alternative; use your distribution settings to retain your preferred manager when needed. Physical-screen capture and input currently require the supported active X11 session. Native Wayland control is not validated; showing an XWayland window does not establish full-desktop capture or input.",
           "commands": [
@@ -449,7 +454,7 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "14c4763e8bb2f59aaa203156d7f12c51085cb48876ffa5961620fdeb1addebfc"
+      "guide_sha256": "5df8d9921b520e730764242e4a32b776f7d4c869d5869077ef1fa1f59544bffe"
     },
     "diagnostics": {
       "ok": true,
@@ -598,5 +603,5 @@
       "guide_sha256": "a4b65ac6fbcf43b25d30a6a3f526289b2831a251d5a3869e12243b387337396c"
     }
   },
-  "guide_sha256": "ef1c324732781464ff253df04775ab9057b9943b79f2000bcd1c6ffaa796c82b"
+  "guide_sha256": "c9f1cf6852be883be36377778ee6e535055206af349cfc15310f6f6a13e94c7e"
 }

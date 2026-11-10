@@ -12,7 +12,7 @@ Give the assistant the computer you want to work on, the intended task, and the 
 
 Name both the computer receiving the assistant's tool call and the intended execution target. `LOCAL` means the current FrameBridge receiver, not a fixed computer called ASUS or the computer displaying the chat. Discover enrolled nodes and use their confirmed aliases or IDs. A legacy connector can have a different default target; changing endpoints does not preserve that default automatically.
 
-Select the computer with `target` in FBEXEC and CUA. The older `node` selector is an alias on the execution and screen tools that accept it. Pass one destination. For graphical input, observe with `framebridge_cua` and `capture_scope="WINDOW"`, then use the same target and the observed window ID and dimensions. The bound screen key and text tools require a visible TTY. A receipt's `hostname` records the system name.
+Select the computer with `target` in FBEXEC and CUA. The older `node` selector is an alias on the execution and screen tools that accept it. Pass one destination. Before screen work, read the [screen procedure](FRAMEBRIDGE-SCREEN-PROCEDURE.md). For physical X11 observe ROOT through `framebridge_cua` and verify the image and physical display context. Before graphical window input observe WINDOW, then use the same target and the observed window ID and source dimensions. The bound screen key and text tools require a visible TTY; a desktop terminal on /dev/pts/N uses graphical input. A receipt's `hostname` records the system name.
 
 Do not put passwords, tunnel IDs, server access keys or browser codes in the prompt. The owner will enter them in the local hidden prompts. An MCP server access key is not an OpenAI API key.
 
@@ -74,8 +74,21 @@ small authorized terminal task. Prove a persistent Bash session by keeping
 its session ID and checking a variable/working directory in later calls.
 Close only the test session and test service you created.
 
-If desktop access is in scope, first identify the actual X11 session and use
-a new test window. A virtual display must be described as virtual. Terminal
+If desktop access is in scope, read the screens help and the screen procedure.
+Choose the route from the actual session. A desktop on tty7 with a terminal
+or tmux client on /dev/pts/N is normal. Use framebridge_cua with the explicit
+target: OBSERVE ROOT and verify physical-x11 context for physical desktop work.
+Observe WINDOW immediately before window input; bind expected_window_id and
+expected_source_width/height to ACTIVE_WINDOW_ID and SOURCE_WIDTH/HEIGHT.
+On every window input call, including TYPE/KEY, pass coord_space=WINDOW
+(or WINDOW_PREVIEW for preview coordinates); capture_scope alone is insufficient.
+SCREEN_VISIBLE_TMUX_NOT_FOUND only describes the visible TTY backend; it is
+not evidence of a graphical CUA failure. Real-screen observation may still
+capture X11; its TTY key/text tools must not be used for graphical input.
+Do not switch VT, change permissions, restart services or edit installed code
+to satisfy a TTY check for an X11 task. Diagnose the graphical route itself.
+Reobserve after input and never automatically replay uncertain input.
+Identify the actual X11 session and use a new test window. A virtual display must be described as virtual. Terminal
 text is not a screen capture, and a VM's desktop is not the owner's physical
 display. Do not claim a screenshot or successful input unless it was observed.
 Coordinate one controller at a time for a shared desktop. Preserve existing
