@@ -80,15 +80,15 @@ def valid_reference(value, regex, optional=False):
 class _AuthenticatedReply(dict):
     """A payload tied to the EXEC recipient verified by this client instance.
 
-    The Linux hostname in the payload is observed screen identity. The route
+    The hostname in the payload is observed screen identity. The route
     alias and UUID come from the existing authenticated executor envelope.
     A JSON object cannot supply this local proof or change its capture identity.
     """
 
     _IDENTITY_FIELDS = ("capture_id", "node", "sha256", "session_id", "bytes",
-                        "width", "height", "source", "screen_type",
+                        "width", "height", "source", "screen_type", "platform",
                         "full_screen", "authentic_pixels", "max_chunk_bytes",
-                        "max_chunk_bytes_v2")
+                        "max_chunk_bytes_v2", "pixel_source_verified", "synthetic")
 
     def __init__(self, payload, owner, node, node_id, receipt):
         super().__init__(payload)
@@ -228,10 +228,19 @@ class ScreenClient:
         require(type(width) is int and type(height) is int and
                 0 < width <= 16384 and 0 < height <= 16384,
                 "SCREEN_DIMENSIONS_INVALID")
-        require(manifest.get("source") in ("linux-framebuffer", "x11-root-XGetImage"),
+        source = manifest.get("source")
+        require(source in ("linux-framebuffer", "x11-root-XGetImage", "windows-gdi-BitBlt"),
                 "SCREEN_PIXEL_SOURCE_INVALID")
         require(manifest.get("full_screen") is True and manifest.get("authentic_pixels") is True,
                 "SCREEN_PIXEL_PROVENANCE_INVALID")
+        if source == "windows-gdi-BitBlt":
+            session, display = manifest.get("session"), manifest.get("display_context")
+            require(manifest.get("platform") == "windows" and manifest.get("screen_type") == "windows"
+                    and manifest.get("pixel_source_verified") is True and manifest.get("synthetic") is False
+                    and type(session) is dict and session.get("session_type") == "windows"
+                    and session.get("physical_console") is True
+                    and type(display) is dict and display.get("kind") == "physical-windows"
+                    and display.get("synthetic") is False, "SCREEN_PIXEL_PROVENANCE_INVALID")
         # Capability belongs to this authenticated manifest, never a shared cache.
         # A new central must retain the old request schema for a frozen receiver.
         chunk_bytes = CHUNK_BYTES
@@ -413,6 +422,8 @@ def register_framebridge_screen_tools(mcp, exec_request, *, image_factory=None,
                                    session_id: str = "", *, target: str = None):
         """Capture target's entire active screen as real pixels.
 
+        Requires the target's typed screen RPC route. For a Windows node with
+        graphical CUA enabled, CUA OBSERVE with capture_scope=ROOT is a separate operation.
         To display or redisplay this original in ChatGPT, call framebridge_screen_show
         with the returned target and capture_id. Do not take another capture to show it.
         """

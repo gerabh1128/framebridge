@@ -11,7 +11,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "expanded"))
 from framebridge_expanded import fleet
-from framebridge_expanded.real_screen.screen_frontdoor import RPC_COMMAND
+from framebridge_expanded.real_screen.screen_frontdoor import RPC_COMMAND, ScreenClient
 from framebridge_expanded.real_screen.screen_rpc import encode
 
 LOCAL_ID = "c6d827a4-219f-48fc-82d8-f410176313ca"
@@ -141,6 +141,28 @@ class FleetRoutingTests(unittest.TestCase):
     @staticmethod
     def screen_script():
         return RPC_COMMAND + base64.b64encode(encode({"op": "observe"})).decode("ascii") + "\n"
+
+    def test_windows_typed_screen_rejection_keeps_policy_error_and_identity(self):
+        def screen_executor(*, target, **payload):
+            return fleet.execute_screen_node(target, **payload)
+
+        image_factory = mock.Mock()
+        client = ScreenClient(screen_executor, image_factory,
+                              resolve_node=lambda alias: (alias, REMOTE_ID))
+        for error in ("ADMIN_OPERATION_DENIED", "PAIR_CUA_SCOPE_MISSING"):
+            # The broker authenticates the response and adds these route fields.
+            backend = {"ok": False, "error": error,
+                       "request_id": "screen-denied", "node_id": REMOTE_ID}
+            with self.subTest(error=error), \
+                    mock.patch("framebridge_expanded.broker.request", return_value=backend) as request:
+                result = client.call("observe", "test-node", True)
+                request.assert_called_once()
+                self.assertEqual(request.call_args.args[:2], (REMOTE_ID, "admin.exec"))
+            self.assertEqual(result["error"], error)
+            self.assertEqual(result["execution_state"], "not_started")
+            self.assertEqual(result["request_id"], "screen-denied")
+            self.assertEqual(result["node_id"], REMOTE_ID)
+        image_factory.assert_not_called()
 
     def assert_identity(self, value, requested, local=False):
         self.assertEqual(value["requested_target"], requested)

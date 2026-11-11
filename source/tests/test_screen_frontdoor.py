@@ -10,7 +10,10 @@ import unittest
 import zlib
 from pathlib import Path
 
-from framebridge_expanded.real_screen.screen_frontdoor import CHUNK_BYTES, ScreenClient, ScreenError, register_framebridge_screen_tools
+from framebridge_expanded.real_screen.screen_frontdoor import (
+    BULK_STDOUT_BYTES, CHUNK_BYTES, EXPANDED_CHUNK_BYTES, ScreenClient, ScreenError,
+    register_framebridge_screen_tools,
+)
 
 
 CAPTURE_ID = "1" * 32
@@ -77,14 +80,22 @@ class Executor:
         elif self.variant == "x11":
             manifest["source"] = "x11-root-XGetImage"
             manifest["screen_type"] = "x11"
+        elif self.variant in ("windows", "windows_synthetic", "windows_virtual_session"):
+            manifest.update(source="windows-gdi-BitBlt", platform="windows", screen_type="windows",
+                            pixel_source_verified=True, synthetic=self.variant == "windows_synthetic",
+                            session={"session_type": "windows", "physical_console":
+                                     self.variant != "windows_virtual_session"},
+                            display_context={"kind": "physical-windows", "synthetic": False},
+                            max_chunk_bytes=EXPANDED_CHUNK_BYTES)
         if request["op"] == "read_chunk":
             index = request["index"]
-            data = self.data[index * CHUNK_BYTES:(index + 1) * CHUNK_BYTES]
+            chunk_bytes = request.get("chunk_bytes", CHUNK_BYTES)
+            data = self.data[index * chunk_bytes:(index + 1) * chunk_bytes]
             result = {"capture_id": CAPTURE_ID, "index": index,
-                      "total_chunks": math.ceil(len(self.data) / CHUNK_BYTES),
+                      "total_chunks": math.ceil(len(self.data) / chunk_bytes),
                       "bytes": len(self.data), "sha256": digest, "encoding": "base64",
                       "data": base64.b64encode(data).decode(),
-                      "more": (index + 1) * CHUNK_BYTES < len(self.data)}
+                      "more": (index + 1) * chunk_bytes < len(self.data)}
             if self.variant == "chunk_index":
                 result["index"] = index + 1
             elif self.variant == "chunk_hash":
@@ -235,6 +246,24 @@ class ScreenTests(unittest.TestCase):
         result = client.call("observe", "ASUS", True)
         self.assertEqual(result[0]["result"]["source"], "x11-root-XGetImage")
         self.assertEqual(result[1].data, executor.data)
+
+    def test_native_windows_capture_uses_its_negotiated_legacy_chunk_size(self):
+        executor = Executor("windows", hostname="win-test")
+        client = ScreenClient(executor, Image, stdout_limit_bytes=BULK_STDOUT_BYTES)
+        metadata, image = client.call("observe", "WINDOWS", True)
+        self.assertEqual(metadata["hostname"], "win-test")
+        self.assertEqual(metadata["result"]["source"], "windows-gdi-BitBlt")
+        self.assertEqual(image.data, executor.data)
+        self.assertEqual(executor.requests[1]["chunk_bytes"], EXPANDED_CHUNK_BYTES)
+        self.assertNotIn("bulk_chunk_bytes", executor.requests[1])
+
+    def test_windows_source_cannot_claim_synthetic_or_virtual_pixels(self):
+        for variant in ("windows_synthetic", "windows_virtual_session"):
+            with self.subTest(variant=variant):
+                client, executor = self.client(variant)
+                response = client.call("observe", "WINDOWS", True)
+                self.assertEqual(response["error"], "SCREEN_PIXEL_PROVENANCE_INVALID")
+                self.assertEqual(executor.requests, [{"op": "observe"}])
 
     def test_trusted_alias_or_uuid_resolver_is_injected(self):
         executor = Executor()
