@@ -1,5 +1,6 @@
 """Validated, private profiles for FrameBridge Expanded."""
 from __future__ import annotations
+import ipaddress
 import json
 import os
 import re
@@ -13,6 +14,47 @@ from urllib.parse import urlsplit
 SCHEMA_VERSION = 1
 ROLES = ("standalone", "central", "node")
 DEFAULT_STATE = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "framebridge-expanded"
+
+
+def broker_connect_host(listen_host):
+    """Use a connectable address in the same family as the configured listener."""
+    if listen_host == "localhost":
+        return "127.0.0.1"
+    try:
+        address = ipaddress.ip_address(listen_host)
+    except ValueError:
+        return listen_host
+    if address.is_unspecified:
+        return "::1" if address.version == 6 else "127.0.0.1"
+    return listen_host
+
+
+def broker_endpoint(scheme, host, port):
+    authority = "[" + host + "]" if ":" in host else host
+    return f"{scheme}://{authority}:{port}"
+
+
+def broker_control_url(config):
+    """Resolve the local endpoint, including profiles with the old generated URL."""
+    port = config.get("ports", {}).get("broker", 20878)
+    listen = config.get("broker_listen_host", "127.0.0.1")
+    connect = broker_connect_host(listen)
+    scheme = "https" if config.get("tls_cert") and config.get("tls_key") else "http"
+    control = config.get("broker_control_url")
+    old_default = broker_endpoint(scheme, "127.0.0.1", port)
+    if connect != "127.0.0.1" and (not control or control == old_default):
+        return broker_endpoint(scheme, connect, port)
+    return control or config.get("broker_url") or old_default
+
+
+def check_listener_port(config, service):
+    """Check the configured bind address using the server's reuse semantics."""
+    host = config.get("broker_listen_host", "127.0.0.1") if service == "broker" else "127.0.0.1"
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    with socket.socket(family) as probe:
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        probe.bind((host, config["ports"][service]))
+
 
 def state_path(state=None):
     value = state or os.environ.get("FRAMEBRIDGE_EXPANDED_STATE") or os.environ.get("FRAMEBRIDGE_STATE_DIR")

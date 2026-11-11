@@ -21,6 +21,7 @@ from .._execution_receipt import (
     NOT_STARTED_EXECUTION, RECEIPT_FIELDS, UNFINISHED_EXECUTION, execution_error, execution_receipt,
 )
 from ..fleet import FleetError, select_target
+from .screen_capture import MAX_BULK_CHUNK_BYTES
 
 CHUNK_BYTES = 2100
 MAX_IMAGE_BYTES = 32 * 1024 * 1024
@@ -28,6 +29,9 @@ MAX_STDOUT_BYTES = 4096
 # Only the explicit typed screen transport preserves this larger stdout budget.
 EXPANDED_STDOUT_BYTES = 65536
 EXPANDED_CHUNK_BYTES = 45000
+# A 700,000-byte chunk leaves room for base64, result and signature metadata
+# within the broker's unchanged 1 MiB signed POST body limit.
+BULK_STDOUT_BYTES = 1_000_000
 TRANSFER_TIMEOUT_SECONDS = 45
 RPC_COMMAND = '/usr/bin/python3 -B -m framebridge_expanded.real_screen.screen_rpc '
 HEX_ID = re.compile(r"[0-9a-f]{32}\Z")
@@ -73,17 +77,32 @@ def valid_reference(value, regex, optional=False):
     return type(value) is str and ((optional and value == "") or regex.fullmatch(value) is not None)
 
 
+def _response_envelope(outer, stdout_limit_bytes):
+    stdout = outer.get("stdout")
+    require(type(stdout) is str and outer.get("stdout_truncated") is not True,
+            "SCREEN_STDOUT_INVALID")
+    try:
+        require(len(stdout.encode("utf-8")) <= stdout_limit_bytes, "SCREEN_STDOUT_INVALID")
+        envelope = json.loads(stdout)
+    except (ValueError, UnicodeError, RecursionError):
+        raise ScreenError("SCREEN_RESPONSE_INVALID") from None
+    require(type(envelope) is dict and type(envelope.get("ok")) is bool,
+            "SCREEN_RESPONSE_INVALID")
+    return envelope
+
+
 class _AuthenticatedReply(dict):
     """A payload tied to the EXEC recipient verified by this client instance.
 
-    The Linux hostname in the payload is observed screen identity. The route
+    The hostname in the payload is observed screen identity. The route
     alias and UUID come from the existing authenticated executor envelope.
     A JSON object cannot supply this local proof or change its capture identity.
     """
 
     _IDENTITY_FIELDS = ("capture_id", "node", "sha256", "session_id", "bytes",
-                        "width", "height", "source", "screen_type",
-                        "full_screen", "authentic_pixels", "max_chunk_bytes")
+                        "width", "height", "source", "screen_type", "platform",
+                        "full_screen", "authentic_pixels", "max_chunk_bytes",
+                        "max_chunk_bytes_v2", "pixel_source_verified", "synthetic")
 
     def __init__(self, payload, owner, node, node_id, receipt):
         super().__init__(payload)
@@ -119,13 +138,13 @@ class ScreenClient:
                  stdout_limit_bytes: int = MAX_STDOUT_BYTES,
                  transfer_timeout_s: int = TRANSFER_TIMEOUT_SECONDS):
         if (type(stdout_limit_bytes) is not int or
-                stdout_limit_bytes not in (MAX_STDOUT_BYTES, EXPANDED_STDOUT_BYTES)):
+                stdout_limit_bytes not in (MAX_STDOUT_BYTES, EXPANDED_STDOUT_BYTES, BULK_STDOUT_BYTES)):
             raise ValueError("unsupported screen stdout budget")
         if type(transfer_timeout_s) is not int or not 1 <= transfer_timeout_s <= 120:
             raise ValueError("screen transfer timeout must be 1..120 seconds")
         self.stdout_limit_bytes = stdout_limit_bytes
         self.chunk_bytes = (EXPANDED_CHUNK_BYTES
-                            if stdout_limit_bytes == EXPANDED_STDOUT_BYTES else CHUNK_BYTES)
+                            if stdout_limit_bytes >= EXPANDED_STDOUT_BYTES else CHUNK_BYTES)
         self.transfer_timeout_s = transfer_timeout_s
         self.exec_request = exec_request
         self.image_factory = image_factory
@@ -160,8 +179,23 @@ class ScreenClient:
             rejected = state in NOT_STARTED_EXECUTION
             if rejected:
                 receipt["performed"] = False
-            raise ScreenError(execution_error(outer, "SCREEN_EXEC_FAILED"), receipt,
-                              backend_rejection=rejected)
+            error = execution_error(outer, "SCREEN_EXEC_FAILED")
+            if (error == "SCREEN_EXEC_FAILED" and state == "outcome_unknown"
+                    and outer.get("request_type") == "screen_rpc"
+                    and type(outer.get("exit_code")) in (int, str)
+                    and str(outer["exit_code"]) == "1"):
+                # Native Windows returns a typed error and a replay barrier
+                # together. Keep the backend error without weakening the barrier.
+                try:
+                    response = _response_envelope(outer, min(self.stdout_limit_bytes, EXPANDED_STDOUT_BYTES))
+                except ScreenError:
+                    pass
+                else:
+                    details = response.get("error")
+                    if (response["ok"] is False and type(details) is dict
+                            and valid_reference(details.get("code"), ERROR)):
+                        error = details["code"]
+            raise ScreenError(error, receipt, backend_rejection=rejected)
         if deadline is not None:
             require(time.monotonic() < deadline, "SCREEN_TRANSFER_TIMEOUT")
         require(type(outer.get("exit_code")) in (int, str) and
@@ -174,15 +208,10 @@ class ScreenClient:
         except (ValueError, AttributeError):
             raise ScreenError("SCREEN_EXEC_NODE_ID_INVALID") from None
         require(expected_node_id is None or node_id == expected_node_id, "SCREEN_EXEC_BINDING_INVALID")
-        stdout = outer.get("stdout")
-        require(type(stdout) is str and len(stdout.encode("utf-8")) <= self.stdout_limit_bytes and
-                outer.get("stdout_truncated") is not True, "SCREEN_STDOUT_INVALID")
-        try:
-            envelope = json.loads(stdout)
-        except (ValueError, UnicodeError):
-            raise ScreenError("SCREEN_RESPONSE_INVALID") from None
-        require(type(envelope) is dict and type(envelope.get("ok")) is bool,
-                "SCREEN_RESPONSE_INVALID")
+        limit = self.stdout_limit_bytes
+        if request["op"] != "read_chunk" or "bulk_chunk_bytes" not in request:
+            limit = min(limit, EXPANDED_STDOUT_BYTES)
+        envelope = _response_envelope(outer, limit)
         if not envelope["ok"]:
             code = envelope.get("error")
             details = {}
@@ -220,10 +249,19 @@ class ScreenClient:
         require(type(width) is int and type(height) is int and
                 0 < width <= 16384 and 0 < height <= 16384,
                 "SCREEN_DIMENSIONS_INVALID")
-        require(manifest.get("source") in ("linux-framebuffer", "x11-root-XGetImage"),
+        source = manifest.get("source")
+        require(source in ("linux-framebuffer", "x11-root-XGetImage", "windows-gdi-BitBlt"),
                 "SCREEN_PIXEL_SOURCE_INVALID")
         require(manifest.get("full_screen") is True and manifest.get("authentic_pixels") is True,
                 "SCREEN_PIXEL_PROVENANCE_INVALID")
+        if source == "windows-gdi-BitBlt":
+            session, display = manifest.get("session"), manifest.get("display_context")
+            require(manifest.get("platform") == "windows" and manifest.get("screen_type") == "windows"
+                    and manifest.get("pixel_source_verified") is True and manifest.get("synthetic") is False
+                    and type(session) is dict and session.get("session_type") == "windows"
+                    and session.get("physical_console") is True
+                    and type(display) is dict and display.get("kind") == "physical-windows"
+                    and display.get("synthetic") is False, "SCREEN_PIXEL_PROVENANCE_INVALID")
         # Capability belongs to this authenticated manifest, never a shared cache.
         # A new central must retain the old request schema for a frozen receiver.
         chunk_bytes = CHUNK_BYTES
@@ -232,13 +270,20 @@ class ScreenClient:
             require(type(capability) is int and 1 <= capability <= EXPANDED_CHUNK_BYTES,
                     "SCREEN_TRANSFER_CAPABILITY_INVALID")
             chunk_bytes = min(self.chunk_bytes, capability)
+        if self.stdout_limit_bytes == BULK_STDOUT_BYTES and "max_chunk_bytes_v2" in manifest:
+            bulk_bytes = manifest["max_chunk_bytes_v2"]
+            require(type(bulk_bytes) is int and EXPANDED_CHUNK_BYTES < bulk_bytes <= MAX_BULK_CHUNK_BYTES,
+                    "SCREEN_TRANSFER_CAPABILITY_INVALID")
+            chunk_bytes = bulk_bytes
         parts = []
         count = math.ceil(total / chunk_bytes)
         for index in range(count):
             request = {"op": "read_chunk", "capture_id": capture_id,
                        "index": index, "expected_sha256": digest}
             # Omit the extension entirely on constrained legacy transports.
-            if chunk_bytes != CHUNK_BYTES:
+            if chunk_bytes > EXPANDED_CHUNK_BYTES:
+                request["bulk_chunk_bytes"] = chunk_bytes
+            elif chunk_bytes != CHUNK_BYTES:
                 request["chunk_bytes"] = chunk_bytes
             part = self.remote(node, request, deadline=deadline)
             require(isinstance(part, _AuthenticatedReply) and
@@ -341,6 +386,8 @@ class ScreenClient:
                 if delivery_receipt:
                     details["result_delivery"] = {"error": str(exc), **delivery_receipt}
                 details.update(manifest.receipt)
+                if op in ("observe", "read_capture") and str(exc) == "SCREEN_TRANSFER_TIMEOUT":
+                    details.update(capture_id=manifest["capture_id"], capture_available=True)
             if op in ("key", "text") and (input_reply_received or
                     (submitted.get("attempted") and not exc.backend_rejection)):
                 details.setdefault("observe_again", True)
@@ -396,6 +443,8 @@ def register_framebridge_screen_tools(mcp, exec_request, *, image_factory=None,
                                    session_id: str = "", *, target: str = None):
         """Capture target's entire active screen as real pixels.
 
+        Requires the target's typed screen RPC route. For a Windows node with
+        graphical CUA enabled, CUA OBSERVE with capture_scope=ROOT is a separate operation.
         To display or redisplay this original in ChatGPT, call framebridge_screen_show
         with the returned target and capture_id. Do not take another capture to show it.
         """

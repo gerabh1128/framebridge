@@ -202,6 +202,35 @@ class PackageUpgradeTests(unittest.TestCase):
         self.assertEqual(value['phase'], 'CAPTURED')
         run.assert_not_called()
 
+    def test_unverified_candidate_cannot_abort_snapshot_of_verified_manager(self):
+        valid = self.identify()
+        fake = self.root / "1000"
+        fake.mkdir()
+        args = self.args[:-1] + ["./forged-profile"]
+        (fake / "cmdline").write_bytes(b"\0".join(value.encode() for value in args) + b"\0")
+        env = (self.proc / "environ").read_bytes().replace(
+            b"FRAMEBRIDGE_EXPANDED_STATE=" + str(self.state).encode(),
+            b"FRAMEBRIDGE_EXPANDED_STATE=./forged-profile",
+        )
+        (fake / "environ").write_bytes(env)
+        with self.assertRaisesRegex(RuntimeError, "UPGRADE_PROFILE_PATH_INVALID"):
+            upgrade.identify(fake)
+        with mock.patch.object(upgrade, "ROOT", self.root), mock.patch.object(upgrade, "_root"):
+            result = upgrade.snapshot(self.root)
+        self.assertEqual(result["profiles"], [valid])
+        self.assertEqual(json.loads((self.root / "pending.json").read_text()), result)
+
+    def test_snapshot_still_refuses_untrusted_existing_global_record(self):
+        self.pending()
+        pending = self.root / "pending.json"
+        before = pending.read_bytes()
+        pending.chmod(0o644)
+        with mock.patch.object(upgrade, "ROOT", self.root), mock.patch.object(upgrade, "_root"), \
+             mock.patch.object(upgrade, "identify", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "UPGRADE_FILE_UNTRUSTED"):
+                upgrade.snapshot(self.root)
+        self.assertEqual(pending.read_bytes(), before)
+
     def test_reinstall_after_failure_preserves_receipt_and_keeps_stopped_profiles_stopped(self):
         failed = {'schema': 1, 'transaction': 'a' * 16, 'phase': 'FAILED',
                   'profiles': [{'state': str(self.state), 'phase': 'FAILED',

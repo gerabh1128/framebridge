@@ -388,8 +388,12 @@ def run(state_dir=None, once=False):
                                          ctx=ctx, state=state, outbound=outbound, recover=not once)
             if posted.get("ok") is not True:
                 raise NodeError("NODE_RESULT_REJECTED")
-            contact.accepted("node.result", heartbeat_v1=supports_heartbeat)
             result = {"ok": True, "idle": False, "request_id": req.get("request_id")}
+            if posted.get("disposition") == "orphaned":
+                _LOG.warning("NODE_RESULT_ORPHANED request_id=%s", req.get("request_id"))
+                result["delivery_disposition"] = "orphaned"
+            else:
+                contact.accepted("node.result", heartbeat_v1=supports_heartbeat)
         if once:
             return result
         time.sleep(1)

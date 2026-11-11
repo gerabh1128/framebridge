@@ -33,6 +33,7 @@ MAX_PIXELS = 4096 * 2160
 MAX_FRAMEBUFFER_BYTES = 128 * 1024 * 1024
 MAX_IMAGE_BYTES = 32 * 1024 * 1024
 MAX_CHUNK_BYTES = 45000
+MAX_BULK_CHUNK_BYTES = 700_000
 CAPTURE_ID = re.compile(r"[0-9a-f]{32}\Z")
 SESSION_ID = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
 DISPLAY_ID = re.compile(r":[0-9]{1,5}(?:\.[0-9]{1,3})?\Z")
@@ -538,11 +539,12 @@ def _read_private(path: Path, max_bytes: int) -> bytes:
 
 
 def read_chunk(output_dir: Path | str, capture_id: str, index: int, *, chunk_bytes: int = 2100,
-               expected_sha256: str | None = None) -> dict:
+               expected_sha256: str | None = None, bulk: bool = False) -> dict:
     require(isinstance(capture_id, str) and CAPTURE_ID.fullmatch(capture_id) is not None,
             "CAPTURE_ID_INVALID")
+    min_bytes, max_bytes = (MAX_CHUNK_BYTES + 1, MAX_BULK_CHUNK_BYTES) if bulk else (1, MAX_CHUNK_BYTES)
     require(type(index) is int and index >= 0 and type(chunk_bytes) is int
-            and 1 <= chunk_bytes <= MAX_CHUNK_BYTES, "CHUNK_BOUNDS_INVALID")
+            and min_bytes <= chunk_bytes <= max_bytes, "CHUNK_BOUNDS_INVALID")
     directory = _directory(output_dir)
     try:
         m = json.loads(_read_private(directory / (capture_id + ".json"), 16384))

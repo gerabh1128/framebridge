@@ -22,10 +22,10 @@
     "adapter_request": "2d59b00e43312b1fbc5296ed20cebb8f6fb05ae115dea8a3069fa5066abc0130"
   },
   "schema": 1,
+  "screen_capture_without_chunk_transfer_ast": "066940e490cf617c7306fe6d0253dda3c49d4422c2992bf5154221e0b5f2f3bd",
   "unchanged_helpers": {
     "autostart.py": "d99392b33531d28d699ec5a6e9e942ce3696ebf29464e8e7c3d74178b2553f09",
-    "display_context.py": "464525537a1af948159a64ff27df65a1a1bf4f6f61c7d7d121f28524ff96b01a",
-    "real_screen/screen_capture.py": "a7e3bebfd3de3b952344fa7361b9d35fc70bea9ddf803ed4a8b1667b88bf1798"
+    "display_context.py": "464525537a1af948159a64ff27df65a1a1bf4f6f61c7d7d121f28524ff96b01a"
   },
   "window_retained_sha256": "b44c78d42d7b0e41d2f75224113e2e23ddd98c708cb623002c2e6794e3f7e03c"
 }
