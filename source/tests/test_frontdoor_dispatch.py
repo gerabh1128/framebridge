@@ -32,7 +32,7 @@ from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from framebridge_expanded import tty_mcp
 from framebridge_expanded.fleet import FleetError, select_target
-from framebridge_expanded.real_screen.screen_frontdoor import register_framebridge_screen_tools
+from framebridge_expanded.real_screen.screen_frontdoor import BULK_STDOUT_BYTES, register_framebridge_screen_tools
 from framebridge_expanded.real_screen.screen_presentation import register_screen_presentation
 from test_screen_frontdoor import Executor, NODE_ID, SESSION_ID
 
@@ -59,7 +59,7 @@ class ChunkExecutor(Executor):
 def portable(*, execute=None, screen_execute=None, cua=None, threaded=True):
     """Load the actual registration statements without bootstrap/profile effects."""
     tree = ast.parse(PORTABLE.read_text())
-    names = {"_BlockingToolRegistrar", "_registered_operations", "framebridge_status",
+    names = {"_BlockingToolRegistrar", "_registered_operations", "framebridge_status", "_verified_cua_image",
              "framebridge_exec", "framebridge_cua", "_screen_exec_request", "_close_target_tool_arguments"}
     assignments = {"_blocking_tools", "_real_screen_client"}
     registrations = {"register_screen_presentation", "register_tty_tools", "_close_target_tool_arguments"}
@@ -79,6 +79,7 @@ def portable(*, execute=None, screen_execute=None, cua=None, threaded=True):
     execute = execute or (lambda *args: {"ok": True})
     screen_execute = screen_execute or (lambda *args: {"ok": False})
     namespace = dict(mcp=mcp, anyio=anyio, partial=partial, wraps=wraps, inspect=inspect,
+                     base64=base64, hashlib=hashlib, BULK_STDOUT_BYTES=BULK_STDOUT_BYTES,
                      FleetError=FleetError, select_target=select_target, uuid=uuid, re=re,
                      dispatch_cua_request=cua,
                      ToolAnnotations=ToolAnnotations, Image=Image, socket=socket,

@@ -20,7 +20,7 @@ import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
-from .config import load_config, state_path, private_dir
+from .config import broker_connect_host, broker_control_url, check_listener_port, load_config, state_path, private_dir
 
 PREFIX = Path(os.environ.get("FRAMEBRIDGE_EXPANDED_PREFIX", Path(__file__).resolve().parents[2]))
 _STOP = False
@@ -64,7 +64,7 @@ def environment(state, config=None, prepare=False):
         "FRAMEBRIDGE_FRONT_DOOR_PORT": str(config["ports"]["mcp"]),
         "FRAMEBRIDGE_FLEET_HUB_PORT": str(config["ports"]["hub"]),
         "FRAMEBRIDGE_HUB_MCP_URL": "http://127.0.0.1:" + str(config["ports"]["hub"]) + "/mcp",
-        "FRAMEBRIDGE_BROKER_CONTROL": config.get("broker_url") or "http://127.0.0.1:" + str(config["ports"]["broker"]),
+        "FRAMEBRIDGE_BROKER_CONTROL": broker_control_url(config),
         "PYTHONPATH": os.pathsep.join(map(str, [PREFIX / "expanded", PREFIX / "portable",
             PREFIX / "original/geranas/FrameBridge-Fleet-Hub/vendor", broker_source, fleet_source])),
         "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1",
@@ -106,10 +106,11 @@ def _read(path):
     except (OSError, ValueError):
         return {}
 
-def _port(port):
-    with socket.socket() as probe:
+def _port(port, host="127.0.0.1"):
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    with socket.socket(family) as probe:
         probe.settimeout(0.2)
-        return probe.connect_ex(("127.0.0.1", port)) == 0
+        return probe.connect_ex((host, port)) == 0
 
 def _observation_environment(state, config):
     """Refresh only an observation copy, never the worker's pinned binding.
@@ -348,7 +349,8 @@ def _worker(state):
         ("adapter", [sys.executable, "-m", "framebridge_expanded.adapter", "serve"]),
         ("tty", [sys.executable, "-m", "framebridge_expanded.tty", "serve", "--state", str(state)])]
     if config["role"] == "central":
-        code = "from framebridge_expanded.broker import serve; serve(host=" + repr(config.get("broker_listen_host", "127.0.0.1")) + ",port=" + str(config["ports"]["broker"]) + ",state_dir=" + repr(str(state)) + ")"
+        broker_host = config.get("broker_listen_host", "127.0.0.1")
+        code = "from framebridge_expanded.broker import serve; serve(host=" + repr(broker_host) + ",port=" + str(config["ports"]["broker"]) + ",state_dir=" + repr(str(state)) + ")"
         commands.append(("broker", [sys.executable, "-c", code]))
     if config["role"] == "node":
         code = "from framebridge_expanded.node import run; run(state_dir=" + repr(str(state)) + ")"
@@ -371,7 +373,7 @@ def _worker(state):
             adapter = Path(env["FRAMEBRIDGE_TOOL_ROOT"], "adapter.sock").is_socket()
             ports = True if config["role"] == "node" else all(_port(config["ports"][k]) for k in ("mcp", "hub"))
             if config["role"] == "central":
-                ports = ports and _port(config["ports"]["broker"])
+                ports = ports and _port(config["ports"]["broker"], broker_connect_host(broker_host))
             try:
                 from . import tty
                 tty_ready = bool(tty.status(state).get("ok"))
@@ -485,10 +487,7 @@ def start(state):
         (state / name).unlink(missing_ok=True)
     if config["role"] != "node":
         for key in ("mcp", "hub") + (("broker",) if config["role"] == "central" else ()):
-            with socket.socket() as probe:
-                # Match server restart semantics while still rejecting live listeners.
-                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                probe.bind(("127.0.0.1", config["ports"][key]))
+            check_listener_port(config, key)
     env = environment(state, config, prepare=True)
     proc, rec = _spawn([sys.executable, "-m", "framebridge_expanded.runtime", "_manager", "--state", str(state)], env, state, "manager")
     _atomic(state / "manager.json", rec)

@@ -1,7 +1,10 @@
 import contextlib
+import errno
 import io
+import json
 import os
 from pathlib import Path
+import socket
 import tempfile
 import unittest
 from unittest import mock
@@ -50,6 +53,17 @@ class CliTests(unittest.TestCase):
         self.assertIn("setup", output.getvalue())
         self.assertIn("connect", output.getvalue())
         modules.assert_not_called()
+
+    def test_unresolvable_explicit_profile_does_not_break_help_or_escape_status(self):
+        output = io.StringIO()
+        missing = "~framebridge-audit-no-such-account-7cfd"
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(cli.main(["--state-dir", missing, "--json", "help"]), 0)
+        self.assertTrue(json.loads(output.getvalue())["ok"])
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(cli.main(["--state-dir", missing, "--json", "status"]), 2)
+        self.assertEqual(json.loads(output.getvalue())["result"]["error"], "PROFILE_UNAVAILABLE")
 
     def test_no_argument_menu_uses_real_newlines(self):
         output = io.StringIO()
@@ -194,15 +208,41 @@ class CliTests(unittest.TestCase):
             before = (state / "config.json").read_bytes()
             runtime = self.connection_runtime(td)
             automatic = mock.Mock()
-            listener = mock.MagicMock()
-            listener.__enter__.return_value.bind.side_effect = OSError("address in use")
             def connect(*args, **kwargs):
                 return kwargs["configure_connection"](state, {"account_label": "test@example.com", "tunnel_id": "tunnel_new"}, "SYNTHETIC-MCP-ACCESS-KEY")
-            with mock.patch.object(cli, "_module", side_effect=lambda name: runtime if name == "runtime" else automatic), mock.patch.object(cli.socket, "socket", return_value=listener), mock.patch.object(cli.tunnel, "connect_chatgpt", side_effect=connect):
+            with mock.patch.object(cli, "_module", side_effect=lambda name: runtime if name == "runtime" else automatic), \
+                 mock.patch.object(cli, "check_listener_port", side_effect=OSError(errno.EADDRINUSE, "address in use")), \
+                 mock.patch.object(cli.tunnel, "connect_chatgpt", side_effect=connect):
                 with self.assertRaisesRegex(RuntimeError, "MCP port 20865 is already in use"):
                     cli.connect_chatgpt(state)
             automatic.configure_connection.assert_not_called()
             self.assertEqual(before, (state / "config.json").read_bytes())
+
+    def test_connection_rejects_occupied_concrete_broker_listener(self):
+        with self.directory() as td, socket.socket() as broker, socket.socket() as mcp, socket.socket() as hub:
+            broker.bind(("127.0.0.2", 0))
+            broker.listen(1)
+            mcp.bind(("127.0.0.1", 0))
+            hub.bind(("127.0.0.1", 0))
+            state = Path(td) / "profile"
+            cfg = default_config(role="central", name="stopped-central")
+            cfg["broker_listen_host"] = "127.0.0.2"
+            cfg["ports"] = {"broker": broker.getsockname()[1], "mcp": mcp.getsockname()[1],
+                            "hub": hub.getsockname()[1]}
+            mcp.close()
+            hub.close()
+            save_config(state, cfg)
+            runtime = self.connection_runtime(td)
+            automatic = mock.Mock()
+
+            def connect(*args, **kwargs):
+                return kwargs["configure_connection"](state, {}, "SYNTHETIC-MCP-ACCESS-KEY")
+
+            with mock.patch.object(cli, "_module", side_effect=lambda name: runtime if name == "runtime" else automatic), \
+                 mock.patch.object(cli.tunnel, "connect_chatgpt", side_effect=connect):
+                with self.assertRaisesRegex(RuntimeError, f"BROKER port {cfg['ports']['broker']} is already in use"):
+                    cli.connect_chatgpt(state)
+            automatic.configure_connection.assert_not_called()
 
     def test_new_connection_needs_no_prior_profile_or_runtime_start(self):
         with self.directory() as td:
@@ -314,6 +354,25 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(cli.main(["--state-dir", str(state), "nodes", "list"]), 0)
             broker.configure.assert_called_once_with(None, state_dir=state)
             self.assertEqual(os.environ.get("FRAMEBRIDGE_EXPANDED_STATE"), before)
+
+    def test_node_listing_and_console_observation_preserve_failure_exit_status(self):
+        with self.directory() as td:
+            state = Path(td)
+            save_config(state, default_config(name="failure-exit"))
+            broker, fleet, console = mock.Mock(), mock.Mock(), mock.Mock()
+            fleet.discover_nodes.return_value = {"ok": False, "error": "FLEET_DISCOVERY_FAILED"}
+            console.status.return_value = {"ok": False, "error": "CONSOLE_TMUX_STATUS_FAILED"}
+            modules = {"broker": broker, "fleet": fleet, "console": console}
+            for command, expected in (
+                (["nodes", "list"], "FLEET_DISCOVERY_FAILED"),
+                (["console", "--status"], "CONSOLE_TMUX_STATUS_FAILED"),
+            ):
+                with self.subTest(command=command), contextlib.redirect_stdout(io.StringIO()) as output, \
+                     mock.patch.object(cli, "_module", side_effect=modules.__getitem__):
+                    self.assertEqual(cli.main(["--state-dir", str(state), "--json", *command]), 1)
+                    result = json.loads(output.getvalue())
+                    self.assertFalse(result["ok"])
+                    self.assertEqual(result["result"]["error"], expected)
 
     def test_nodes_approval_requires_expected_uuid(self):
         parser = cli.build_parser()

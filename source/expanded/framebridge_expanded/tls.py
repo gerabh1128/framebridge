@@ -11,7 +11,7 @@ import shutil
 import sys
 from urllib.parse import urlsplit
 
-from .config import load_config, save_config, state_path, private_dir
+from .config import broker_connect_host, broker_endpoint, load_config, save_config, state_path, private_dir
 
 
 def _crypto():
@@ -54,10 +54,6 @@ def _address(value):
     return address
 
 
-def _url(host, port):
-    return "https://" + ("[" + host + "]" if ":" in host else host) + ":" + str(port)
-
-
 def _write(path, data, mode):
     fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
     with os.fdopen(fd, "wb") as stream:
@@ -88,6 +84,7 @@ def create_certificates(state, host, address, *, listen_host=None, advertise_hos
             ipaddress.ip_address(listen)
         except (ValueError, TypeError):
             raise ValueError("The listen host must be an IP address or localhost.") from None
+    control_host = broker_connect_host(listen)
     advertised = str(address) if advertise_host is None else str(advertise_host)
     if advertised not in {host, str(address), "localhost", "127.0.0.1", "::1"}:
         raise ValueError("The advertised host must match the certificate DNS name or one of its IP addresses.")
@@ -107,7 +104,8 @@ def create_certificates(state, host, address, *, listen_host=None, advertise_hos
           .add_extension(x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key()), critical=False)
           .sign(ca_key, hashes.SHA256()))
     dns_names = list(dict.fromkeys([host, "localhost"]))
-    ips = list(dict.fromkeys([address, ipaddress.ip_address("127.0.0.1"), ipaddress.ip_address("::1")]))
+    ips = list(dict.fromkeys([address, ipaddress.ip_address("127.0.0.1"), ipaddress.ip_address("::1"),
+                             ipaddress.ip_address(control_host)]))
     san = x509.SubjectAlternativeName([x509.DNSName(v) for v in dns_names] + [x509.IPAddress(v) for v in ips])
     server_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, host)])
     server = (x509.CertificateBuilder().subject_name(server_name).issuer_name(ca.subject)
@@ -133,8 +131,8 @@ def create_certificates(state, host, address, *, listen_host=None, advertise_hos
     no_password = serialization.NoEncryption()
     updated = dict(config)
     updated.update(tls_ca=str(ca_file), tls_cert=str(server_file), tls_key=str(server_key_file),
-                   broker_url=_url(advertised, config["ports"]["broker"]),
-                   broker_control_url=_url("127.0.0.1", config["ports"]["broker"]),
+                   broker_url=broker_endpoint("https", advertised, config["ports"]["broker"]),
+                   broker_control_url=broker_endpoint("https", control_host, config["ports"]["broker"]),
                    broker_listen_host=listen)
     public = {
         "ca_public_file": str(ca_file),
