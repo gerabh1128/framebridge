@@ -93,7 +93,8 @@ class NodeRecoveryTests(unittest.TestCase):
             with self.subTest(after_acceptance=after_acceptance):
                 marker.write_text("")
                 script = "printf x >> " + shlex.quote(str(marker))
-                payload = {"authorized": True, "job_id": "recovery-command", "timeout_s": 10,
+                job_id = "recovery-command-after" if after_acceptance else "recovery-command-before"
+                payload = {"authorized": True, "job_id": job_id, "timeout_s": 10,
                            "script": script, "sha256": hashlib.sha256(script.encode()).hexdigest()}
                 queued, error = self.server.expanded_store.queue_admin(ident, "admin.exec", payload)
                 self.assertIsNone(error)
@@ -141,7 +142,7 @@ class NodeRecoveryTests(unittest.TestCase):
                     with self.assertRaises(StopLoop):
                         node.run(state)
                 self.assertEqual(marker.read_text(), "x")
-                self.assertEqual(dispatched, ["recovery-command"])
+                self.assertEqual(dispatched, [job_id])
                 self.assertEqual(waits, [1])
                 self.assertEqual(len(posted), 2)
                 self.assertNotEqual(posted[0]["nonce"], posted[1]["nonce"])

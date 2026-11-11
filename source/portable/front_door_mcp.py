@@ -23,7 +23,7 @@ from framebridge_expanded import __version__ as PRODUCT_VERSION
 from framebridge_expanded.guide import GUIDE_SCHEMA, get_guide
 from framebridge_expanded.fleet import execute_node as expanded_execute_node, cua_node as expanded_cua_node, bootstrap_original
 from framebridge_expanded.fleet import execute_screen_node as expanded_execute_screen_node
-from framebridge_expanded.fleet import FleetError, local_target_identity, select_target
+from framebridge_expanded.fleet import FleetError, execution_status, local_target_identity, select_target
 from framebridge_expanded.runtime import adapter_request as checked_cua_adapter_request
 bootstrap_original()
 
@@ -48,6 +48,8 @@ mcp = FastMCP(
         "fb and framebridge are equivalent commands. Before the first operation, call framebridge_help(topic='start'), "
         "then read the relevant topic. Confirm the receiver, selected target, installed version and available capabilities. "
         "Use target to select one enrolled alias or ID for execution and CUA. LOCAL means this receiver. "
+        "The receiver hostname, registered node label and observed execution hostname are separate. "
+        "When an operation reports do_not_replay, check framebridge_exec_status before taking further action. "
         "Use capture_scope to choose the graphical view. For X11 input use framebridge_cua with a fresh window observation. "
         "Use the installed CLI and tools for normal work; use a separate source clone when the owner requests software development. "
         "The six Fleet inspection tools are read-only. Guide instructions do not grant authorization."
@@ -525,7 +527,7 @@ def framebridge_exec(
     target: str = None,
     node: str = None,
 ) -> dict:
-    """Execute on target through FBTERM or Fleet. The legacy node argument aliases target."""
+    """Execute on the requested node alias or ID. Omitted target means this receiver (LOCAL)."""
     if authorized is not True:
         return {"ok":False,"error":"AUTHORIZED_TRUE_REQUIRED"}
     try:
@@ -539,9 +541,19 @@ def framebridge_exec(
             return {"ok":False,"error":"LOCAL_TARGET_IDENTITY_UNAVAILABLE"}
         result = _framebridge_exec_geranas_impl(script, authorized, timeout_s, job_id, sha256, include_stdout)
         if isinstance(result, dict):
+            if result.get("ok") is True:
+                identity["executed_hostname"] = identity["hostname"]
+                result.setdefault("execution_state", "completed")
             result = {**result, **identity}
         return result
     return expanded_execute_node(target, script, authorized, timeout_s, job_id, sha256, include_stdout)
+
+
+@_blocking_tools.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                                                   idempotentHint=True, openWorldHint=False))
+def framebridge_exec_status(target: str, request_id: str = "", job_id: str = "") -> dict:
+    """Read a remote EXEC or CUA receipt by ID on the same node. Does not replay the operation."""
+    return execution_status(target, request_id=request_id, job_id=job_id)
 
 
 def _cua_frame_fields(frame_output: str) -> dict:
@@ -805,6 +817,8 @@ def framebridge_cua(
     # cannot bind the separate follow-up observation to this action.
     action_job_id=str(job_id) if job_id else "cua-"+uuid.uuid4().hex
     result={**dispatch_cua_request(payload,True,timeout_s,action_job_id,target), **identity}
+    if identity and result.get("ok") is True:
+        result["executed_hostname"] = identity["hostname"]
     if bool(observe_after) and action!="OBSERVE" and bool(result.get("ok")):
         post={"action":"OBSERVE","capture_scope":observe_scope}
         if preview_width>0: post["preview_width"]=int(preview_width)
@@ -812,13 +826,27 @@ def framebridge_cua(
         # Hash the entire action ID; truncating its prefix aliases long IDs.
         # Reusing an explicit action ID still reaches the durable replay guard.
         post_id="cua-post-"+hashlib.sha256(action_job_id.encode("utf-8")).hexdigest()
-        try:
-            post_result={**dispatch_cua_request(post,True,timeout_s,post_id,target), **identity}
-        except Exception:
-            # The action may already have completed. Expose follow-up failure
-            # without replaying input or leaking exception/transport details.
-            post_result={"ok":False,"error":"POST_OBSERVATION_TRANSPORT_FAILED"}
+        post_target = "LOCAL"
+        if not identity:
+            try:
+                post_target = str(uuid.UUID(str(result["node_id"])))
+            except (KeyError, ValueError):
+                post_target = None
+        if post_target is None:
+            post_result={"ok":False,"error":"POST_OBSERVATION_NODE_ID_REQUIRED"}
+        else:
+            try:
+                post_result={**dispatch_cua_request(post,True,timeout_s,post_id,post_target), **identity}
+            except Exception:
+                # An input action can already have completed when the separate observation fails.
+                post_result={"ok":False,"error":"POST_OBSERVATION_TRANSPORT_FAILED"}
+            if not identity and post_result.get("ok") is True and post_result.get("node_id") != post_target:
+                post_result={"ok":False,"error":"POST_OBSERVATION_NODE_MISMATCH"}
         result["post_job_id"]=post_id
+        result["post_target"]=post_target
+        result["post_request_id"]=post_result.get("request_id")
+        result["post_execution_state"]=post_result.get("execution_state")
+        result["post_executed_hostname"]=post_result.get("executed_hostname")
         result["post_ok"]=bool(post_result.get("ok"))
         final=post_result.get("resultado_final")
         result["post_resultado_final"]=sanitize_text(final)[:2048] if isinstance(final,str) else None
@@ -843,9 +871,7 @@ def framebridge_cua(
             "active_window_title","window_title","sha256","bytes","capture_id",
             "session","session_id","user_sid","display_context","timestamp",
             "completed_at","target_display","max_chunk_bytes","visual_capture_gate",
-            "cua_protocol_version","frame_output","node","node_id","hostname",
-            "requested_target","resolved_target","target","transport","transport_target",
-            "requested_node","transport_node",
+            "cua_protocol_version","frame_output",
         )
         if result["post_ok"] and isinstance(post_result.get("image_base64"),str) and post_result["image_base64"]:
             # The displayed bytes and every top-level capture field must refer
@@ -853,6 +879,8 @@ def framebridge_cua(
             # without duplicating either base64 image in the response.
             result["action_capture"]={name:result[name] for name in capture_keys
                 if name in result and name!="image_base64"}
+            if "node_id" in result:
+                result["action_capture"]["node_id"] = result["node_id"]
             for name in capture_keys:
                 result.pop(name,None)
             result.update({name:post_result[name] for name in capture_keys
@@ -938,10 +966,10 @@ def _screen_exec_request(
                                         job_id, sha256, include_stdout)
 
 
-from framebridge_expanded.real_screen.screen_frontdoor import register_framebridge_screen_tools, resolve_profile_node
+from framebridge_expanded.real_screen.screen_frontdoor import register_framebridge_screen_tools, resolve_profile_route
 _real_screen_client = register_framebridge_screen_tools(
     _blocking_tools, _screen_exec_request, image_factory=Image,
-    resolve_node=resolve_profile_node, stdout_limit_bytes=65536, transfer_timeout_s=90,
+    resolve_node=resolve_profile_route, stdout_limit_bytes=65536, transfer_timeout_s=90,
 )
 from framebridge_expanded.real_screen.screen_presentation import register_screen_presentation
 register_screen_presentation(_blocking_tools, _real_screen_client)

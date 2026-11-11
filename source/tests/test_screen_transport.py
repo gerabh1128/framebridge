@@ -303,12 +303,13 @@ class TypedFleetRouteTests(unittest.TestCase):
     def test_remote_admin_exec_preserves_type_through_broker_node(self):
         payload = make_payload({"op": "status"})
         calls = []
+        deadline = time.time() + 30
         def adapter(value):
-            self.assertEqual(value, payload)
+            self.assertEqual(value, dict(payload, start_before=deadline))
             return response(value)
         def request(node_id, capability, value, timeout_s):
             calls.append((node_id, capability, value, timeout_s))
-            req = {"node_id": node_id, "expires_at": time.time() + 30,
+            req = {"node_id": node_id, "expires_at": deadline,
                    "request_id": "request-fixture", "operation": capability, "payload": value}
             with patch.object(node, "_context", return_value=(None, None, None, {"node_id": NODE_ID})):
                 return node.dispatch_request(req, adapter_request=adapter)

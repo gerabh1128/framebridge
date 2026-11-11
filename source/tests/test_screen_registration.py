@@ -43,7 +43,8 @@ class PortableScreenRegistrationTests(unittest.TestCase):
             args = dict(script=script, authorized=authorized, timeout_s=timeout_s,
                         job_id=job_id, sha256=sha256, include_stdout=include_stdout, target=alias)
             calls.append(args)
-            result = fixture(**args)
+            result = {**fixture(**args), "requested_target": alias,
+                      "target": target, "resolved_target": target}
             if corrupt == "uuid":
                 result.pop("node_id")
             elif corrupt == "hash":
@@ -71,7 +72,7 @@ class PortableScreenRegistrationTests(unittest.TestCase):
         scope = dict(mcp=MCP(), Image=Image, expanded_execute_node=expanded, expanded_execute_screen_node=expanded,
                      framebridge_exec=legacy,
                      register_framebridge_screen_tools=register_framebridge_screen_tools,
-                     resolve_profile_node=lambda node: node)
+                     resolve_profile_route=lambda node: (node, NODE_ID))
         scope["_blocking_tools"] = scope["mcp"]  # This fixture calls registrations synchronously.
         # Load the definition and registration from production source rather
         # than recreating the adapter inside this test.
@@ -86,6 +87,7 @@ class PortableScreenRegistrationTests(unittest.TestCase):
         metadata, image = response
         self.assertTrue(metadata["ok"])
         self.assertEqual(metadata["requested_node"], target)
+        self.assertEqual(metadata["target"], target)
         self.assertEqual(metadata["node_id"], NODE_ID)
         self.assertEqual(metadata["hostname"], fixture.hostname)
         self.assertEqual(image.data, fixture.data)
@@ -93,7 +95,7 @@ class PortableScreenRegistrationTests(unittest.TestCase):
         if target == "LOCAL":
             self.assertFalse(legacy_calls)
         self.assertGreater(len(calls), 1)  # Manifest plus bound image chunks.
-        self.assertTrue(all(item["target"] == target for item in calls))
+        self.assertTrue(all(item["target"] == NODE_ID for item in calls))
         self.assertTrue(all(item["authorized"] is True and item["include_stdout"] is True
                             and item["timeout_s"] == 30 for item in calls))
 

@@ -1,5 +1,18 @@
 # FrameBridge release notes
 
+## 0.3.8
+
+The broker discards a queued direct execution request once its dispatch deadline
+passes. The node checks the deadline again before forwarding the request to its
+executor. A response without a final result reports the available execution state
+and preserves the requested and resolved node identities. A command that already
+started remains subject to its execution timeout.
+
+Use `fb nodes execution` or the read-only MCP tool `framebridge_exec_status`
+to check an existing remote receipt by request or job ID. Receipts distinguish
+the registered node label, the receiver's hostname and the hostname reported
+by the node in its execution result.
+
 ## 0.3.7
 
 The Linux package carries forward the 0.4.0~rc3 tray, automatic LAN role

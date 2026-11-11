@@ -94,5 +94,17 @@ class CliExtensionTests(unittest.TestCase):
         self.assertEqual(target.call_args.kwargs["payload"]["op"], "observe")
         self.assertEqual(target.call_args.args[1], "NodeCase")
 
+    def test_conflicting_target_and_legacy_node_do_not_dispatch(self):
+        args = self.parsed("tty", "close", self.SID, "--target", "TargetA", "--node", "TargetB")
+        out = io.StringIO()
+        with mock.patch.object(cli, "_target_tty") as target, contextlib.redirect_stdout(out):
+            self.assertEqual(cli.tty_command(args, Path("/qa/profile")), 2)
+        target.assert_not_called()
+        self.assertIn("TARGET_SELECTOR_CONFLICT", out.getvalue())
+
+    def test_nodes_execution_uses_explicit_target_and_receipt(self):
+        args = self.parsed("nodes", "execution", "--target", "NodeCase", "--job-id", "job-1")
+        self.assertEqual((args.target, args.request_id, args.job_id), ("NodeCase", "", "job-1"))
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,7 @@
 import ast
 import hashlib
 import importlib.util
+import json
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -141,7 +142,13 @@ class AuditTests(unittest.TestCase):
 
     def test_only_the_history_iteration_changes(self):
         old = (FIXTURES / 'fbterm_engine.py').read_text()
-        new = (SOURCE_ROOT / 'sources/original-asus/fbterm/bin/fbterm_engine.py').read_text()
+        root = SOURCE_ROOT.parent
+        review = json.loads((root / 'provenance/FBTERM-VIEWER-HEADER-0.3.7-REVIEW.json').read_text())
+        self.assertEqual(hashlib.sha256((root / review['path']).read_bytes()).hexdigest(),
+                         review['reviewed_sha256'])
+        preserved = (root / review['preserved_original']).read_bytes()
+        self.assertEqual(hashlib.sha256(preserved).hexdigest(), review['preserved_original_sha256'])
+        new = preserved.decode('utf-8')
         start = old.index('                for prior in self.jobs.iterdir():')
         end = old.index('            except OSError as exc:', start)
         nstart = new.index('                # DirEntry reuses')

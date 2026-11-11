@@ -1,4 +1,4 @@
-.TH FRAMEBRIDGE 1 "2026-10-31" "FrameBridge 0.3.7" "User Commands"
+.TH FRAMEBRIDGE 1 "2026-10-31" "FrameBridge 0.3.8" "User Commands"
 .SH NAME
 framebridge, fb \- use local Linux tools and enrolled nodes with ChatGPT
 .SH SYNOPSIS
@@ -171,7 +171,15 @@ fb nodes pending
 fb nodes status
 .fi
 .SS Targets
-Use target to select one enrolled alias or ID for FBEXEC and CUA. LOCAL means the actual receiver and remains the default in the execution tools when the selector is omitted. Legacy node arguments alias target. Supply only one spelling, or identical values. Conflicting selectors, unknown fields and unknown targets are rejected. For graphical CUA, capture_scope chooses WINDOW or ROOT. Legacy node:ALIAS scope works for observation only and must agree with any explicit target. In receipts, target names the resolved computer and hostname records its system name. The older node field is retained for compatibility. Local dispatch is identified by transport_target=LOCAL. Do not guess SSH identities or use historical lab hostnames as defaults. CLI tty \-\-node can use the authenticated node transport. The interactive console command is local; run it at the destination or use an explicitly configured SSH destination.
+Use target to select one enrolled alias or ID for FBEXEC and CUA. LOCAL means the actual receiver and remains the default in the execution tools when the selector is omitted. Legacy node arguments alias target. Supply only one spelling, or identical values. Conflicting selectors, unknown fields and unknown targets are rejected. For graphical CUA, capture_scope chooses WINDOW or ROOT. Legacy node:ALIAS scope works for observation only and must agree with any explicit target. Execution receipts keep requested_target and resolved_target separate. registered_label is the label in the node registry and receiver_hostname is the machine receiving the tool call. For remote execution, hostname and executed_hostname are populated from a confirmed node result. The older node field is retained for compatibility. Local dispatch is identified by transport_target=LOCAL. Do not guess SSH identities or use historical lab hostnames as defaults. CLI tty \-\-node can use the authenticated node transport. The interactive console command is local; run it at the destination or use an explicitly configured SSH destination.
+.SS Check a remote execution receipt
+Use fb nodes execution or the read\-only MCP tool framebridge_exec_status with the original node and its request_id or job_id. The receipt distinguishes a queued request, a request that expired before dispatch, an in\-flight operation, a completed operation and an unknown outcome. A dispatched operation may already be running. When do_not_replay is true, check the existing receipt before deciding whether another execution is safe.
+.PP
+.nf
+fb nodes execution \-\-help
+fb nodes execution \-\-target ALIAS_OR_UUID \-\-request\-id REQUEST_ID
+fb nodes execution \-\-target ALIAS_OR_UUID \-\-job\-id JOB_ID
+.fi
 .SS Transport trust
 certificates create manages a private central/node transport CA, not a public website certificate or ChatGPT account authentication. Private keys stay protected on the central host; distribute only the required public trust material. Off\-loopback broker use requires correctly configured verified TLS. Do not recreate trust merely to work around a connection symptom.
 .PP

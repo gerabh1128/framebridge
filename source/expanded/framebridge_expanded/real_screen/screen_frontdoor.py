@@ -17,6 +17,9 @@ import time
 import uuid
 from typing import Callable
 
+from .._execution_receipt import (
+    NOT_STARTED_EXECUTION, RECEIPT_FIELDS, UNFINISHED_EXECUTION, execution_error, execution_receipt,
+)
 from ..fleet import FleetError, select_target
 
 CHUNK_BYTES = 2100
@@ -82,10 +85,11 @@ class _AuthenticatedReply(dict):
                         "width", "height", "source", "screen_type",
                         "full_screen", "authentic_pixels", "max_chunk_bytes")
 
-    def __init__(self, payload, owner, node, node_id):
+    def __init__(self, payload, owner, node, node_id, receipt):
         super().__init__(payload)
         self.__owner, self.__node, self.__node_id = owner, node, node_id
         self.__identity = tuple(self.get(key) for key in self._IDENTITY_FIELDS)
+        self.__receipt = receipt
 
     def bound_to(self, owner, node, node_id=None):
         return (self.__owner is owner and self.__node == node
@@ -95,6 +99,10 @@ class _AuthenticatedReply(dict):
     @property
     def node_id(self):
         return self.__node_id
+
+    @property
+    def receipt(self):
+        return dict(self.__receipt)
 
 
 class ScreenClient:
@@ -124,7 +132,7 @@ class ScreenClient:
         self.resolve_node = resolve_node or (lambda node: node.upper())
         self._reply_owner = object()
 
-    def remote(self, node, request, *, deadline=None, submitted=None):
+    def remote(self, node, request, *, deadline=None, submitted=None, expected_node_id=None):
         timeout_s = 30
         if deadline is not None:
             remaining = deadline - time.monotonic()
@@ -141,19 +149,31 @@ class ScreenClient:
         outer = self.exec_request(script=script, authorized=True, timeout_s=timeout_s,
                                   job_id=job_id, sha256=digest,
                                   include_stdout=True, target=node)
+        require(type(outer) is dict, "SCREEN_EXEC_FAILED")
+        receipt = execution_receipt(outer)
+        state = receipt.get("execution_state")
+        bound = (outer.get("requested_target", outer.get("target")) == node and
+                 outer.get("mcp_job_id") == job_id and outer.get("mcp_script_sha256") == digest)
+        if outer.get("ok") is False and state in UNFINISHED_EXECUTION:
+            require(bound and (expected_node_id is None or outer.get("node_id") == expected_node_id),
+                    "SCREEN_EXEC_BINDING_INVALID")
+            rejected = state in NOT_STARTED_EXECUTION
+            if rejected:
+                receipt["performed"] = False
+            raise ScreenError(execution_error(outer, "SCREEN_EXEC_FAILED"), receipt,
+                              backend_rejection=rejected)
         if deadline is not None:
             require(time.monotonic() < deadline, "SCREEN_TRANSFER_TIMEOUT")
-        require(type(outer) is dict, "SCREEN_EXEC_FAILED")
         require(type(outer.get("exit_code")) in (int, str) and
                 str(outer["exit_code"]) in ("0", "1"), "SCREEN_EXEC_FAILED")
-        require(outer.get("target") == node and outer.get("mcp_job_id") == job_id and
-                outer.get("mcp_script_sha256") == digest, "SCREEN_EXEC_BINDING_INVALID")
+        require(bound, "SCREEN_EXEC_BINDING_INVALID")
         try:
             node_id = outer.get("node_id")
             require(type(node_id) is str, "SCREEN_EXEC_NODE_ID_INVALID")
             node_id = str(uuid.UUID(node_id))
         except (ValueError, AttributeError):
             raise ScreenError("SCREEN_EXEC_NODE_ID_INVALID") from None
+        require(expected_node_id is None or node_id == expected_node_id, "SCREEN_EXEC_BINDING_INVALID")
         stdout = outer.get("stdout")
         require(type(stdout) is str and len(stdout.encode("utf-8")) <= self.stdout_limit_bytes and
                 outer.get("stdout_truncated") is not True, "SCREEN_STDOUT_INVALID")
@@ -183,7 +203,7 @@ class ScreenClient:
                                                       or details.get("performed") is False)))
         require(outer.get("ok") is True and str(outer["exit_code"]) == "0", "SCREEN_EXEC_FAILED")
         require(type(envelope.get("result")) is dict, "SCREEN_RESPONSE_INVALID")
-        return _AuthenticatedReply(envelope["result"], self._reply_owner, node, node_id)
+        return _AuthenticatedReply(envelope["result"], self._reply_owner, node, node_id, receipt)
 
     def image(self, node, manifest, *, deadline=None):
         if deadline is None:
@@ -253,6 +273,7 @@ class ScreenClient:
         requested_node = target if target is not None else (node if node is not None else "")
         action_confirmed = False
         input_reply_received = False
+        manifest = None
         submitted = {}
         deadline = time.monotonic() + self.transfer_timeout_s
         try:
@@ -263,8 +284,14 @@ class ScreenClient:
                 raise ScreenError(str(exc)) from None
             requested_node = node
             require(valid_reference(node, NODE), "SCREEN_NODE_INVALID")
-            node = self.resolve_node(node)
+            route = self.resolve_node(node)
+            if isinstance(route, tuple):
+                node, node_id = route
+                require(valid_reference(node_id, NODE), "SCREEN_EXEC_NODE_ID_INVALID")
+            else:
+                node, node_id = route, None
             require(valid_reference(node, NODE), "SCREEN_NODE_INVALID")
+            dispatch_target = node_id or node
             if kwargs.get("session_id"):
                 require(valid_reference(kwargs["session_id"], SID), "SCREEN_SESSION_INVALID")
             else:
@@ -277,8 +304,8 @@ class ScreenClient:
             if op == "text":
                 require(type(kwargs.get("text")) is str and 0 < len(kwargs["text"].encode("utf-8")) <= 4096,
                         "SCREEN_TEXT_INVALID")
-            manifest = self.remote(node, {"op": op, **kwargs}, deadline=deadline,
-                                   submitted=submitted)
+            manifest = self.remote(dispatch_target, {"op": op, **kwargs}, deadline=deadline,
+                                   submitted=submitted, expected_node_id=node_id)
             input_reply_received = op in ("key", "text")
             action = manifest.get("action")
             summary = action.get("result") if type(action) is dict else None
@@ -289,11 +316,15 @@ class ScreenClient:
             if op == "read_capture":
                 require(manifest.get("capture_id") == kwargs["capture_id"],
                         "SCREEN_CAPTURE_REFERENCE_MISMATCH")
-            image = self.image(node, manifest, deadline=deadline)
+            image = self.image(dispatch_target, manifest, deadline=deadline)
             require(time.monotonic() < deadline, "SCREEN_TRANSFER_TIMEOUT")
-            metadata = {"ok": True, "target": node, "requested_target": requested_node,
+            node = manifest.receipt.get("resolved_target", node)
+            metadata = {**manifest.receipt,
+                        "ok": True, "target": node, "requested_target": requested_node,
                         "node": node, "requested_node": requested_node,
+                        "resolved_target": node,
                         "node_id": manifest.node_id, "hostname": manifest["node"],
+                        "observed_hostname": manifest["node"],
                         "result": dict(manifest, transport_node=node, node_id=manifest.node_id)}
             metadata["result"].pop("path", None)
             metadata["result"].pop("image_base64", None)
@@ -302,31 +333,50 @@ class ScreenClient:
             metadata["result"]["authentic_pixels"] = True
             return [metadata, image]
         except ScreenError as exc:
+            details = dict(exc.details)
+            if manifest is not None:
+                delivery_receipt = execution_receipt(details)
+                details = {key: value for key, value in details.items()
+                           if key not in RECEIPT_FIELDS and key != "performed"}
+                if delivery_receipt:
+                    details["result_delivery"] = {"error": str(exc), **delivery_receipt}
+                details.update(manifest.receipt)
             if op in ("key", "text") and (input_reply_received or
                     (submitted.get("attempted") and not exc.backend_rejection)):
-                exc.details.setdefault("observe_again", True)
+                details.setdefault("observe_again", True)
+                details["do_not_replay"] = True
                 if action_confirmed:
-                    exc.details.update(performed=True, capture_consumed=True)
-                exc.details.setdefault("capture_id", kwargs["capture_id"])
-            return {"ok": False, "node": requested_node, "error": str(exc), **exc.details}
+                    details.update(performed=True, capture_consumed=True)
+                details.setdefault("capture_id", kwargs["capture_id"])
+            return {"ok": False, "node": requested_node, "error": str(exc),
+                    **details, "requested_target": requested_node}
         except Exception:
             details = {}
             if op in ("key", "text") and submitted.get("attempted"):
-                details.update(observe_again=True, capture_id=kwargs["capture_id"])
+                details.update(observe_again=True, do_not_replay=True, capture_id=kwargs["capture_id"])
                 if action_confirmed:
                     details.update(performed=True, capture_consumed=True)
             return {"ok": False, "node": requested_node,
                     "error": "SCREEN_BACKEND_UNAVAILABLE", **details}
 
 
-def resolve_profile_node(alias):
-    """Canonicalize only through the enrolled profile registry, never guessed hostnames."""
+def _resolve_profile_descriptor(alias):
     from ..fleet import resolve_node
     try:
-        descriptor = resolve_node(alias)
+        return resolve_node(alias)
     except FleetError as exc:
         raise ScreenError(str(exc)) from None
-    return descriptor["alias"]
+
+
+def resolve_profile_node(alias):
+    """Canonicalize only through the enrolled profile registry, never guessed hostnames."""
+    return _resolve_profile_descriptor(alias)["alias"]
+
+
+def resolve_profile_route(selector):
+    """Keep the public alias and dispatch screen operations to the enrolled UUID."""
+    descriptor = _resolve_profile_descriptor(selector)
+    return descriptor["alias"], descriptor["node_id"]
 
 
 def register_framebridge_screen_tools(mcp, exec_request, *, image_factory=None,

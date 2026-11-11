@@ -7,10 +7,14 @@ import json
 import os
 import re
 import shlex
+import socket
 import uuid
 import zlib
 
 from . import tty
+from ._execution_receipt import (
+    RECEIPT_FIELDS, UNFINISHED_EXECUTION, execution_error, execution_receipt,
+)
 
 TOOL_NAMES = (
     "cua_tty_status", "cua_tty_open", "cua_tty_observe",
@@ -20,22 +24,35 @@ TOOL_NAMES = (
 
 def _exec_json(execute, target, arguments):
     script = "python3 -m framebridge_expanded.tty " + " ".join(shlex.quote(str(x)) for x in arguments)
-    response = execute(script=script, authorized=True, timeout_s=30,
-                       job_id="tty-rpc-" + uuid.uuid4().hex[:24],
-                       sha256=hashlib.sha256(script.encode()).hexdigest(),
-                       include_stdout=True, target=target)
-    if type(response) is not dict or response.get("ok") is not True:
+    job_id = "tty-rpc-" + uuid.uuid4().hex[:24]
+    digest = hashlib.sha256(script.encode()).hexdigest()
+    response = execute(script=script, authorized=True, timeout_s=30, job_id=job_id,
+                       sha256=digest, include_stdout=True, target=target)
+    if type(response) is not dict:
         return {"ok": False, "error": "TTY_REMOTE_EXEC_FAILED"}
+    receipt = execution_receipt(response)
+    claimed = receipt.get("execution_state") in UNFINISHED_EXECUTION or any(
+        key in receipt for key in ("mcp_job_id", "mcp_script_sha256"))
+    if claimed and (receipt.get("mcp_job_id") != job_id or receipt.get("mcp_script_sha256") != digest):
+        return {"ok": False, "error": "TTY_REMOTE_RECEIPT_BINDING_INVALID",
+                "execution_state": "outcome_unknown", "do_not_replay": True, "mcp_job_id": job_id}
+    if response.get("ok") is not True:
+        error = "TTY_REMOTE_EXEC_FAILED"
+        if receipt.get("execution_state") in UNFINISHED_EXECUTION:
+            error = execution_error(response, error)
+        return {"ok": False, "error": error, **receipt}
     if response.get("stdout_truncated"):
-        return {"ok": False, "error": "TTY_REMOTE_RESPONSE_TRUNCATED"}
+        return {"ok": False, "error": "TTY_REMOTE_RESPONSE_TRUNCATED", **receipt}
     output = response.get("stdout", "")
     if type(output) is not str:
-        return {"ok": False, "error": "TTY_REMOTE_RESPONSE_INVALID"}
+        return {"ok": False, "error": "TTY_REMOTE_RESPONSE_INVALID", **receipt}
     try:
         value = json.loads(output)
     except (ValueError, TypeError):
-        return {"ok": False, "error": "TTY_REMOTE_RESPONSE_INVALID"}
-    return value if type(value) is dict else {"ok": False, "error": "TTY_REMOTE_RESPONSE_INVALID"}
+        value = None
+    if type(value) is not dict:
+        return {"ok": False, "error": "TTY_REMOTE_RESPONSE_INVALID", **receipt}
+    return {**{key: value[key] for key in value if key not in RECEIPT_FIELDS}, **receipt}
 
 
 def _remote_request(execute, target, payload):
@@ -43,6 +60,9 @@ def _remote_request(execute, target, payload):
     first = _exec_json(execute, target, ["request", "--payload-b64", encoded, "--wire"])
     if first.get("ok") is not True:
         return first
+    receipt = execution_receipt(first)
+    node_id = receipt.get("node_id")
+    read_target = node_id or target
     try:
         ticket = first["ticket"]
         digest = first["sha256"]
@@ -57,8 +77,14 @@ def _remote_request(execute, target, payload):
         chunks = []
         for index in range(count):
             part = first if index == 0 else _exec_json(
-                execute, target, ["read", "--ticket", ticket, "--index", index])
+                execute, read_target, ["read", "--ticket", ticket, "--index", index])
+            if index and part.get("ok") is not True:
+                delivery = {"error": execution_error(part, "TTY_REMOTE_RESPONSE_INVALID"),
+                            **execution_receipt(part)}
+                return {"ok": False, "error": "TTY_REMOTE_RESULT_UNAVAILABLE", **receipt,
+                        "do_not_replay": True, "result_delivery": delivery}
             if (part.get("ok") is not True or part.get("ticket") != ticket
+                    or (node_id is not None and part.get("node_id") != node_id)
                     or part.get("index") != index or part.get("chunks") != count
                     or part.get("sha256") != digest or type(part.get("data")) is not str
                     or len(part["data"]) > 1800):
@@ -71,33 +97,42 @@ def _remote_request(execute, target, payload):
                 or decoder.unconsumed_tail or hashlib.sha256(raw).hexdigest() != digest):
             raise ValueError()
         result = json.loads(raw)
-        return result if type(result) is dict else {"ok": False, "error": "TTY_REMOTE_RESPONSE_INVALID"}
+        if type(result) is not dict:
+            raise ValueError()
+        return {**{key: result[key] for key in result if key not in RECEIPT_FIELDS}, **receipt}
     except (KeyError, ValueError, TypeError, zlib.error):
-        return {"ok": False, "error": "TTY_REMOTE_RESPONSE_INVALID"}
+        return {"ok": False, "error": "TTY_REMOTE_RESPONSE_INVALID", **receipt,
+                "do_not_replay": True}
 
 
 def register_tools(mcp, exec_request, *, screen_client=None, image_factory=None):
+    """Register tools; exec_request is the existing authorized fleet executor."""
     if screen_client is None:
-        from .real_screen.screen_frontdoor import ScreenClient, resolve_profile_node
+        from .real_screen.screen_frontdoor import ScreenClient, resolve_profile_route
         if image_factory is None:
             from mcp.server.fastmcp import Image
             image_factory = Image
-        screen_client = ScreenClient(exec_request, image_factory, resolve_node=resolve_profile_node)
-    """Register tools; exec_request is the existing authorized fleet executor."""
+        screen_client = ScreenClient(exec_request, image_factory, resolve_node=resolve_profile_route)
     def call(payload, target):
         if payload.get("authorized") is not True:
             return {"ok": False, "error": "AUTHORIZED_TRUE_REQUIRED"}
         if type(target) is not str or not target.strip():
             return {"ok": False, "error": "TTY_TARGET_INVALID"}
+        requested = target
         target = target.strip()
         if target.upper() == "LOCAL":
+            from .fleet import local_target_identity
+            host = socket.gethostname()
+            try:
+                identity = local_target_identity()
+            except (OSError, ValueError):
+                identity = {"transport": "local", "transport_target": "LOCAL"}
             result = tty.request(os.environ.get("FRAMEBRIDGE_EXPANDED_STATE"), payload)
-            target = "LOCAL"
+            result = {**result, **identity, "hostname": host,
+                      "executed_hostname": host, "receiver_hostname": host}
         else:
             result = _remote_request(exec_request, target, payload)
-        result = dict(result)
-        result["target"] = target
-        return result
+        return {**result, "requested_target": requested}
 
     @mcp.tool()
     def cua_tty_status(authorized: bool = False, target: str = "LOCAL") -> dict:

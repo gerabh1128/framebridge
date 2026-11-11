@@ -239,19 +239,24 @@ def connect_chatgpt(state, *, foreground=False, replace=False):
 
 def nodes_command(args, state):
     config = load_config(state)
-    if args.node_command == "list":
+    if args.node_command in {"list", "execution"}:
         broker = _module("broker")
         broker.configure(None, state_dir=state)
         previous = os.environ.get("FRAMEBRIDGE_EXPANDED_STATE")
         try:
             os.environ["FRAMEBRIDGE_EXPANDED_STATE"] = str(state)
-            _show(_module("fleet").discover_nodes())
+            fleet = _module("fleet")
+            if args.node_command == "execution":
+                result = fleet.execution_status(args.target, args.request_id, args.job_id)
+            else:
+                result = fleet.discover_nodes()
+            _show(result)
         finally:
             if previous is None:
                 os.environ.pop("FRAMEBRIDGE_EXPANDED_STATE", None)
             else:
                 os.environ["FRAMEBRIDGE_EXPANDED_STATE"] = previous
-        return 0
+        return _result_code(result) if args.node_command == "execution" else 0
     if args.node_command in {"pending", "approve"}:
         broker = _module("broker")
         broker.configure(None, state_dir=state)
@@ -295,8 +300,13 @@ def _target_tty(state, target, payload=None, service=None):
 
 
 def tty_command(args, state):
+    from . import fleet
     action = getattr(args, "tty_service_action", None) if args.tty_command == "service" else args.tty_command
-    target = getattr(args, "node", "LOCAL")
+    try:
+        target = fleet.select_target(getattr(args, "target", None), getattr(args, "node", None), default="LOCAL")
+    except fleet.FleetError as exc:
+        _show({"ok": False, "error": str(exc)})
+        return 2
     if action in {"start", "stop", "status"}:
         result = _target_tty(state, target, service=action)
     else:
@@ -621,6 +631,10 @@ def build_parser():
     ns = nodes.add_subparsers(dest="node_command", required=True)
     for name in ("list", "pending", "status", "poll"):
         ns.add_parser(name)
+    execution = ns.add_parser("execution", help="Check a remote operation receipt without replaying it.")
+    execution.add_argument("--target", required=True, help="Enrolled node alias or UUID.")
+    execution.add_argument("--request-id", default="")
+    execution.add_argument("--job-id", default="")
     approve = ns.add_parser("approve", help="Approve after checking the node identity.")
     approve.add_argument("request_id")
     approve.add_argument("--node-id", required=True, help="Expected UUID from the pending request.")
@@ -645,22 +659,26 @@ def build_parser():
     desktop.add_argument("console_desktop_action", choices=("migrate-legacy",))
     tty = sub.add_parser("tty", help="Manage persistent Bash sessions; persistence is between calls, not reboots.")
     ts = tty.add_subparsers(dest="tty_command", required=True, metavar="ACTION")
+    def tty_target(item):
+        item.add_argument("--target", help="Enrolled node alias or UUID; defaults to this receiver.")
+        item.add_argument("--node", help="Legacy spelling of --target.")
+
     tty_service = ts.add_parser("service", help="Manage the terminal daemon.")
     tss = tty_service.add_subparsers(dest="tty_service_action", required=True)
     for name in ("start", "stop", "status"):
         item = tss.add_parser(name)
-        item.add_argument("--node", default="LOCAL")
+        tty_target(item)
     for name in ("start", "stop", "status", "list"):
         item = ts.add_parser(name, help="List session state." if name == "list" else argparse.SUPPRESS)
-        item.add_argument("--node", default="LOCAL")
+        tty_target(item)
     sudo = ts.add_parser("sudo", help="Per-session sudo eligibility; changing mode recreates Bash and loses shell variables.")
     modes = sudo.add_subparsers(dest="sudo_mode", required=True)
     for mode in ("on", "status", "off"):
         item = modes.add_parser(mode)
         item.add_argument("session_id")
-        item.add_argument("--node", default="LOCAL")
+        tty_target(item)
     op = ts.add_parser("open", help="Create a real Bash session and return its ID.")
-    op.add_argument("--node", default="LOCAL")
+    tty_target(op)
     op.add_argument("--program", choices=("bash",), default="bash")
     op.add_argument("--rows", type=int, default=24)
     op.add_argument("--cols", type=int, default=80)
@@ -669,7 +687,7 @@ def build_parser():
              "key":"Send a named key such as ENTER or CTRL_C.", "type":"Type text without adding Enter.",
              "resize":"Change terminal dimensions.", "close":"Close this session and its processes; not detachment."}[name])
         item.add_argument("session_id")
-        item.add_argument("--node", default="LOCAL")
+        tty_target(item)
         if name == "key":
             item.add_argument("key")
         elif name == "type":
