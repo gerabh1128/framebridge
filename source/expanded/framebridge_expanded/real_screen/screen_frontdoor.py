@@ -77,6 +77,20 @@ def valid_reference(value, regex, optional=False):
     return type(value) is str and ((optional and value == "") or regex.fullmatch(value) is not None)
 
 
+def _response_envelope(outer, stdout_limit_bytes):
+    stdout = outer.get("stdout")
+    require(type(stdout) is str and outer.get("stdout_truncated") is not True,
+            "SCREEN_STDOUT_INVALID")
+    try:
+        require(len(stdout.encode("utf-8")) <= stdout_limit_bytes, "SCREEN_STDOUT_INVALID")
+        envelope = json.loads(stdout)
+    except (ValueError, UnicodeError, RecursionError):
+        raise ScreenError("SCREEN_RESPONSE_INVALID") from None
+    require(type(envelope) is dict and type(envelope.get("ok")) is bool,
+            "SCREEN_RESPONSE_INVALID")
+    return envelope
+
+
 class _AuthenticatedReply(dict):
     """A payload tied to the EXEC recipient verified by this client instance.
 
@@ -165,8 +179,23 @@ class ScreenClient:
             rejected = state in NOT_STARTED_EXECUTION
             if rejected:
                 receipt["performed"] = False
-            raise ScreenError(execution_error(outer, "SCREEN_EXEC_FAILED"), receipt,
-                              backend_rejection=rejected)
+            error = execution_error(outer, "SCREEN_EXEC_FAILED")
+            if (error == "SCREEN_EXEC_FAILED" and state == "outcome_unknown"
+                    and outer.get("request_type") == "screen_rpc"
+                    and type(outer.get("exit_code")) in (int, str)
+                    and str(outer["exit_code"]) == "1"):
+                # Native Windows returns a typed error and a replay barrier
+                # together. Keep the backend error without weakening the barrier.
+                try:
+                    response = _response_envelope(outer, min(self.stdout_limit_bytes, EXPANDED_STDOUT_BYTES))
+                except ScreenError:
+                    pass
+                else:
+                    details = response.get("error")
+                    if (response["ok"] is False and type(details) is dict
+                            and valid_reference(details.get("code"), ERROR)):
+                        error = details["code"]
+            raise ScreenError(error, receipt, backend_rejection=rejected)
         if deadline is not None:
             require(time.monotonic() < deadline, "SCREEN_TRANSFER_TIMEOUT")
         require(type(outer.get("exit_code")) in (int, str) and
@@ -179,18 +208,10 @@ class ScreenClient:
         except (ValueError, AttributeError):
             raise ScreenError("SCREEN_EXEC_NODE_ID_INVALID") from None
         require(expected_node_id is None or node_id == expected_node_id, "SCREEN_EXEC_BINDING_INVALID")
-        stdout = outer.get("stdout")
         limit = self.stdout_limit_bytes
         if request["op"] != "read_chunk" or "bulk_chunk_bytes" not in request:
             limit = min(limit, EXPANDED_STDOUT_BYTES)
-        require(type(stdout) is str and len(stdout.encode("utf-8")) <= limit and
-                outer.get("stdout_truncated") is not True, "SCREEN_STDOUT_INVALID")
-        try:
-            envelope = json.loads(stdout)
-        except (ValueError, UnicodeError):
-            raise ScreenError("SCREEN_RESPONSE_INVALID") from None
-        require(type(envelope) is dict and type(envelope.get("ok")) is bool,
-                "SCREEN_RESPONSE_INVALID")
+        envelope = _response_envelope(outer, limit)
         if not envelope["ok"]:
             code = envelope.get("error")
             details = {}

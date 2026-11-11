@@ -205,6 +205,22 @@ class ScreenTests(unittest.TestCase):
         self.assertNotIn("text", result)
         self.assertEqual(len(executor.requests), 1)
 
+    def test_native_typed_failure_keeps_error_and_replay_barrier(self):
+        executor = Executor("uncertain_input")
+
+        def windows_failure(**kwargs):
+            return dict(executor(**kwargs), request_type="screen_rpc",
+                        execution_state="outcome_unknown", do_not_replay=True)
+
+        client = ScreenClient(windows_failure, Image, resolve_node=lambda alias: (alias, NODE_ID))
+        result = client.call("key", "WINDOWS", True, capture_id=CAPTURE_ID, key="ENTER")
+        self.assertEqual(result["error"], "INPUT_SENT_OBSERVE_FAILED")
+        self.assertEqual(result["execution_state"], "outcome_unknown")
+        self.assertIs(result["do_not_replay"], True)
+        self.assertIs(result["observe_again"], True)
+        self.assertNotIn("text", result)
+        self.assertEqual(len(executor.requests), 1)
+
     def test_utf8_text_limit_matches_backend(self):
         client, executor = self.client()
         result = client.call("text", "GERAMEG", True, capture_id=CAPTURE_ID, text="界" * 1400)
