@@ -22,8 +22,8 @@ class Image:
 class PostMetadata(unittest.TestCase):
     def setUp(self):
         self.calls=[]
-        self.before_data=b'BEFORE_OPAQUE_IMAGE_TEST_BYTES'
-        self.after_data=b'AFTER_OPAQUE_IMAGE_TEST_BYTES'
+        self.before_data=b'\xff\xd8BEFORE_OPAQUE_IMAGE_TEST_BYTES\xff\xd9'
+        self.after_data=b'\xff\xd8AFTER_OPAQUE_IMAGE_TEST_BYTES\xff\xd9'
         self.before=dict(ok=True,action='CLICK',performed=True,resultado_final='CUA_CLICK_PASS',
             input_may_have_been_sent=True,do_not_replay=False,job_id='action-id',mcp_job_id='action-id',
             request_id='action-request',expected_window_gate='PASS',expected_source_geometry_gate='PASS',
@@ -61,9 +61,11 @@ class PostMetadata(unittest.TestCase):
                      FleetError=FleetError,select_target=select_target,
                      sanitize_text=str,dispatch_cua_request=self.dispatch)
         module=ast.parse((SOURCE_ROOT/'portable/front_door_mcp.py').read_text())
-        function=next(n for n in module.body if isinstance(n,ast.FunctionDef) and n.name=='framebridge_cua')
-        function.decorator_list=[]
-        exec(compile(ast.fix_missing_locations(ast.Module(body=[function],type_ignores=[])),
+        functions=[n for n in module.body if isinstance(n,ast.FunctionDef)
+                   and n.name in {'_verified_cua_image', 'framebridge_cua'}]
+        for function in functions:
+            function.decorator_list=[]
+        exec(compile(ast.fix_missing_locations(ast.Module(body=functions,type_ignores=[])),
                      str(SOURCE_ROOT/'portable/front_door_mcp.py'),'exec'),self.ns)
         self.function=self.ns['framebridge_cua']
 
@@ -167,6 +169,39 @@ class PostMetadata(unittest.TestCase):
         self.assertTrue(meta['performed']);self.assertFalse(meta['post_ok'])
         self.assertEqual(meta['post_error'],'POST_OBSERVATION_TRANSPORT_FAILED')
         self.assertEqual(len(self.calls),2)
+
+    def test_corrupted_post_snapshot_keeps_valid_action_evidence(self):
+        self.after['sha256']='0'*64
+        meta,image=self.call()
+        self.assertTrue(meta['performed'])
+        self.assertFalse(meta['post_ok'])
+        self.assertEqual(meta['post_error'],'CUA_IMAGE_INTEGRITY_INVALID')
+        self.assertEqual(image.data,self.before_data)
+        self.assertEqual(len(self.calls),2)
+
+    def test_direct_observe_cannot_return_corrupted_image_as_success(self):
+        self.before['bytes']=len(self.before_data)+1
+        meta,image=self.call(action='OBSERVE')
+        self.assertFalse(meta['ok'])
+        self.assertEqual(meta['error'],'CUA_IMAGE_INTEGRITY_INVALID')
+        self.assertNotIn('image_base64',meta)
+        self.assertIsNone(image)
+
+    def test_missing_direct_observe_image_is_a_capture_failure(self):
+        self.before.pop('image_base64')
+        meta,image=self.call(action='OBSERVE')
+        self.assertFalse(meta['ok'])
+        self.assertEqual(meta['error'],'CUA_IMAGE_MISSING')
+        self.assertIsNone(image)
+
+    def test_bad_action_image_does_not_erase_completed_input_evidence(self):
+        self.before['image_base64']='invalid!'
+        meta,image=self.call(observe_after=False)
+        self.assertTrue(meta['ok'])
+        self.assertTrue(meta['performed'])
+        self.assertEqual(meta['image_decode_error'],'CUA_IMAGE_BASE64_INVALID')
+        self.assertNotIn('image_base64',meta)
+        self.assertIsNone(image)
 
     def test_unauthorized_request_never_dispatches(self):
         meta,image=self.call(authorized=False)

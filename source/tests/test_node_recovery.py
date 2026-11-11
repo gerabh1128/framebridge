@@ -151,7 +151,7 @@ class NodeRecoveryTests(unittest.TestCase):
                 self.assertEqual(saved["state"], "complete")
                 self.assertTrue(saved["result"]["ok"])
 
-    def test_broker_restart_after_execution_is_terminal_without_replay(self):
+    def test_broker_restart_releases_orphaned_delivery_without_replay(self):
         state, ident = self.pair("orphan-node")
         marker = self.root / "orphan-effect.txt"
         script = "printf x >> " + shlex.quote(str(marker))
@@ -160,15 +160,17 @@ class NodeRecoveryTests(unittest.TestCase):
         queued, error = self.server.expanded_store.queue_admin(ident, "admin.exec", payload)
         self.assertIsNone(error)
         real_post = broker.post_json
-        result_attempts = []
+        result_attempts, acknowledgements, next_requests = [], [], []
 
         def execute(value):
             subprocess.run(["/bin/sh", "-c", value["script"]], check=True)
             return {"ok": True, "exit_code": "0"}
 
         def post(url, envelope, **kwargs):
-            if url.endswith("/node/result"):
-                result_attempts.append(1)
+            if not url.endswith("/node/result"):
+                return real_post(url, envelope, **kwargs)
+            result_attempts.append(envelope["payload"]["request_id"])
+            if len(result_attempts) == 1:
                 self.assertEqual(marker.read_text(), "x")
                 self.server.shutdown()
                 self.server.server_close()
@@ -177,20 +179,33 @@ class NodeRecoveryTests(unittest.TestCase):
                 self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
                 self.thread.start()
                 self.assertIsNone(self.server.expanded_store.get_result(queued["request_id"]))
-            return real_post(url, envelope, **kwargs)
+                new_request, error = self.server.expanded_store.queue_read(ident, "system.status", {})
+                self.assertIsNone(error)
+                next_requests.append(new_request["request_id"])
+            response = real_post(url, envelope, **kwargs)
+            if not acknowledgements:
+                self.assertFalse(self.server.expanded_store.node_runtime_status(ident)["ready"])
+            acknowledgements.append(response)
+            return response
+
+        def pause(seconds):
+            if len(acknowledgements) == 2:
+                raise StopLoop
 
         with mock.patch.object(broker, "post_json", side_effect=post), \
                 mock.patch("framebridge_expanded.runtime.adapter_request", side_effect=execute) as adapter, \
-                mock.patch.object(node, "time", wraps=time) as clock:
-            with self.assertRaisesRegex(broker.BrokerError, "^BROKER_HTTP_REJECTED_400$"):
+                mock.patch.object(node, "time", wraps=time) as clock, \
+                self.assertLogs(node._LOG, level="WARNING") as logs:
+            clock.sleep.side_effect = pause
+            with self.assertRaises(StopLoop):
                 node.run(state)
             adapter.assert_called_once()
-            clock.sleep.assert_not_called()
-        self.assertEqual(result_attempts, [1])
-        self.assertEqual(marker.read_text(), "x")
-        # A later operator restart may poll, but must never reconstruct/replay
-        # the orphaned command from its lost acknowledgement.
-        self.assertTrue(node.run(state, once=True)["idle"])
+        self.assertEqual(result_attempts, [queued["request_id"], next_requests[0]])
+        self.assertEqual(acknowledgements, [{"ok": True, "disposition": "orphaned"}, {"ok": True}])
+        self.assertIn("NODE_RESULT_ORPHANED", "\n".join(logs.output))
+        self.assertIsNone(self.server.expanded_store.get_result(queued["request_id"]))
+        self.assertTrue(self.server.expanded_store.get_result(next_requests[0])["result"]["ok"])
+        self.assertTrue(self.server.expanded_store.node_runtime_status(ident)["ready"])
         self.assertEqual(marker.read_text(), "x")
 
     def test_gateway_failures_recover_without_replaying_signed_envelope(self):

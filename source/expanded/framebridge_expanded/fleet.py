@@ -423,6 +423,12 @@ def execute_screen_node(alias: str, script: str, authorized: bool, timeout_s: in
                             stdout=encode({"ok": False, "error": {"code": "SCREEN_RPC_UNSUPPORTED_ON_NODE"}}).decode("ascii") + "\n")
         response.update(_target_identity(alias, node, result))
         response.update(_received_execution_receipt(result))
+        if (result.get("ok") is False
+                and result.get("error") in ("ADMIN_OPERATION_DENIED", "PAIR_CUA_SCOPE_MISSING")
+                and set(result) <= {"ok", "error", "request_id", "node_id"}):
+            # The Windows client returns a bare rejection before calling its
+            # typed adapter. Preserve it without requiring an EXEC exit code.
+            response["execution_state"] = "not_started"
         response.update(mcp_job_id=payload["job_id"],
                         mcp_script_sha256=payload["sha256"])
         return response

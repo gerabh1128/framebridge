@@ -196,6 +196,14 @@ class ObservationRegression(unittest.TestCase):
         guards = json.loads((FIXTURES / 'STRUCTURAL-GUARDS.json').read_text())
         for name, expected in guards['unchanged_helpers'].items():
             self.assertEqual(hashlib.sha256((PACKAGE_ROOT / name).read_bytes()).hexdigest(), expected)
+        # Only the chunk reader and its new bound changed. Keep a guard on all
+        # capture provenance, permissions and input-binding helpers in this module.
+        screen = ast.parse((PACKAGE_ROOT / 'real_screen/screen_capture.py').read_text())
+        screen.body = [node for node in screen.body if not (
+            isinstance(node, ast.FunctionDef) and node.name == 'read_chunk'
+            or isinstance(node, ast.Assign) and any(isinstance(target, ast.Name)
+                and target.id == 'MAX_BULK_CHUNK_BYTES' for target in node.targets))]
+        self.assertEqual(semantic_ast_digest(screen), guards['screen_capture_without_chunk_transfer_ast'])
         text = (PACKAGE_ROOT / 'runtime.py').read_text()
         function = next(n for n in ast.parse(text).body
                         if isinstance(n, ast.FunctionDef) and n.name == 'adapter_request')

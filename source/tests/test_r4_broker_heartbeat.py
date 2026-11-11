@@ -180,6 +180,60 @@ class HeartbeatTests(unittest.TestCase):
         self.assertEqual(self.store.get_result('work-a')['state'], 'complete')
         self.assertFalse(self.store.node_runtime_status('node-a')['busy'])
 
+    def test_orphaned_frozen_delivery_is_acknowledged_without_result_or_liveness(self):
+        for rid in ('a' * 32, 'fbreq_' + 'Ab_0-' * 4 + 'Def1'):
+            with self.subTest(rid=rid):
+                envelope = self.message(kind='node.result', rid=rid)
+                self.assertEqual(self.call('result', envelope), (200, {'ok': True, 'disposition': 'orphaned'}))
+                self.assertEqual(self.call('result', envelope)[0], 403)
+                self.assertIsNone(self.store.get_result(rid))
+                self.assertNotIn('node-a', self.store.node_last_seen)
+        tampered = self.message(kind='node.result', rid='b' * 32)
+        tampered['node_proof']['signature_b64'] = 'AAAA'
+        self.assertEqual(self.call('result', tampered)[0], 403)
+        self.assertEqual(self.call('result', self.message(kind='node.result', rid='not-issued'))[0], 400)
+
+    def test_known_wrong_node_and_pending_results_are_never_acknowledged(self):
+        pending = 'b' * 32
+        foreign = 'c' * 32
+        self.enqueue(foreign)
+        self.assertEqual(self.store.next_read('node-a')['request_id'], foreign)
+        self.enqueue(pending)
+        self.assertEqual(self.call('result', self.message(kind='node.result', rid=pending))[0], 400)
+        self.assertEqual(self.call('result', self.message(kind='node.result', rid=foreign, node='node-b'))[0], 400)
+        self.assertNotIn('node-a', self.store.node_last_seen)
+        self.assertNotIn('node-b', self.store.node_last_seen)
+        self.assertEqual(self.store.get_result(pending)['state'], 'pending')
+        self.assertEqual(self.store.get_result(foreign)['state'], 'dispatched')
+
+    def test_late_dispatched_result_and_same_result_retry_are_accepted(self):
+        clock.now = self.store.control_requests['work-a']['expires_at'] + 1
+        for _ in range(2):
+            code, response = self.call('result', self.message(kind='node.result'))
+            self.assertEqual((code, response), (200, {'ok': True}))
+        saved = self.store.get_result('work-a')
+        clock.now += 1
+        conflict = self.message(kind='node.result', payload={'request_id': 'work-a', 'result': {'ok': False}})
+        self.assertEqual(self.call('result', conflict)[0], 400)
+        self.assertEqual(self.store.get_result('work-a'), saved)
+        self.assertEqual(self.store.node_last_seen['node-a'], clock.now - 1)
+
+    def test_poll_and_result_envelopes_cannot_cross_endpoints(self):
+        self.enqueue('queued-a')
+        self.assertEqual(self.call('poll', self.message(kind='node.result'))[0], 403)
+        self.assertEqual(self.call('result', self.message(kind='node.poll'))[0], 403)
+        self.assertEqual(list(self.store.control_queue['node-a']), ['queued-a'])
+        self.assertEqual(self.store.get_result('work-a')['state'], 'dispatched')
+        self.assertNotIn('node-a', self.store.node_last_seen)
+
+    def test_malformed_result_never_completes_or_refreshes_liveness(self):
+        for payload in (['work-a'], {'request_id': 'work-a'}, {'request_id': 'work-a', 'result': []}):
+            with self.subTest(payload=payload):
+                code, _ = self.call('result', self.message(kind='node.result', payload=payload))
+                self.assertIn(code, (400, 403))
+        self.assertEqual(self.store.get_result('work-a')['state'], 'dispatched')
+        self.assertNotIn('node-a', self.store.node_last_seen)
+
     def test_heartbeat_cannot_dequeue_through_poll_endpoint(self):
         self.enqueue('queued-a')
         self.assertEqual(self.call('poll')[0], 403)

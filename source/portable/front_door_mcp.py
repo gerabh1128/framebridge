@@ -711,6 +711,29 @@ def asus_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -
     return {"ok":False,"error":"ASUS_CUA_TIMEOUT","request_id":rid}
 
 
+def _verified_cua_image(result):
+    encoded = result.get("image_base64")
+    if not isinstance(encoded, str) or not encoded:
+        raise ValueError("CUA_IMAGE_MISSING")
+    try:
+        data = base64.b64decode(encoded, validate=True)
+    except ValueError:
+        raise ValueError("CUA_IMAGE_BASE64_INVALID") from None
+    mime = result.get("image_mime")
+    if mime == "image/jpeg" and data.startswith(b"\xff\xd8") and data.endswith(b"\xff\xd9"):
+        image_format = "jpeg"
+    elif mime == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n"):
+        image_format = "png"
+    else:
+        raise ValueError("CUA_IMAGE_FORMAT_INVALID")
+    size = result.get("bytes")
+    digest = result.get("sha256")
+    if (type(size) not in (int, str) or str(size) != str(len(data))
+            or not isinstance(digest, str) or digest.lower() != hashlib.sha256(data).hexdigest()):
+        raise ValueError("CUA_IMAGE_INTEGRITY_INVALID")
+    return data, image_format
+
+
 @_blocking_tools.tool()
 def framebridge_cua(
     action: str,
@@ -819,6 +842,7 @@ def framebridge_cua(
     result={**dispatch_cua_request(payload,True,timeout_s,action_job_id,target), **identity}
     if identity and result.get("ok") is True:
         result["executed_hostname"] = identity["hostname"]
+    verified_image = None
     if bool(observe_after) and action!="OBSERVE" and bool(result.get("ok")):
         post={"action":"OBSERVE","capture_scope":observe_scope}
         if preview_width>0: post["preview_width"]=int(preview_width)
@@ -842,6 +866,11 @@ def framebridge_cua(
                 post_result={"ok":False,"error":"POST_OBSERVATION_TRANSPORT_FAILED"}
             if not identity and post_result.get("ok") is True and post_result.get("node_id") != post_target:
                 post_result={"ok":False,"error":"POST_OBSERVATION_NODE_MISMATCH"}
+        if post_result.get("ok") is True:
+            try:
+                verified_image = _verified_cua_image(post_result)
+            except ValueError as exc:
+                post_result.update(ok=False, error=str(exc))
         result["post_job_id"]=post_id
         result["post_target"]=post_target
         result["post_request_id"]=post_result.get("request_id")
@@ -873,7 +902,7 @@ def framebridge_cua(
             "completed_at","target_display","max_chunk_bytes","visual_capture_gate",
             "cua_protocol_version","frame_output",
         )
-        if result["post_ok"] and isinstance(post_result.get("image_base64"),str) and post_result["image_base64"]:
+        if result["post_ok"]:
             # The displayed bytes and every top-level capture field must refer
             # to the same observation. Keep the action's evidence separately,
             # without duplicating either base64 image in the response.
@@ -886,18 +915,17 @@ def framebridge_cua(
             result.update({name:post_result[name] for name in capture_keys
                 if name in post_result})
 
-    image_b64=result.get("image_base64")
-    mime=str(result.get("image_mime") or "")
-    if isinstance(image_b64,str) and image_b64:
+    if result.get("ok") is True and (action == "OBSERVE" or "image_base64" in result):
         try:
-            data=base64.b64decode(image_b64,validate=True)
-            fmt="jpeg" if mime=="image/jpeg" else ("png" if mime=="image/png" else None)
-            if fmt:
-                meta=dict(result)
-                meta.pop("image_base64",None)
-                return [meta, Image(data=data,format=fmt)]
-        except Exception:
-            result["image_decode_error"]="INVALID_BASE64"
+            data, fmt = verified_image or _verified_cua_image(result)
+        except ValueError as exc:
+            result["image_decode_error"] = str(exc)
+            if action == "OBSERVE":
+                result.update(ok=False, error=str(exc))
+        else:
+            result.pop("image_base64", None)
+            return [result, Image(data=data, format=fmt)]
+    result.pop("image_base64", None)
     return result
 
 
@@ -966,10 +994,12 @@ def _screen_exec_request(
                                         job_id, sha256, include_stdout)
 
 
-from framebridge_expanded.real_screen.screen_frontdoor import register_framebridge_screen_tools, resolve_profile_route
+from framebridge_expanded.real_screen.screen_frontdoor import (
+    BULK_STDOUT_BYTES, register_framebridge_screen_tools, resolve_profile_route,
+)
 _real_screen_client = register_framebridge_screen_tools(
     _blocking_tools, _screen_exec_request, image_factory=Image,
-    resolve_node=resolve_profile_route, stdout_limit_bytes=65536, transfer_timeout_s=90,
+    resolve_node=resolve_profile_route, stdout_limit_bytes=BULK_STDOUT_BYTES, transfer_timeout_s=90,
 )
 from framebridge_expanded.real_screen.screen_presentation import register_screen_presentation
 register_screen_presentation(_blocking_tools, _real_screen_client)

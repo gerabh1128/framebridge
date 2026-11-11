@@ -55,6 +55,53 @@ class BrokerDispatchDeadlineTests(unittest.TestCase):
             self.assertIsNone(store.next_read(ident))
         self.assertEqual(broker.request_status(ident, request_id=receipt_id)["state"], "expired")
 
+    def test_read_receipt_expires_without_a_node_poll(self):
+        _, ident = self.pair("read-expiry-node")
+        store = self.server.expanded_store
+        queued, error = store.queue_read(ident, "system.status", {})
+        self.assertIsNone(error)
+        rid = queued["request_id"]
+        with mock.patch.object(broker.time, "time", return_value=queued["expires_at"]):
+            self.assertEqual(store.get_result(rid)["state"], "expired")
+        self.assertIsNone(store.next_read(ident))
+        self.assertFalse(store.put_result(ident, rid, {"ok": True}))
+
+    def test_read_result_deadline_starts_after_enqueue_and_retries_a_transient_poll(self):
+        elapsed = 0.0
+        routes = []
+
+        def discover():
+            nonlocal elapsed
+            elapsed += 9.5
+            return [{"node_id": "windows", "ready": True}]
+
+        def control(route, args, **kwargs):
+            nonlocal elapsed
+            routes.append(route)
+            if route == "request":
+                elapsed += 3
+                return {"ok": True, "request_id": "read-receipt"}
+            self.assertEqual(args, {"request_id": "read-receipt"})
+            if routes.count("result") == 1:
+                raise broker.BrokerError("BROKER_HTTP_REJECTED_503")
+            if elapsed < 42:
+                return {"node_id": "windows", "state": "pending"}
+            return {"node_id": "windows", "state": "complete", "result": {"ok": True}}
+
+        def sleep(delay):
+            nonlocal elapsed
+            elapsed += delay
+
+        with mock.patch.object(broker, "list_confirmed_nodes", side_effect=discover), \
+                mock.patch.object(broker, "_control", side_effect=control), \
+                mock.patch.object(broker, "time") as clock:
+            clock.monotonic.side_effect = lambda: elapsed
+            clock.sleep.side_effect = sleep
+            result = broker.request("windows", "system.status", {}, timeout_s=30)
+        self.assertEqual(result, {"node_id": "windows", "request_id": "read-receipt", "ok": True})
+        self.assertEqual(routes.count("request"), 1)
+        self.assertGreaterEqual(elapsed, 42)
+
     def test_cancellation_and_claim_are_mutually_exclusive(self):
         _, ident = self.pair("race-node")
         store = self.server.expanded_store

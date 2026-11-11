@@ -3,20 +3,24 @@ from __future__ import annotations
 
 import argparse
 import copy
+import errno
 import importlib
 import json
 import os
 from pathlib import Path
 import re
-import socket
 import sys
 import shlex
 
-from .config import default_config, load_config, save_config, state_path
+from .config import (
+    broker_connect_host, broker_endpoint, check_listener_port, default_config,
+    load_config, save_config, state_path,
+)
 from . import profiles
 from . import tunnel, __version__
 
 _EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+\Z")
+_PROFILE_FREE_COMMANDS = {"screen-access", "help", "tutorial", "profile", "installation"}
 
 
 def resolve_state(value=None):
@@ -156,9 +160,10 @@ def setup(state, *, ask=None):
             config["tls_ca"] = _ask("Trusted CA file (path only; optional)", config.get("tls_ca", ""), ask=ask)
             config["broker_url"] = _ask("Advertised broker URL (optional on loopback)", config.get("broker_url", ""), ask=ask)
             scheme = "https" if config["tls_cert"] and config["tls_key"] else "http"
-            config["broker_control_url"] = scheme + "://127.0.0.1:" + str(ports["broker"])
+            control_host = broker_connect_host(config["broker_listen_host"])
+            config["broker_control_url"] = broker_endpoint(scheme, control_host, ports["broker"])
             if scheme == "https":
-                print("Existing certificates must cover 127.0.0.1 or localhost for private local control.")
+                print(f"Existing certificates must cover {control_host} for private local control.")
             if config["broker_listen_host"] not in {"localhost", "127.0.0.1", "::1"} and not (config["tls_cert"] and config["tls_key"]):
                 raise ValueError("A broker listening outside loopback requires HTTPS certificate and key files.")
         else:
@@ -228,11 +233,12 @@ def connect_chatgpt(state, *, foreground=False, replace=False):
         if not current.get("running"):
             for name in ("mcp", "hub") + (("broker",) if config["role"] == "central" else ()):
                 try:
-                    with socket.socket() as probe:
-                        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                        probe.bind(("127.0.0.1", config["ports"][name]))
-                except OSError:
-                    raise RuntimeError("The local " + name.upper() + " port " + str(config["ports"][name]) + " is already in use. Choose an available port with fb setup.") from None
+                    check_listener_port(config, name)
+                except OSError as exc:
+                    port = config["ports"][name]
+                    if exc.errno == errno.EADDRINUSE:
+                        raise RuntimeError(f"The local {name.upper()} port {port} is already in use. Choose an available port with fb setup.") from None
+                    raise RuntimeError(f"The {name.upper()} listener on port {port} could not bind: {exc}. Check fb setup.") from None
         return _module("autostart").configure_connection(profile, settings, runtime_key)
     return tunnel.connect_chatgpt(binary, state, expected_url, config, configure_connection=configure_connection)
 
@@ -256,7 +262,7 @@ def nodes_command(args, state):
                 os.environ.pop("FRAMEBRIDGE_EXPANDED_STATE", None)
             else:
                 os.environ["FRAMEBRIDGE_EXPANDED_STATE"] = previous
-        return _result_code(result) if args.node_command == "execution" else 0
+        return _result_code(result)
     if args.node_command in {"pending", "approve"}:
         broker = _module("broker")
         broker.configure(None, state_dir=state)
@@ -273,7 +279,7 @@ def nodes_command(args, state):
             result = node.run(state_dir=state, once=args.once)
     if result is not None:
         _show(result)
-    return 0
+    return _result_code(result)
 
 
 def _target_tty(state, target, payload=None, service=None):
@@ -716,9 +722,11 @@ def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
     previous = _OUTPUT
-    _OUTPUT = {"json": args.json, "command": args.command,
-               "explicit_state": str(resolve_state(args.state_dir)) if args.command != "screen-access" and (args.state_dir or os.environ.get("FRAMEBRIDGE_EXPANDED_STATE") or os.environ.get("FRAMEBRIDGE_STATE_DIR")) else None}
+    _OUTPUT = {"json": args.json, "command": args.command, "explicit_state": None}
     try:
+        explicit = args.state_dir or os.environ.get("FRAMEBRIDGE_EXPANDED_STATE") or os.environ.get("FRAMEBRIDGE_STATE_DIR")
+        if explicit and args.command is not None and args.command not in _PROFILE_FREE_COMMANDS:
+            _OUTPUT["explicit_state"] = str(resolve_state(explicit))
         return _dispatch(parser, args)
     except (OSError, ValueError, RuntimeError) as exc:
         # Profile resolution happens before normal command dispatch. A broken
@@ -756,7 +764,7 @@ def _dispatch(parser, args):
         return main(prefix + action)
     # Help and reference recovery remain available when the saved profile is
     # missing, ambiguous or unsafe. None of these reads creates a profile.
-    state = None if args.command in {"screen-access", "help", "tutorial", "profile", "installation"} else resolve_state(args.state_dir)
+    state = None if args.command in _PROFILE_FREE_COMMANDS else resolve_state(args.state_dir)
     try:
         if args.command == "profile":
             if args.profile_action == "select":
@@ -893,8 +901,9 @@ def _dispatch(parser, args):
                 return _result_code(result)
             console = _module("console")
             if args.status:
-                _show(console.status(state, args.node))
-                return 0
+                result = console.status(state, args.node)
+                _show(result)
+                return _result_code(result)
             if args.json or args.non_interactive:
                 return _interaction_required("fb console")
             return console.run(state, args.node, inside=args.inside, mode=args.mode)

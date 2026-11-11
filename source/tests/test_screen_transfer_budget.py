@@ -19,8 +19,9 @@ from unittest.mock import patch
 
 from framebridge_expanded.real_screen import screen_rpc as rpc
 from framebridge_expanded.real_screen import screen_transport as transport
+from framebridge_expanded.real_screen.screen_capture import MAX_BULK_CHUNK_BYTES
 from framebridge_expanded.real_screen.screen_frontdoor import (
-    CHUNK_BYTES, EXPANDED_CHUNK_BYTES, EXPANDED_STDOUT_BYTES,
+    BULK_STDOUT_BYTES, CHUNK_BYTES, EXPANDED_CHUNK_BYTES, EXPANDED_STDOUT_BYTES,
     MAX_STDOUT_BYTES, RPC_COMMAND, ScreenClient, ScreenError,
 )
 from test_screen_frontdoor import CAPTURE_ID, NODE_ID, Image, png, Executor
@@ -166,6 +167,48 @@ class ScreenTransferBudgetTests(unittest.TestCase):
         self.assertTrue(all('chunk_bytes' not in r for r, _ in self.fixture.calls))
         self.assertLessEqual(max(self.fixture.reply_sizes), MAX_STDOUT_BYTES)
 
+    def test_large_capture_finishes_with_bulk_negotiation_under_same_deadline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.fixture = ProtocolFixture(Path(directory), width=1000, height=733)
+            clock = Clock()
+            self.fixture.clock, self.fixture.latency = clock, 1.9
+            with patch('framebridge_expanded.real_screen.screen_frontdoor.time.monotonic', clock):
+                timed_out = self.read(self.client(stdout_limit_bytes=EXPANDED_STDOUT_BYTES,
+                                                  transfer_timeout_s=90))
+                self.assertEqual(timed_out['error'], 'SCREEN_TRANSFER_TIMEOUT')
+                self.assertTrue(timed_out['capture_available'])
+                self.assertEqual(timed_out['capture_id'], CAPTURE_ID)
+                self.fixture.calls.clear()
+                self.fixture.reply_sizes.clear()
+                started = clock.now
+                result = self.read(self.client(stdout_limit_bytes=BULK_STDOUT_BYTES,
+                                               transfer_timeout_s=90))
+            self.assertEqual(result[1].data, self.fixture.data)
+            self.assertEqual(result[0]['result']['sha256'], self.fixture.manifest['sha256'])
+            self.assertEqual(len(self.fixture.calls), 5)
+            self.assertAlmostEqual(clock.now - started, 9.5)
+            self.assertTrue(all(r['bulk_chunk_bytes'] == MAX_BULK_CHUNK_BYTES
+                                for r, _ in self.fixture.calls[1:]))
+            self.assertLessEqual(max(self.fixture.reply_sizes), BULK_STDOUT_BYTES)
+            self.assertGreater(max(self.fixture.reply_sizes), EXPANDED_STDOUT_BYTES)
+            # The original broker accepts a 1 MiB signed JSON POST. Bound the
+            # nested, serialized result and leave room for its signed envelope.
+            result_body_size = max(self.fixture.reply_sizes) + 4096
+            self.assertLess(result_body_size, 1024 * 1024)
+
+    def test_bulk_client_preserves_existing_typed_schema_without_bulk_offer(self):
+        original = self.fixture.rpc.public_manifest
+        def legacy_manifest(value):
+            manifest = original(value)
+            manifest.pop('max_chunk_bytes_v2')
+            return manifest
+        with patch.object(self.fixture.rpc, 'public_manifest', side_effect=legacy_manifest):
+            result = self.read(self.client(stdout_limit_bytes=BULK_STDOUT_BYTES))
+        self.assertEqual(result[1].data, self.fixture.data)
+        self.assertEqual(len(self.fixture.calls), 1 + math.ceil(len(self.fixture.data) / EXPANDED_CHUNK_BYTES))
+        self.assertTrue(all(r['chunk_bytes'] == EXPANDED_CHUNK_BYTES and 'bulk_chunk_bytes' not in r
+                            for r, _ in self.fixture.calls[1:]))
+
     def test_new_central_with_actual_frozen_receiver_uses_legacy_schema(self):
         with frozen_receiver(self) as (frozen_rpc, frozen_transport):
             self.fixture.rpc, self.fixture.transport = frozen_rpc, frozen_transport
@@ -176,12 +219,14 @@ class ScreenTransferBudgetTests(unittest.TestCase):
                 for op, arguments in [('observe', {}), ('read_capture', {'capture_id': CAPTURE_ID})]:
                     with self.subTest(op=op):
                         self.fixture.calls.clear()
-                        result = self.client(stdout_limit_bytes=EXPANDED_STDOUT_BYTES).call(
+                        result = self.client(stdout_limit_bytes=BULK_STDOUT_BYTES).call(
                             op, 'GERAMEG', True, **arguments)
                         self.assertEqual(result[1].data, self.fixture.data)
                         self.assertEqual(result[0]['result']['sha256'], self.fixture.manifest['sha256'])
                         self.assertNotIn('max_chunk_bytes', result[0]['result'])
+                        self.assertNotIn('max_chunk_bytes_v2', result[0]['result'])
                         self.assertTrue(all('chunk_bytes' not in request for request, _ in self.fixture.calls))
+                        self.assertTrue(all('bulk_chunk_bytes' not in request for request, _ in self.fixture.calls))
                         self.assertEqual(len(self.fixture.calls), 1 + math.ceil(len(self.fixture.data) / CHUNK_BYTES))
                         self.assertLessEqual(max(self.fixture.reply_sizes), MAX_STDOUT_BYTES)
 
@@ -349,14 +394,21 @@ class ScreenTransferBudgetTests(unittest.TestCase):
                 rpc.validate_request(dict(request, chunk_bytes=value))
         with self.assertRaisesRegex(rpc.ScreenRpcError, 'UNKNOWN_REQUEST_FIELDS'):
             rpc.validate_request(dict(request, extra='invalid'))
+        for value in (True, 0, EXPANDED_CHUNK_BYTES, MAX_BULK_CHUNK_BYTES + 1, 700000.0, '700000'):
+            with self.subTest(bulk_value=value), self.assertRaisesRegex(rpc.ScreenRpcError, 'CHUNK_BOUNDS_INVALID'):
+                rpc.validate_request(dict(request, bulk_chunk_bytes=value))
+        with self.assertRaisesRegex(rpc.ScreenRpcError, 'CHUNK_BOUNDS_INVALID'):
+            rpc.validate_request(dict(request, bulk_chunk_bytes=MAX_BULK_CHUNK_BYTES,
+                                      chunk_bytes=EXPANDED_CHUNK_BYTES))
 
     def test_client_stdout_budgets_reject_one_byte_over_exact_boundary(self):
-        for budget in (MAX_STDOUT_BYTES, EXPANDED_STDOUT_BYTES):
+        for budget in (MAX_STDOUT_BYTES, EXPANDED_STDOUT_BYTES, BULK_STDOUT_BYTES):
             for over in (0, 1):
                 with self.subTest(budget=budget, over=over):
                     def execute(**kwargs):
                         envelope = {'ok': True, 'result': {'padding': ''}}
-                        envelope['result']['padding'] = 'x' * (budget + over - len(rpc.encode(envelope)))
+                        envelope['result']['padding'] = 'x' * (
+                            min(budget, EXPANDED_STDOUT_BYTES) + over - len(rpc.encode(envelope)))
                         return {'ok': True, 'exit_code': '0', 'target': kwargs['target'], 'node_id': NODE_ID,
                                 'mcp_job_id': kwargs['job_id'], 'mcp_script_sha256': kwargs['sha256'],
                                 'stdout': rpc.encode(envelope).decode(), 'stdout_truncated': False}

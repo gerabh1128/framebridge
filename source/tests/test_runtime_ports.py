@@ -16,8 +16,8 @@ class SpawnBoundaryReached(Exception):
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "Linux TCP restart regression")
 class RuntimePortPreflightTests(unittest.TestCase):
-    def start_until_spawn(self, state, ports):
-        settings = {"role": "central", "ports": ports}
+    def start_until_spawn(self, state, ports, broker_host="127.0.0.1"):
+        settings = {"role": "central", "ports": ports, "broker_listen_host": broker_host}
         with patch.object(runtime, "state_path", return_value=state), \
              patch.object(runtime, "load_config", return_value=settings), \
              patch.object(runtime, "status", return_value={"running": False}), \
@@ -70,6 +70,24 @@ class RuntimePortPreflightTests(unittest.TestCase):
                 with self.assertRaises(OSError) as blocked:
                     self.start_until_spawn(Path(directory), ports)
                 self.assertEqual(blocked.exception.errno, errno.EADDRINUSE)
+
+    def test_concrete_broker_listener_is_the_preflight_and_readiness_target(self):
+        with socket.socket() as listener, socket.socket() as mcp, socket.socket() as hub, \
+             tempfile.TemporaryDirectory() as directory:
+            mcp.bind(("127.0.0.1", 0))
+            hub.bind(("127.0.0.1", 0))
+            listener.bind(("127.0.0.2", 0))
+            listener.listen(2)
+            ports = {"mcp": mcp.getsockname()[1], "hub": hub.getsockname()[1],
+                     "broker": listener.getsockname()[1]}
+            mcp.close()
+            hub.close()
+            self.assertTrue(runtime._port(ports["broker"], "127.0.0.2"))
+            self.assertFalse(runtime._port(ports["broker"]))
+            self.start_until_spawn(Path(directory), ports)
+            with self.assertRaises(OSError) as blocked:
+                self.start_until_spawn(Path(directory), ports, broker_host="127.0.0.2")
+            self.assertEqual(blocked.exception.errno, errno.EADDRINUSE)
 
 
 if __name__ == "__main__":

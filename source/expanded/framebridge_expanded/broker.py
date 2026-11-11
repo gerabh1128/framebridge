@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import importlib
 import importlib.util
 import ipaddress
@@ -21,10 +22,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from functools import lru_cache
+from functools import lru_cache, partial
 from http.server import ThreadingHTTPServer
 from pathlib import Path
-
 
 class BrokerError(ValueError):
     """A fixed public failure code; never include HTTP bodies or credentials."""
@@ -46,6 +46,7 @@ _url = None
 _control_path = None
 _JOB = re.compile(r"[A-Za-z0-9._-]{1,80}")
 _LABEL = re.compile(r"[A-Za-z0-9._-]{1,64}")
+_ISSUED_REQUEST_ID = re.compile(r"(?:[0-9a-f]{32}|fbreq_[A-Za-z0-9_-]{24})")
 _CONTROL_TIMEOUT = 10
 _RESULT_GRACE = 10
 _ACTIVE_GRACE = 90
@@ -113,7 +114,7 @@ class _NodeHeartbeatStore:
                 self._node_verifier_locks = {}
             return self._node_verifier_locks.setdefault(node_id, threading.Lock())
 
-    def verify_node_envelope(self, envelope):
+    def verify_node_envelope(self, envelope, *, refresh_last_seen=True):
         guard = self._node_verification_lock(envelope)
         if guard is None:
             if not isinstance(envelope, dict):
@@ -125,7 +126,13 @@ class _NodeHeartbeatStore:
         # Serialize each node's verification through nonce check and commit,
         # without holding the global store lock across subprocess verification.
         with guard:
-            return super().verify_node_envelope(envelope)
+            if refresh_last_seen:
+                return super().verify_node_envelope(envelope)
+            # Nonces are still consumed by the original verifier, but result
+            # delivery can only refresh liveness after the receipt is accepted.
+            shadow = copy.copy(self)
+            shadow.node_last_seen = {}
+            return super(_NodeHeartbeatStore, shadow).verify_node_envelope(envelope)
 
     def next_read(self, node_id):
         node_id = str(node_id)
@@ -152,19 +159,47 @@ class _NodeHeartbeatStore:
                 return item
         return None
 
+    def _put_result_locked(self, node_id, request_id, result):
+        receipt = self.control_results.get(request_id)
+        if not receipt or receipt.get("node_id") != node_id or not isinstance(result, dict):
+            return False
+        if receipt.get("state") == "complete":
+            return receipt.get("result") == result
+        if receipt.get("state") != "dispatched":
+            return False
+        receipt.update(state="complete", result=result, completed_at=time.time())
+        getattr(self, "_heartbeat_dispatched", {}).get(node_id, {}).pop(request_id, None)
+        return True
+
     def put_result(self, node_id, request_id, result):
-        node_id, request_id = str(node_id), str(request_id)
+        with self.lock:
+            return self._put_result_locked(str(node_id), str(request_id), result)
+
+    def receive_node_result(self, node_id, request_id, result):
+        """Settle an authenticated delivery without recreating a lost receipt."""
+        with self.lock:
+            if self._put_result_locked(node_id, request_id, result):
+                self.node_last_seen[node_id] = time.time()
+                return {"ok": True}
+            if (request_id not in self.control_results and request_id not in self.control_requests
+                    and _ISSUED_REQUEST_ID.fullmatch(request_id)):
+                # The broker keeps requests in memory. A frozen node may have
+                # kept an already executed result across a broker restart.
+                # Tell it to stop retrying, without reporting a saved result.
+                return {"ok": True, "disposition": "orphaned"}
+            return {"ok": False}
+
+    def get_result(self, request_id):
+        request_id = str(request_id)
         with self.lock:
             receipt = self.control_results.get(request_id)
-            if not receipt or receipt.get("node_id") != node_id or not isinstance(result, dict):
-                return False
-            if receipt.get("state") == "complete":
-                return receipt.get("result") == result
-            if receipt.get("state") != "dispatched":
-                return False
-            receipt.update(state="complete", result=result, completed_at=time.time())
-            getattr(self, "_heartbeat_dispatched", {}).get(node_id, {}).pop(request_id, None)
-        return True
+            if receipt is None:
+                return None
+            if receipt["state"] == "pending":
+                item = self.control_requests[request_id]
+                if time.time() >= item["expires_at"]:
+                    receipt["state"] = "expired"
+            return dict(receipt)
 
     def admin_request_status(self, node_id, request_id, job_id, cancel_pending):
         with self.lock:
@@ -221,7 +256,8 @@ class _NodeHeartbeatStore:
         node_id, rid = envelope.get("node_id"), payload["request_id"]
         timestamp = envelope.get("timestamp")
         if (type(node_id) is not str or type(timestamp) not in (int, float)
-                or not math.isfinite(timestamp)):
+                or not -math.inf < timestamp < math.inf
+                or not isinstance(envelope.get("node_proof"), dict)):
             return False, "heartbeat_envelope_invalid"
         guard = self._node_verification_lock(envelope)
         if guard is None:
@@ -259,38 +295,49 @@ class _NodeHeartbeatStore:
 
 
 def _node_message_response(store, path, body):
-    """The new route uses the existing authenticated wire envelope, never EXEC."""
+    """Keep each authenticated wire operation bound to its endpoint."""
     if path == NODE_HEARTBEAT_PATH:
         ok, detail = store.accept_node_heartbeat(body)
         return (200, detail) if ok else (403, {"ok": False, "error": detail})
-    # A heartbeat cannot be replayed as a poll (dequeue) or result (ack). Other
-    # legacy message kinds retain the original v1 handling for frozen clients.
-    if isinstance(body, dict) and body.get("kind") == "node.heartbeat":
+    kind = {"/fbpair/v1/node/poll": "node.poll", "/fbpair/v1/node/result": "node.result"}.get(path)
+    if kind is None:
+        raise BrokerError("ENDPOINT_NOT_AVAILABLE")
+    if not isinstance(body, dict):
+        return 403, {"ok": False, "error": "invalid_envelope"}
+    if body.get("kind") != kind:
         return 403, {"ok": False, "error": "node_message_kind_mismatch"}
-    ok, detail = store.verify_node_envelope(body)
+    timestamp, payload = body.get("timestamp"), body.get("payload")
+    if (type(body.get("schema")) is not int or body["schema"] != 1
+            or type(body.get("node_id")) is not str
+            or type(timestamp) not in (int, float) or not -math.inf < timestamp < math.inf
+            or not isinstance(payload, dict) or not isinstance(body.get("node_proof"), dict)):
+        return 403, {"ok": False, "error": "invalid_envelope"}
+    poll = kind == "node.poll"
+    if not poll:
+        request_id, result = payload.get("request_id"), payload.get("result")
+        if (not isinstance(request_id, str) or _JOB.fullmatch(request_id) is None
+                or not isinstance(result, dict)):
+            return 400, {"ok": False, "error": "node_result_payload_invalid"}
+    ok, detail = store.verify_node_envelope(body, refresh_last_seen=poll)
     if not ok:
         return 403, {"ok": False, "error": detail}
-    if path == "/fbpair/v1/node/poll":
+    if poll:
         item = store.next_read(body["node_id"])
         return 200, {"ok": True, "request": item,
                      "protocol_features": [NODE_HEARTBEAT_FEATURE]}
-    if path == "/fbpair/v1/node/result":
-        payload = body.get("payload") or {}
-        saved = store.put_result(body["node_id"], str(payload.get("request_id") or ""),
-                                 payload.get("result") or {})
-        return (200 if saved else 400), {"ok": bool(saved)}
-    raise BrokerError("ENDPOINT_NOT_AVAILABLE")
+    response = store.receive_node_result(body["node_id"], request_id, result)
+    return (200 if response["ok"] else 400), response
 
 
 def configure(broker_url=None, state_dir=None, control_key_path=None):
+    from framebridge_expanded.config import broker_control_url
+
     global _state, _url, _control_path
     # Workers must see one fully validated profile, including explicit changes.
     with _SETTINGS_LOCK:
         state = state_path(state_dir)
         config = _config(state)
-        port = config.get("ports", {}).get("broker", 20878)
-        url = validate_endpoint(broker_url or config.get("broker_control_url") or config.get("broker_url")
-                                or f"http://127.0.0.1:{port}")
+        url = validate_endpoint(broker_url or broker_control_url(config))
         control_path = Path(control_key_path or state / "broker" / "control.key")
         _state, _url, _control_path = state, url, control_path
 
@@ -344,6 +391,32 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         raise BrokerError("BROKER_REDIRECT_BLOCKED")
 
 
+class _ControlHTTPSHandler(urllib.request.HTTPSHandler):
+    def __init__(self, context, source_address):
+        super().__init__(context=context)
+        self.source_address = source_address
+
+    def https_open(self, request):
+        connect = partial(http.client.HTTPSConnection, source_address=self.source_address)
+        return self.do_open(connect, request, context=self._context)
+
+
+def _control_source_address(url, config):
+    """Bind the local control connection to loopback for a concrete local listener."""
+    endpoint = urllib.parse.urlsplit(url)
+    if (endpoint.scheme != "https"
+            or endpoint.port != config.get("ports", {}).get("broker", 20878)):
+        return None
+    try:
+        listener = ipaddress.ip_address(config.get("broker_listen_host"))
+        destination = ipaddress.ip_address(endpoint.hostname)
+    except ValueError:
+        return None
+    if listener != destination or listener.is_loopback or listener.is_unspecified or listener.is_multicast:
+        return None
+    return ("::1" if listener.version == 6 else "127.0.0.1", 0)
+
+
 def post_json(url, value, *, state_dir=None, timeout=10, control=False):
     validate_endpoint(url)
     config = _config(state_dir)
@@ -356,8 +429,10 @@ def post_json(url, value, *, state_dir=None, timeout=10, control=False):
     request = urllib.request.Request(url, data=json.dumps(value, separators=(",", ":"),
                                                          allow_nan=False).encode(),
                                      headers=headers, method="POST")
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect(),
-                                         urllib.request.HTTPSHandler(context=context))
+    source_address = _control_source_address(url, config) if control else None
+    https = (_ControlHTTPSHandler(context, source_address) if source_address
+             else urllib.request.HTTPSHandler(context=context))
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect(), https)
     try:
         with opener.open(request, timeout=timeout) as response:
             raw = response.read(20 * 1024 * 1024 + 1)
@@ -473,8 +548,14 @@ def request(node_id, capability, args, timeout_s=120):
         raise BrokerError("INVALID_TIMEOUT")
     if not isinstance(args, dict):
         raise BrokerError("ARGS_NOT_OBJECT")
-    deadline = time.monotonic() + timeout_s + _RESULT_GRACE
-    start_by = time.time() + timeout_s + _RESULT_GRACE
+    path = {"admin.exec": "admin-exec", "admin.cua": "admin-cua"}.get(capability, "request")
+    admin = path != "request"
+    payload = {"node_id": node_id}
+    if admin:
+        deadline = time.monotonic() + timeout_s + _RESULT_GRACE
+        payload.update(payload=args, start_by=time.time() + timeout_s + _RESULT_GRACE)
+    else:
+        payload.update(capability=capability, args=args)
     confirmed = {n["node_id"]: n for n in list_confirmed_nodes()}
     if node_id not in confirmed:
         raise BrokerError("NODE_NOT_CONFIRMED")
@@ -482,25 +563,15 @@ def request(node_id, capability, args, timeout_s=120):
         if confirmed[node_id].get("busy") is True:
             raise BrokerError("NODE_BUSY_HEARTBEAT_STALE")
         raise BrokerError("NODE_OFFLINE")
-    path = {"admin.exec": "admin-exec", "admin.cua": "admin-cua"}.get(capability, "request")
-    payload = {"node_id": node_id}
-    if path == "request":
-        payload.update(capability=capability, args=args)
-    else:
-        payload["payload"] = args
-        payload["start_by"] = start_by
-    admin = path != "request"
     if admin and confirmed[node_id].get("supports_start_deadline") is not True:
         raise BrokerError("BROKER_START_DEADLINE_UNSUPPORTED")
     job_id = args.get("job_id")
     job_id = job_id if isinstance(job_id, str) and _JOB.fullmatch(job_id) else ""
-    if time.monotonic() >= deadline:
-        if admin:
-            raise BrokerRequestError("BROKER_REQUEST_EXPIRED", request_id=None,
-                                     execution_state="expired_before_dispatch")
-        raise BrokerError("BROKER_RESULT_TIMEOUT")
+    if admin and time.monotonic() >= deadline:
+        raise BrokerRequestError("BROKER_REQUEST_EXPIRED", request_id=None,
+                                 execution_state="expired_before_dispatch")
     try:
-        created = _control_until(path, payload, deadline)
+        created = _control_until(path, payload, deadline) if admin else _control(path, payload)
     except BrokerError as exc:
         if not admin or str(exc) == "BROKER_HTTP_REJECTED_400":
             raise
@@ -514,6 +585,10 @@ def request(node_id, capability, args, timeout_s=120):
         if admin:
             return _settle_admin_request(node_id, None, job_id)
         raise BrokerError("BROKER_REQUEST_REJECTED")
+    if not admin:
+        # Discovery and enqueue have their own bounded HTTP calls. A READ's
+        # result budget starts after the broker has actually queued the work.
+        deadline = time.monotonic() + timeout_s + _RESULT_GRACE
     while time.monotonic() < deadline:
         try:
             final = _control_until("result", {"request_id": rid}, deadline)
@@ -522,10 +597,10 @@ def request(node_id, capability, args, timeout_s=120):
             if final.get("state") == "complete":
                 return _complete_result(final, node_id, rid)
         except BrokerError as exc:
-            if not admin:
-                raise
             from .node import _retryable_broker_failure
             if not _retryable_broker_failure(exc):
+                if not admin:
+                    raise
                 break
         else:
             if final.get("state") in {"expired", "cancelled"}:
@@ -601,6 +676,8 @@ def _admin_payload(operation, payload):
 
 def make_server(host="127.0.0.1", port=20878, state_dir=None):
     """Build without starting; tests and runtime own the server lifecycle."""
+    from framebridge_expanded.config import broker_connect_host, broker_endpoint
+
     state = state_path(state_dir)
     config = _config(state)
     if not isinstance(host, str) or not host:
@@ -613,7 +690,8 @@ def make_server(host="127.0.0.1", port=20878, state_dir=None):
     secret = _control_secret(state, create=True)
     original = original_modules()
     discovery = state / "broker" / "paired-nodes.json"
-    public_base = config.get("broker_url") or (f"https://{host}:{port}" if tls_cert else f"http://{host}:{port}")
+    public_base = config.get("broker_url") or broker_endpoint(
+        "https" if tls_cert else "http", broker_connect_host(host), port)
     public_base = validate_endpoint(public_base)
     admin_lock = threading.RLock()
 

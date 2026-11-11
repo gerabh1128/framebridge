@@ -17,7 +17,7 @@ import signal
 import subprocess
 import time
 
-from .screen_frontdoor import RPC_COMMAND, EXPANDED_STDOUT_BYTES
+from .screen_frontdoor import RPC_COMMAND, EXPANDED_STDOUT_BYTES, BULK_STDOUT_BYTES
 
 # This typed route bypasses the legacy 4096-byte administrative sanitizer.
 MAX_STDOUT_BYTES = EXPANDED_STDOUT_BYTES
@@ -89,7 +89,7 @@ def validate_payload(payload):
     return request, argument
 
 
-def _run_rpc(argument, timeout_s):
+def _run_rpc(argument, timeout_s, *, stdout_limit_bytes=MAX_STDOUT_BYTES):
     """Bound memory while draining both pipes; bound wall time and child lifetime."""
     argv = ["/usr/bin/python3", "-B", "-m",
             "framebridge_expanded.real_screen.screen_rpc", argument]
@@ -114,7 +114,7 @@ def _run_rpc(argument, timeout_s):
                     selector.unregister(item.fileobj)
                     continue
                 name = item.data
-                limit = MAX_STDOUT_BYTES if name == "stdout" else MAX_STDERR_BYTES
+                limit = stdout_limit_bytes if name == "stdout" else MAX_STDERR_BYTES
                 if len(buffers[name]) + len(chunk) > limit:
                     raise ScreenProcessError("SCREEN_RPC_OUTPUT_LIMIT", started=True)
                 buffers[name].extend(chunk)
@@ -168,13 +168,16 @@ def _failure(payload, request, code, *, started=False):
 
 def handle_request(payload, *, runner=None):
     request, argument = validate_payload(payload)
-    runner = _run_rpc if runner is None else runner
+    stdout_limit = BULK_STDOUT_BYTES if "bulk_chunk_bytes" in request else MAX_STDOUT_BYTES
     try:
-        code, stdout, stderr = runner(argument, payload["timeout_s"])
+        if runner is None:
+            code, stdout, stderr = _run_rpc(argument, payload["timeout_s"], stdout_limit_bytes=stdout_limit)
+        else:
+            code, stdout, stderr = runner(argument, payload["timeout_s"])
     except ScreenProcessError as exc:
         return _failure(payload, request, str(exc), started=exc.started)
     if (type(stdout) is not bytes or type(stderr) is not bytes
-            or len(stdout) > MAX_STDOUT_BYTES or len(stderr) > MAX_STDERR_BYTES):
+            or len(stdout) > stdout_limit or len(stderr) > MAX_STDERR_BYTES):
         return _failure(payload, request, "SCREEN_RPC_OUTPUT_LIMIT", started=True)
     try:
         envelope = json.loads(stdout)

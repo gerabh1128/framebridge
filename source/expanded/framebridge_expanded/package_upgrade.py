@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+import errno
 import fcntl
 import hashlib
 import json
@@ -31,9 +32,13 @@ UNIT = re.compile(r'framebridge-(?:autostart-[0-9a-f]{16}|profile-[0-9a-f]{20}|q
 MAXIMUM = 2 * 1024 * 1024
 
 
+class _VerificationError(RuntimeError):
+    """A FrameBridge upgrade record or process did not pass verification."""
+
+
 def _need(value, message):
     if not value:
-        raise RuntimeError(message)
+        raise _VerificationError(message)
 
 
 def _read(path, uid, maximum=MAXIMUM):
@@ -87,6 +92,21 @@ def _birth(proc):
     return fields[19] if fields[0] not in {'Z', 'X'} else None
 
 
+def _candidate_record(path, uid):
+    try:
+        raw = _read(path, uid)
+    except OSError as error:
+        if error.errno == errno.ELOOP:
+            raise _VerificationError('UPGRADE_PROFILE_RECORD_UNTRUSTED') from None
+        raise
+    try:
+        value = json.loads(raw)
+    except (ValueError, UnicodeError):
+        raise _VerificationError('UPGRADE_PROFILE_RECORD_INVALID') from None
+    _need(type(value) is dict, 'UPGRADE_PROFILE_RECORD_INVALID')
+    return value, raw
+
+
 def identify(proc):
     args = [part.decode() for part in (proc / 'cmdline').read_bytes().rstrip(b'\0').split(b'\0')]
     if (len(args) != 6 or args[0] not in PYTHONS
@@ -107,20 +127,26 @@ def identify(proc):
     _private(state, uid)
     birth = _birth(proc)
     _need(birth is not None, 'UPGRADE_MANAGER_NOT_ALIVE')
-    record = json.loads(_read(state / 'manager.json', uid))
+    record, _ = _candidate_record(state / 'manager.json', uid)
     _need(record.get('pid') == int(proc.name) and record.get('birth') == birth
           and record.get('uid') == uid, 'UPGRADE_MANAGER_RECORD_MISMATCH')
-    account = pwd.getpwuid(uid)
-    config = json.loads(_read(state / 'config.json', uid))
-    _need(config.get('role') in {'node', 'central', 'standalone'}, 'UPGRADE_CONFIG_INVALID')
+    try:
+        account = pwd.getpwuid(uid)
+    except KeyError:
+        raise _VerificationError('UPGRADE_ACCOUNT_UNAVAILABLE') from None
+    config, config_bytes = _candidate_record(state / 'config.json', uid)
+    role = config.get('role')
+    ports = config.get('ports', {})
+    _need(type(role) is str and role in {'node', 'central', 'standalone'}
+          and type(ports) is dict, 'UPGRADE_CONFIG_INVALID')
     group = (proc / 'cgroup').read_text().splitlines()
     units = [part for line in group for part in line.split('/') if UNIT.fullmatch(part)]
     _need(len(set(units)) <= 1, 'UPGRADE_MANAGER_UNIT_AMBIGUOUS')
     return {'uid': uid, 'user': account.pw_name, 'home': account.pw_dir,
             'state': str(state), 'pid': int(proc.name), 'birth': birth,
-            'config_sha256': hashlib.sha256(_read(state / 'config.json', uid)).hexdigest(),
-            'node_id': config.get('node_id'), 'role': config['role'],
-            'broker_port': (config.get('ports') or {}).get('broker'),
+            'config_sha256': hashlib.sha256(config_bytes).hexdigest(),
+            'node_id': config.get('node_id'), 'role': role,
+            'broker_port': ports.get('broker'),
             'unit': next(iter(set(units)), None),
             'phase': 'CAPTURED'}
 
@@ -133,7 +159,9 @@ def snapshot(proc_root=Path('/proc')):
             continue
         try:
             row = identify(proc)
-        except (FileNotFoundError, ProcessLookupError, PermissionError, UnicodeError, IndexError):
+        except (_VerificationError, FileNotFoundError, ProcessLookupError, PermissionError, UnicodeError, IndexError):
+            # Candidate processes and their profile files are owner-controlled.
+            # They cannot invalidate a snapshot of other verified managers.
             continue
         if row:
             rows.append(row)
