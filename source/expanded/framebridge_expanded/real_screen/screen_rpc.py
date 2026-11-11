@@ -13,7 +13,7 @@ import stat
 import sys
 import time
 
-from .screen_capture import CaptureError, capture_screen, read_chunk, MAX_CHUNK_BYTES
+from .screen_capture import CaptureError, capture_screen, read_chunk, MAX_CHUNK_BYTES, MAX_BULK_CHUNK_BYTES
 from .screen_control import ControlError, act, bind_screen, snapshot_binding
 
 MAX_REQUEST = 16384
@@ -92,6 +92,7 @@ def public_manifest(manifest):
     result = {k: v for k, v in manifest.items() if k not in {'path', '_action_consumed'}}
     # An old receiver omits this capability and only accepts the original schema.
     result['max_chunk_bytes'] = MAX_CHUNK_BYTES
+    result['max_chunk_bytes_v2'] = MAX_BULK_CHUNK_BYTES
     return result
 
 
@@ -141,7 +142,7 @@ def validate_request(request):
     allowed = {
         'observe': {'op', 'session_id'},
         'status': {'op'},
-        'read_chunk': {'op', 'capture_id', 'index', 'expected_sha256', 'chunk_bytes'},
+        'read_chunk': {'op', 'capture_id', 'index', 'expected_sha256', 'chunk_bytes', 'bulk_chunk_bytes'},
         'read_capture': {'op', 'capture_id'},
         'key': {'op', 'capture_id', 'session_id', 'key'},
         'text': {'op', 'capture_id', 'session_id', 'text'},
@@ -152,6 +153,10 @@ def validate_request(request):
         sid = request['session_id']
         require(type(sid) is str and len(sid) <= 96 and re.fullmatch(r'[A-Za-z0-9_-]+', sid), 'SESSION_ID_INVALID')
     if op == 'read_chunk':
+        if 'bulk_chunk_bytes' in request:
+            size = request['bulk_chunk_bytes']
+            require('chunk_bytes' not in request and type(size) is int
+                    and MAX_CHUNK_BYTES < size <= MAX_BULK_CHUNK_BYTES, 'CHUNK_BOUNDS_INVALID')
         if 'chunk_bytes' in request:
             require(type(request['chunk_bytes']) is int and
                     1 <= request['chunk_bytes'] <= MAX_CHUNK_BYTES, 'CHUNK_BOUNDS_INVALID')
@@ -184,8 +189,10 @@ def dispatch(request, directory=None):
         return {'ok': True, 'result': historical}
     if op == 'read_chunk':
         require(manifest['sha256'] == request['expected_sha256'], 'CAPTURE_SHA256_MISMATCH')
+        bulk = 'bulk_chunk_bytes' in request
+        chunk_bytes = request['bulk_chunk_bytes'] if bulk else request.get('chunk_bytes', 2100)
         chunk = read_chunk(directory, manifest['capture_id'], request['index'],
-                           chunk_bytes=request.get('chunk_bytes', 2100), expected_sha256=request['expected_sha256'])
+                           chunk_bytes=chunk_bytes, expected_sha256=request['expected_sha256'], bulk=bulk)
         return {'ok': True, 'result': chunk}
     if manifest.get('screen_type') == 'x11':
         raise ScreenRpcError('USE_GRAPHICAL_CUA_FOR_X11_INPUT')

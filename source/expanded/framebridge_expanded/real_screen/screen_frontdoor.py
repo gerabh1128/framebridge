@@ -21,6 +21,7 @@ from .._execution_receipt import (
     NOT_STARTED_EXECUTION, RECEIPT_FIELDS, UNFINISHED_EXECUTION, execution_error, execution_receipt,
 )
 from ..fleet import FleetError, select_target
+from .screen_capture import MAX_BULK_CHUNK_BYTES
 
 CHUNK_BYTES = 2100
 MAX_IMAGE_BYTES = 32 * 1024 * 1024
@@ -28,6 +29,9 @@ MAX_STDOUT_BYTES = 4096
 # Only the explicit typed screen transport preserves this larger stdout budget.
 EXPANDED_STDOUT_BYTES = 65536
 EXPANDED_CHUNK_BYTES = 45000
+# A 700,000-byte chunk leaves room for base64, result and signature metadata
+# within the broker's unchanged 1 MiB signed POST body limit.
+BULK_STDOUT_BYTES = 1_000_000
 TRANSFER_TIMEOUT_SECONDS = 45
 RPC_COMMAND = '/usr/bin/python3 -B -m framebridge_expanded.real_screen.screen_rpc '
 HEX_ID = re.compile(r"[0-9a-f]{32}\Z")
@@ -83,7 +87,8 @@ class _AuthenticatedReply(dict):
 
     _IDENTITY_FIELDS = ("capture_id", "node", "sha256", "session_id", "bytes",
                         "width", "height", "source", "screen_type",
-                        "full_screen", "authentic_pixels", "max_chunk_bytes")
+                        "full_screen", "authentic_pixels", "max_chunk_bytes",
+                        "max_chunk_bytes_v2")
 
     def __init__(self, payload, owner, node, node_id, receipt):
         super().__init__(payload)
@@ -119,13 +124,13 @@ class ScreenClient:
                  stdout_limit_bytes: int = MAX_STDOUT_BYTES,
                  transfer_timeout_s: int = TRANSFER_TIMEOUT_SECONDS):
         if (type(stdout_limit_bytes) is not int or
-                stdout_limit_bytes not in (MAX_STDOUT_BYTES, EXPANDED_STDOUT_BYTES)):
+                stdout_limit_bytes not in (MAX_STDOUT_BYTES, EXPANDED_STDOUT_BYTES, BULK_STDOUT_BYTES)):
             raise ValueError("unsupported screen stdout budget")
         if type(transfer_timeout_s) is not int or not 1 <= transfer_timeout_s <= 120:
             raise ValueError("screen transfer timeout must be 1..120 seconds")
         self.stdout_limit_bytes = stdout_limit_bytes
         self.chunk_bytes = (EXPANDED_CHUNK_BYTES
-                            if stdout_limit_bytes == EXPANDED_STDOUT_BYTES else CHUNK_BYTES)
+                            if stdout_limit_bytes >= EXPANDED_STDOUT_BYTES else CHUNK_BYTES)
         self.transfer_timeout_s = transfer_timeout_s
         self.exec_request = exec_request
         self.image_factory = image_factory
@@ -175,7 +180,10 @@ class ScreenClient:
             raise ScreenError("SCREEN_EXEC_NODE_ID_INVALID") from None
         require(expected_node_id is None or node_id == expected_node_id, "SCREEN_EXEC_BINDING_INVALID")
         stdout = outer.get("stdout")
-        require(type(stdout) is str and len(stdout.encode("utf-8")) <= self.stdout_limit_bytes and
+        limit = self.stdout_limit_bytes
+        if request["op"] != "read_chunk" or "bulk_chunk_bytes" not in request:
+            limit = min(limit, EXPANDED_STDOUT_BYTES)
+        require(type(stdout) is str and len(stdout.encode("utf-8")) <= limit and
                 outer.get("stdout_truncated") is not True, "SCREEN_STDOUT_INVALID")
         try:
             envelope = json.loads(stdout)
@@ -232,13 +240,20 @@ class ScreenClient:
             require(type(capability) is int and 1 <= capability <= EXPANDED_CHUNK_BYTES,
                     "SCREEN_TRANSFER_CAPABILITY_INVALID")
             chunk_bytes = min(self.chunk_bytes, capability)
+        if self.stdout_limit_bytes == BULK_STDOUT_BYTES and "max_chunk_bytes_v2" in manifest:
+            bulk_bytes = manifest["max_chunk_bytes_v2"]
+            require(type(bulk_bytes) is int and EXPANDED_CHUNK_BYTES < bulk_bytes <= MAX_BULK_CHUNK_BYTES,
+                    "SCREEN_TRANSFER_CAPABILITY_INVALID")
+            chunk_bytes = bulk_bytes
         parts = []
         count = math.ceil(total / chunk_bytes)
         for index in range(count):
             request = {"op": "read_chunk", "capture_id": capture_id,
                        "index": index, "expected_sha256": digest}
             # Omit the extension entirely on constrained legacy transports.
-            if chunk_bytes != CHUNK_BYTES:
+            if chunk_bytes > EXPANDED_CHUNK_BYTES:
+                request["bulk_chunk_bytes"] = chunk_bytes
+            elif chunk_bytes != CHUNK_BYTES:
                 request["chunk_bytes"] = chunk_bytes
             part = self.remote(node, request, deadline=deadline)
             require(isinstance(part, _AuthenticatedReply) and
@@ -341,6 +356,8 @@ class ScreenClient:
                 if delivery_receipt:
                     details["result_delivery"] = {"error": str(exc), **delivery_receipt}
                 details.update(manifest.receipt)
+                if op in ("observe", "read_capture") and str(exc) == "SCREEN_TRANSFER_TIMEOUT":
+                    details.update(capture_id=manifest["capture_id"], capture_available=True)
             if op in ("key", "text") and (input_reply_received or
                     (submitted.get("attempted") and not exc.backend_rejection)):
                 details.setdefault("observe_again", True)

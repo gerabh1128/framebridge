@@ -53,6 +53,8 @@ class ScreenViewResult(BaseModel):
     execution_state: str | None = None
     do_not_replay: bool | None = None
     result_delivery: dict[str, Any] | None = None
+    capture_id: str | None = None
+    capture_available: bool | None = None
     result: dict[str, Any] | None = None
     error: str | None = None
 

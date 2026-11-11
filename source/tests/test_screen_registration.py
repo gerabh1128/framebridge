@@ -10,7 +10,8 @@ import shlex
 from pathlib import Path
 import unittest
 
-from framebridge_expanded.real_screen.screen_frontdoor import register_framebridge_screen_tools
+from framebridge_expanded.real_screen.screen_capture import MAX_BULK_CHUNK_BYTES
+from framebridge_expanded.real_screen.screen_frontdoor import BULK_STDOUT_BYTES, register_framebridge_screen_tools
 from test_screen_frontdoor import Executor, Image, MCP, NODE_ID
 
 
@@ -22,14 +23,18 @@ class TypedChunkExecutor(Executor):
     def __call__(self, **kwargs):
         outer = super().__call__(**kwargs)
         request = json.loads(base64.b64decode(shlex.split(kwargs["script"])[-1]))
-        if request["op"] == "read_chunk" and request.get("chunk_bytes"):
-            size, index = request["chunk_bytes"], request["index"]
+        if request["op"] == "read_chunk" and request.get("bulk_chunk_bytes"):
+            size, index = request["bulk_chunk_bytes"], request["index"]
             envelope = json.loads(outer["stdout"])
             envelope["result"].update(
                 total_chunks=math.ceil(len(self.data) / size),
                 data=base64.b64encode(self.data[index * size:(index + 1) * size]).decode(),
                 more=(index + 1) * size < len(self.data),
             )
+            outer["stdout"] = json.dumps(envelope)
+        elif request["op"] == "observe":
+            envelope = json.loads(outer["stdout"])
+            envelope["result"]["max_chunk_bytes_v2"] = MAX_BULK_CHUNK_BYTES
             outer["stdout"] = json.dumps(envelope)
         return outer
 
@@ -71,6 +76,7 @@ class PortableScreenRegistrationTests(unittest.TestCase):
         self.assertEqual(len(registrations), 1)
         scope = dict(mcp=MCP(), Image=Image, expanded_execute_node=expanded, expanded_execute_screen_node=expanded,
                      framebridge_exec=legacy,
+                     BULK_STDOUT_BYTES=BULK_STDOUT_BYTES,
                      register_framebridge_screen_tools=register_framebridge_screen_tools,
                      resolve_profile_route=lambda node: (node, NODE_ID))
         scope["_blocking_tools"] = scope["mcp"]  # This fixture calls registrations synchronously.
@@ -94,7 +100,8 @@ class PortableScreenRegistrationTests(unittest.TestCase):
         self.assertEqual(image.format, "png")
         if target == "LOCAL":
             self.assertFalse(legacy_calls)
-        self.assertGreater(len(calls), 1)  # Manifest plus bound image chunks.
+        self.assertEqual(len(calls), 2)  # Manifest plus one bound bulk chunk.
+        self.assertEqual(fixture.requests[1]["bulk_chunk_bytes"], MAX_BULK_CHUNK_BYTES)
         self.assertTrue(all(item["target"] == NODE_ID for item in calls))
         self.assertTrue(all(item["authorized"] is True and item["include_stdout"] is True
                             and item["timeout_s"] == 30 for item in calls))
