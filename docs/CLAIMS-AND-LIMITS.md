@@ -1,15 +1,15 @@
 # Claims and evidence boundaries
 
-**FrameBridge 0.3.7** targets the same three release profiles, with separate amd64 packages for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. It includes the Linux tray and automatic central/node role selection, but does not bundle the administrative supervision Site. The [official download page](https://framebridge.betancourt.one/download/) identifies the actual artifacts, signatures and corresponding source. A later default-branch documentation change does not rewrite frozen release source or an installed package.
+**FrameBridge 0.3.8** has separate amd64 packages for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. It includes the Linux tray and automatic central/node role selection. The administrative supervision Site is outside the package scope. The release record identifies the frozen source, signed artifacts and verification evidence. [Official download page](https://framebridge.betancourt.one/download/) · [0.3.8 source-to-artifact record](RELEASE-SOURCE-0.3.8.md)
 
 ## Current release scope
 
 | Statement | Evidence and boundary |
 | --- | --- |
 | Distribution profiles | Debian 13 / CPython 3.13, Ubuntu 24.04 / CPython 3.12 and Mint 22.x / CPython 3.12, all amd64. Ubuntu 26.04, LMDE 7, other architectures and other distributions are outside this release's validated scope. |
-| Signed APT updates | The [0.3.7 publication record](RELEASE-SOURCE-0.3.7.md) records isolated APT update and candidate-selection verification through public HTTPS on 9 November 2026 for trixie, noble and mint22: candidate 0.3.7 and signed index Size/SHA256 matching the verified artifacts. Complete package downloads were checked separately through the public downloads URLs, not performed by that APT test. This is distribution acceptance, not a new package installation, managed-service restart or reboot test. Earlier VM lifecycle results remain historical. |
-| Release identity | The signed corresponding-source archive, manifest, package signatures and release record identify released source and bytes. The [v0.3.7 GitHub source release](https://github.com/gerabh1128/framebridge/releases/tag/v0.3.7) and its Git tag are separate records. A source checkout, successful build, Git tag or checksum alone does not establish an official signed binary release. |
-| Source tests | See the directly runnable focused tests and their prerequisites in [CONTRIBUTING.md](../CONTRIBUTING.md#run-focused-source-tests). The historical 0.3.5 1,011-case result and the 0.3.7 source-release test report are not substitutes for a fresh run. A result applies to the exact source revision and environment tested; neither a source-test count nor a signed package proves live graphical, upgrade or reboot acceptance. |
+| Signed APT updates | The isolated local APT checks passed for `trixie`, `noble` and `mint22`. The release record tracks the public HTTPS catalog, signature and candidate checks. Installation, managed-service restart and reboot require separate evidence. [0.3.8 source-to-artifact record](RELEASE-SOURCE-0.3.8.md) |
+| Release identity | The frozen commit identifies the source. The signed corresponding-source archive, manifest, package signatures and release record identify the released bytes. [0.3.8 source-to-artifact record](RELEASE-SOURCE-0.3.8.md) |
+| Source tests and isolated QA | All 260 focused tests and all 133 isolated GERAMEG QA checks passed. The full suite and its environment-related results are recorded separately. Each result applies to its tested source and environment. Live graphical, upgrade and reboot acceptance apply to the specific systems checked. [0.3.8 source-to-artifact record](RELEASE-SOURCE-0.3.8.md) · [Run focused source tests](../CONTRIBUTING.md#run-focused-source-tests) |
 | Installed documentation | Read the guide matching the installed version. A newer repository README cannot update an older installed manual. Report contradictory release labels with the package version and file path. |
 
 ## Operation results
@@ -18,6 +18,7 @@
 | --- | --- |
 | ChatGPT connection | Manual owner account consent; the model remains hosted while tools run on selected owner-controlled computers. Installing the package or assigning an account label does not prove connection. |
 | Receiver and target | `LOCAL` denotes the current receiver. Another computer must be selected using a confirmed enrolled alias or ID. A legacy endpoint's default destination is not a routing guarantee for a replacement endpoint. |
+| Direct execution receipt | The receipt distinguishes expiry before dispatch or execution from an in-flight request or an unknown result. Reconcile `in_flight` and `outcome_unknown` by request or job ID. The enrolled alias, node UUID, receiver hostname and available execution hostname identify different parts of the route. |
 | Query and task success | A successful status query or outer tool wrapper does not prove readiness or successful inner execution. Read the target, exit code and operation result, then verify the intended effect. |
 | Persistent console | Bash continuity lasts while the session survives; it does not promise survival across reboot. Preserve the existing console and unrelated work unless changing them is authorized. |
 | Independent FBEXEC tasks | Repeated maintainer experience with non-overlapping work; no certified isolation or guarantee that every command can run concurrently. |
