@@ -1,0 +1,46 @@
+{
+  "authorization_record": "FRAMEBRIDGE-FBTERM-LINUX-SINCRONIZACION-GIT-R1-20261109.md",
+  "baseline_source_key": "original-asus/fbterm/bin/fbterm_engine.py",
+  "historical_record_policy": "Historical source and package identities remain unchanged. Only the strict current-source hash for this reviewed file is advanced, with its previous bytes preserved explicitly.",
+  "patch": "provenance/patches/fbterm-viewer-header-0.3.7.patch",
+  "patch_sha256": "46fe28a10e91cd6a2dbff74a6fb339590dcb61d0d990554411e952731597081d",
+  "path": "source/sources/original-asus/fbterm/bin/fbterm_engine.py",
+  "preserved_original": "provenance/originals/fbterm_engine-before-viewer-header-0.3.7.py",
+  "preserved_original_sha256": "01ca3556b6e0d05ba95fa805fba70befbf765c8ae45fee75bce4131ab834a93a",
+  "previous_sha256": "01ca3556b6e0d05ba95fa805fba70befbf765c8ae45fee75bce4131ab834a93a",
+  "previous_source_commit": "221466147dda23b0a2707a55902d400accc9eb3d",
+  "reason": "Record the previously authorized fixed FrameBridge version and GNU GPL/Copyleft viewer header; the earlier source commit omitted its build-baseline provenance.",
+  "release_version": "0.3.7.10",
+  "reviewed_on": "2026-11-10",
+  "reviewed_sha256": "dc810baddeaf526323fd7ca9bde12735a7e3eb0918e06606e9ef7fdc5fa894fe",
+  "reviewed_source_commit": "02269108a1f0fec4efc22b7bc9a6bf336321f4d2",
+  "schema_version": 1,
+  "scope": "Viewer pane border only. The engine source is unchanged by this reconciliation.",
+  "validation": {
+    "ast_algorithm": "SHA-256 of ast.dump(include_attributes=False), compared using the same Python interpreter",
+    "entire_module_without_header_method_and_call_matches_previous_ast": true,
+    "forward_patch_reconstruction": "PASS_EXACT_REVIEWED_BYTES",
+    "new_desktop_or_input_certification": false,
+    "relevant_unit_tests": {
+      "count": 40,
+      "modules": [
+        "test_archive_targets",
+        "test_fbterm_viewer_environment",
+        "test_public_release_metadata"
+      ],
+      "real_desktop_or_package_installation_asserted": false,
+      "result": "PASS"
+    },
+    "reverse_patch_reconstruction": "PASS_EXACT_PREVIOUS_BYTES",
+    "unchanged_function_ast_sha256": {
+      "FBTerm.__init__": "e7d7db2b325bfb416d54550a84e9eb029164bb4845b99c0a74fd07247b781bd7",
+      "FBTerm._run": "090dcdaf1e032678b8fa0f79f1d1bcc57ca63d7bc085bd221c7738a649f5eb05",
+      "FBTerm._viewer_environment": "98bf363b691c278601939154e072035aeeb303a83622dbc3e8dca763b08f3348",
+      "FBTerm.execute": "d339f95e2d26037ae6192c54b4155916cf269b3ec4ed1b58fcc7d90d52e20a33",
+      "FBTerm.has_session": "ab10a3cf76b74c7fcbf3aee4792203344e80a67b5c791c662c4fec0d1556a79c",
+      "FBTerm.status": "e1aee1b0a67125b232bcf2973fbff7e56938d6886b76383f035ccbf809565ae1",
+      "FBTerm.visible_window": "38975f12725a912b0b08aa69b64eb1965339283841153116c036e2d2d2be7fc5",
+      "file_text": "d7507896f807e0815b88ddc4aa803c5c30150591e2cb7222d5691e0af52745bb"
+    }
+  }
+}

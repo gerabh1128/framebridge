@@ -20,6 +20,11 @@ READ_CAPABILITIES = frozenset({
     "system.status", "hardware.summary", "storage.inspect",
     "network.inspect", "service.status",
 })
+_UNCERTAIN_EXECUTION = frozenset({"in_flight", "outcome_unknown"})
+_PRE_SUBMISSION_ERRORS = frozenset({
+    "NODE_BUSY_HEARTBEAT_STALE", "NODE_OFFLINE", "NODE_NOT_CONFIRMED",
+    "BROKER_START_DEADLINE_UNSUPPORTED",
+})
 
 
 class FleetError(ValueError):
@@ -57,9 +62,53 @@ def _routing_error(exc, fallback, *public_types):
         from . import broker
     except ImportError:
         return fallback
-    if isinstance(exc, broker.BrokerError) and str(exc) in {"NODE_BUSY_HEARTBEAT_STALE", "NODE_OFFLINE"}:
+    if isinstance(exc, broker.BrokerError) and str(exc) in _PRE_SUBMISSION_ERRORS:
         return str(exc)
     return fallback
+
+
+def _operation_error(exc, fallback, attempted=False, *public_types):
+    """Preserve what the authenticated transport knows about execution."""
+    from . import broker
+    error = _routing_error(exc, fallback, *public_types)
+    state = "outcome_unknown" if attempted else "not_started"
+    response = {"ok": False, "error": error, "execution_state": state}
+    if isinstance(exc, getattr(broker, "BrokerRequestError", ())):
+        state = exc.execution_state
+        response.update(error=str(exc), execution_state=state)
+        if exc.request_id:
+            response["request_id"] = exc.request_id
+    elif error in _PRE_SUBMISSION_ERRORS:
+        state = "not_started"
+        response["execution_state"] = state
+    if state in _UNCERTAIN_EXECUTION:
+        response["do_not_replay"] = True
+    return response
+
+
+def _received_execution_state(result):
+    if result.get("ok") is False:
+        state = result.get("execution_state")
+        if state in ("not_started", "expired_before_start", "outcome_unknown"):
+            return state
+        if result.get("error") == "REQUEST_EXPIRED":
+            return "expired_before_start"
+        if (result.get("error") == "INVALID_START_DEADLINE"
+                or result.get("adapter_error") == "ValueError:UNSUPPORTED_REQUEST_TYPE"):
+            return "not_started"
+        if (result.get("do_not_replay") is True or result.get("error") in (
+                "NODE_DISPATCH_FAILED", "ADAPTER_RESPONSE_INVALID",
+                "CUA_ADAPTER_RESPONSE_UNCERTAIN", "CUA_ADAPTER_RESPONSE_INVALID")):
+            return "outcome_unknown"
+    return "completed"
+
+
+def _received_execution_receipt(result):
+    state = _received_execution_state(result)
+    receipt = {"execution_state": state}
+    if state in _UNCERTAIN_EXECUTION:
+        receipt["do_not_replay"] = True
+    return receipt
 
 
 def original_paths() -> tuple[Path, Path]:
@@ -131,6 +180,7 @@ def _local_descriptor(config: dict[str, Any]) -> dict[str, Any]:
     _require(callable(execute_capability), "LOCAL_READ_PROVIDER_UNAVAILABLE")
     return {
         "alias": config["name"], "node_id": str(config["node_id"]),
+        "registered_label": config["name"],
         "hostname": socket.gethostname(), "transport": "local",
         "target": config["name"], "transport_target": "LOCAL",
         "capability_profile": "original-readonly",
@@ -156,7 +206,9 @@ def _remote_descriptors(config: dict[str, Any]) -> list[dict[str, Any]]:
             raise FleetError("BROKER_NODE_ID_INVALID") from None
         result.append({
             "alias": alias, "node_id": str(node_id),
-            "hostname": str(item.get("hostname") or alias),
+            "registered_label": str(item.get("registered_label") or item.get("hostname") or alias),
+            "hostname": None,
+            "hostname_verified": False,
             "transport": "broker_outbound", "target": alias, "transport_target": alias,
             "capability_profile": "original-readonly",
             "source": "confirmed_pairing",
@@ -200,16 +252,26 @@ def resolve_node(alias: str) -> dict[str, Any]:
     return matches[0]
 
 
-def _target_identity(requested: str, node: dict[str, Any]) -> dict[str, Any]:
-    """Describe the confirmed route, never identity claimed by a node response."""
+def _target_identity(requested: str, node: dict[str, Any],
+                     result: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Separate the confirmed route from the receiver and execution hosts."""
+    local = node["transport"] == "local"
+    executed_host = None
+    if result is not None and _received_execution_state(result) == "completed":
+        observed = node.get("hostname") if local else result.get("executed_hostname")
+        if type(observed) is str and re.fullmatch(r"[A-Za-z0-9._-]{1,253}", observed):
+            executed_host = observed
     return {
         "requested_target": requested,
         "resolved_target": node["alias"],
         "node": node["alias"],
         "target": node["alias"],
-        "transport_target": "LOCAL" if node["transport"] == "local" else node["alias"],
+        "transport_target": "LOCAL" if local else node["alias"],
         "node_id": node["node_id"],
-        "hostname": node.get("hostname"),
+        "registered_label": node.get("registered_label") or node["alias"],
+        "receiver_hostname": socket.gethostname(),
+        "executed_hostname": executed_host,
+        "hostname": node.get("hostname") if local else executed_host,
         "transport": node["transport"],
     }
 
@@ -257,7 +319,7 @@ def node_read(alias: str, capability: str, args: dict[str, Any]) -> dict[str, An
             result = broker.request(node["node_id"], capability, normalized, timeout_s=30)
         _require(type(result) is dict, "NODE_READ_RESPONSE_INVALID")
         response = dict(result)
-        response.update(_target_identity(alias, node))
+        response.update(_target_identity(alias, node, result))
         return response
     except Exception as exc:
         response = {"ok": False, "error": _routing_error(exc, "NODE_READ_FAILED")}
@@ -288,16 +350,19 @@ def _exec_payload(script: str, authorized: bool, timeout_s: int, job_id: str,
 
 def execute_node(alias: str, script: str, authorized: bool, timeout_s: int = 120,
                  job_id: str = "", sha256: str = "", include_stdout: bool = False) -> dict[str, Any]:
-    node = None
+    node = payload = None
+    attempted = False
     try:
         payload = _exec_payload(script, authorized, timeout_s, job_id, sha256, include_stdout)
         node = resolve_node(alias)
         if node["transport"] == "local":
             from .runtime import adapter_request
+            attempted = True
             result = adapter_request(payload)
         else:
             _require_transport_ready(node)
             from . import broker
+            attempted = True
             result = broker.request(node["node_id"], "admin.exec", payload, timeout_s=payload["timeout_s"])
         _require(type(result) is dict, "NODE_EXEC_RESPONSE_INVALID")
         response = dict(result)
@@ -306,14 +371,17 @@ def execute_node(alias: str, script: str, authorized: bool, timeout_s: int = 120
                      "NODE_EXEC_JOB_BINDING_INVALID")
             _require(response.get("mcp_script_sha256", response.get("command_sha256")) == payload["sha256"],
                      "NODE_EXEC_HASH_BINDING_INVALID")
-        response.update(_target_identity(alias, node))
+        response.update(_target_identity(alias, node, result))
+        response.update(_received_execution_receipt(result))
         response.update(mcp_job_id=payload["job_id"],
                         mcp_script_sha256=payload["sha256"])
         if include_stdout is not True:
             response.pop("stdout", None)
         return response
     except Exception as exc:
-        response = {"ok": False, "error": _routing_error(exc, "NODE_EXEC_FAILED")}
+        response = _operation_error(exc, "NODE_EXEC_FAILED", attempted)
+        if payload is not None:
+            response.update(mcp_job_id=payload["job_id"], mcp_script_sha256=payload["sha256"])
         if node is not None:
             response.update(_target_identity(alias, node))
         return response
@@ -323,7 +391,8 @@ def execute_screen_node(alias: str, script: str, authorized: bool, timeout_s: in
                         job_id: str = "", sha256: str = "", include_stdout: bool = False) -> dict[str, Any]:
     """Use the same confirmed-node authority with an explicit non-shell screen operation."""
     from .real_screen.screen_transport import REQUEST_TYPE, validate_payload, ScreenTransportError
-    node = None
+    node = payload = None
+    attempted = False
     try:
         _require(type(timeout_s) is int and 1 <= timeout_s <= 30, "INVALID_SCREEN_TIMEOUT")
         payload = _exec_payload(script, authorized, timeout_s, job_id, sha256, include_stdout)
@@ -332,10 +401,12 @@ def execute_screen_node(alias: str, script: str, authorized: bool, timeout_s: in
         node = resolve_node(alias)
         if node["transport"] == "local":
             from .runtime import adapter_request
+            attempted = True
             result = adapter_request(payload)
         else:
             _require_transport_ready(node)
             from . import broker
+            attempted = True
             result = broker.request(node["node_id"], "admin.exec", payload, timeout_s=payload["timeout_s"])
         _require(type(result) is dict, "NODE_EXEC_RESPONSE_INVALID")
         response = dict(result)
@@ -347,14 +418,18 @@ def execute_screen_node(alias: str, script: str, authorized: bool, timeout_s: in
         if response.get("adapter_error") == "ValueError:UNSUPPORTED_REQUEST_TYPE":
             # An old adapter rejects this type before EXEC. Never retry it as shell code.
             from .real_screen.screen_rpc import encode
-            response.update(ok=False, exit_code="1", stdout_truncated=False,
+            response.update(ok=False, error="SCREEN_RPC_UNSUPPORTED_ON_NODE",
+                            exit_code="1", stdout_truncated=False,
                             stdout=encode({"ok": False, "error": {"code": "SCREEN_RPC_UNSUPPORTED_ON_NODE"}}).decode("ascii") + "\n")
-        response.update(_target_identity(alias, node))
+        response.update(_target_identity(alias, node, result))
+        response.update(_received_execution_receipt(result))
         response.update(mcp_job_id=payload["job_id"],
                         mcp_script_sha256=payload["sha256"])
         return response
     except Exception as exc:
-        response = {"ok": False, "error": _routing_error(exc, "SCREEN_RPC_FAILED", ScreenTransportError)}
+        response = _operation_error(exc, "SCREEN_RPC_FAILED", attempted, ScreenTransportError)
+        if payload is not None:
+            response.update(mcp_job_id=payload["job_id"], mcp_script_sha256=payload["sha256"])
         if node is not None:
             response.update(_target_identity(alias, node))
         return response
@@ -362,7 +437,8 @@ def execute_screen_node(alias: str, script: str, authorized: bool, timeout_s: in
 
 def cua_node(alias: str, payload: dict[str, Any], authorized: bool,
              timeout_s: int = 60, job_id: str = "") -> dict[str, Any]:
-    node = None
+    node = job = None
+    attempted = False
     try:
         _require(authorized is True, "AUTHORIZED_TRUE_REQUIRED")
         _require(type(payload) is dict, "CUA_PAYLOAD_REQUIRED")
@@ -380,19 +456,67 @@ def cua_node(alias: str, payload: dict[str, Any], authorized: bool,
         node = resolve_node(alias)
         if node["transport"] == "local":
             from .runtime import adapter_request
+            attempted = True
             result = adapter_request(request)
         else:
             _require_transport_ready(node)
             from . import broker
+            attempted = True
             result = broker.request(node["node_id"], "admin.cua", request, timeout_s=timeout)
         _require(type(result) is dict, "NODE_CUA_RESPONSE_INVALID")
         response = dict(result)
         if response.get("ok") is True:
             _require(response.get("job_id") == job, "NODE_CUA_JOB_BINDING_INVALID")
-        response.update(_target_identity(alias, node))
+        response.update(_target_identity(alias, node, result))
+        response.update(_received_execution_receipt(result))
+        response["mcp_job_id"] = job
         return response
     except Exception as exc:
-        response = {"ok": False, "error": _routing_error(exc, "NODE_CUA_FAILED")}
+        response = _operation_error(exc, "NODE_CUA_FAILED", attempted)
+        if type(job) is str and JOB_RE.fullmatch(job):
+            response["mcp_job_id"] = job
+        if node is not None:
+            response.update(_target_identity(alias, node))
+        return response
+
+
+def execution_status(alias: str, request_id: str = "", job_id: str = "") -> dict[str, Any]:
+    """Reconcile one previously submitted remote operation without replaying it."""
+    node = None
+    try:
+        _require(bool(request_id or job_id), "EXEC_STATUS_ID_REQUIRED")
+        _require(all(type(value) is str and (not value or JOB_RE.fullmatch(value))
+                     for value in (request_id, job_id)), "EXEC_STATUS_ID_INVALID")
+        node = resolve_node(alias)
+        _require(node["transport"] == "broker_outbound", "EXEC_STATUS_REMOTE_REQUIRED")
+        from . import broker
+        entry = broker.request_status(node["node_id"], request_id=request_id, job_id=job_id)
+        states = {
+            "pending": "queued",
+            "dispatched": "in_flight",
+            "complete": "completed",
+            "expired": "expired_before_dispatch",
+            "cancelled": "expired_before_dispatch",
+        }
+        state = states.get(entry.get("state"), "outcome_unknown")
+        result = entry.get("result")
+        if not isinstance(result, dict):
+            result = None
+        if state == "completed" and result is not None:
+            state = _received_execution_state(result)
+        response = {"ok": True, "execution_state": state,
+                    "request_id": entry.get("request_id") or request_id or None,
+                    "mcp_job_id": entry.get("job_id") or job_id or None,
+                    "do_not_replay": state in _UNCERTAIN_EXECUTION or state == "queued"}
+        response.update(_target_identity(alias, node, result if state == "completed" else None))
+        if state == "completed" and result is not None:
+            response["operation_ok"] = result.get("ok") is True
+            if isinstance(result.get("exit_code"), (str, int)):
+                response["exit_code"] = result["exit_code"]
+        return response
+    except (OSError, ValueError) as exc:
+        response = {"ok": False, "error": _routing_error(exc, "EXEC_STATUS_UNAVAILABLE"),
+                    "execution_state": "outcome_unknown", "do_not_replay": True}
         if node is not None:
             response.update(_target_identity(alias, node))
         return response
@@ -404,16 +528,14 @@ def main() -> None:
     parser.parse_args()
     bootstrap_original()
     from mcp.server.fastmcp import FastMCP
-    from framebridge_linux_chatgpt.fleet_hub import FleetHub
-    from framebridge_linux_chatgpt.fleet_mcp_surface import register_fleet_read_tools
+    from .fleet_read_mcp import register_fleet_read_tools
     host = os.environ.get("FRAMEBRIDGE_FLEET_HUB_HOST", "127.0.0.1")
     _require(host in ("127.0.0.1", "::1"), "FLEET_HUB_HOST_INVALID")
     port = int(os.environ.get("FRAMEBRIDGE_FLEET_HUB_PORT", "20877"))
     _require(1024 <= port <= 65535, "FLEET_HUB_PORT_INVALID")
     server = FastMCP("FrameBridge Original Expanded Fleet", host=host, port=port,
                      streamable_http_path="/mcp")
-    hub = FleetHub(discover_nodes, node_read)
-    register_fleet_read_tools(server, hub)
+    register_fleet_read_tools(server, discover_nodes, node_read)
     from .http_server import run_streamable_mcp
     run_streamable_mcp(server)
 

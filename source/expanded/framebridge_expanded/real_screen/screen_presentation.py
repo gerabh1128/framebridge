@@ -37,8 +37,22 @@ class ScreenViewResult(BaseModel):
     requested_node: str | None = None
     target: str | None = None
     requested_target: str | None = None
+    resolved_target: str | None = None
     node_id: str | None = None
     hostname: str | None = None
+    observed_hostname: str | None = None
+    executed_hostname: str | None = None
+    receiver_hostname: str | None = None
+    registered_label: str | None = None
+    transport: str | None = None
+    transport_target: str | None = None
+    request_id: str | None = None
+    job_id: str | None = None
+    mcp_job_id: str | None = None
+    mcp_script_sha256: str | None = None
+    execution_state: str | None = None
+    do_not_replay: bool | None = None
+    result_delivery: dict[str, Any] | None = None
     result: dict[str, Any] | None = None
     error: str | None = None
 

@@ -30,6 +30,15 @@ class BrokerError(ValueError):
     """A fixed public failure code; never include HTTP bodies or credentials."""
 
 
+class BrokerRequestError(BrokerError):
+    """An admin request whose outcome must be checked before any replay."""
+
+    def __init__(self, message, *, request_id, execution_state):
+        super().__init__(message)
+        self.request_id = request_id
+        self.execution_state = execution_state
+
+
 _SETTINGS_LOCK = threading.RLock()
 
 _state = None
@@ -37,6 +46,9 @@ _url = None
 _control_path = None
 _JOB = re.compile(r"[A-Za-z0-9._-]{1,80}")
 _LABEL = re.compile(r"[A-Za-z0-9._-]{1,64}")
+_CONTROL_TIMEOUT = 10
+_RESULT_GRACE = 10
+_ACTIVE_GRACE = 90
 
 
 def state_path(state_dir=None):
@@ -116,27 +128,68 @@ class _NodeHeartbeatStore:
             return super().verify_node_envelope(envelope)
 
     def next_read(self, node_id):
-        item = super().next_read(node_id)
-        if item is not None:
-            with self.lock:
+        node_id = str(node_id)
+        with self.lock:
+            queue = self.control_queue[node_id]
+            while queue:
+                rid = queue.popleft()
+                item = self.control_requests.get(rid)
+                receipt = self.control_results.get(rid)
+                if not item or not receipt or receipt.get("state") != "pending":
+                    continue
+                now = time.time()
+                start_by = item["expires_at"]
+                if now >= start_by:
+                    receipt["state"] = "expired"
+                    continue
+                receipt.update(state="dispatched", dispatched_at=now)
+                active_until = start_by
+                if item.get("operation") in {"admin.exec", "admin.cua"}:
+                    active_until = now + item["payload"]["timeout_s"] + _ACTIVE_GRACE
                 if not hasattr(self, "_heartbeat_dispatched"):
                     self._heartbeat_dispatched = {}
-                self._heartbeat_dispatched.setdefault(str(node_id), {})[item["request_id"]] = item["expires_at"]
-        return item
+                self._heartbeat_dispatched.setdefault(node_id, {})[rid] = (start_by, active_until)
+                return item
+        return None
 
     def put_result(self, node_id, request_id, result):
-        saved = super().put_result(node_id, request_id, result)
-        if saved:
-            with self.lock:
-                getattr(self, "_heartbeat_dispatched", {}).get(str(node_id), {}).pop(str(request_id), None)
-        return saved
+        node_id, request_id = str(node_id), str(request_id)
+        with self.lock:
+            receipt = self.control_results.get(request_id)
+            if not receipt or receipt.get("node_id") != node_id or not isinstance(result, dict):
+                return False
+            if receipt.get("state") == "complete":
+                return receipt.get("result") == result
+            if receipt.get("state") != "dispatched":
+                return False
+            receipt.update(state="complete", result=result, completed_at=time.time())
+            getattr(self, "_heartbeat_dispatched", {}).get(node_id, {}).pop(request_id, None)
+        return True
+
+    def admin_request_status(self, node_id, request_id, job_id, cancel_pending):
+        with self.lock:
+            rid = request_id or getattr(self, "_admin_requests_by_job", {}).get((node_id, job_id))
+            item = self.control_requests.get(rid)
+            if (not item or item.get("node_id") != node_id
+                    or item.get("operation") not in {"admin.exec", "admin.cua"}):
+                return {"state": "unknown", "node_id": node_id}
+            actual_job_id = item["payload"]["job_id"]
+            if job_id and job_id != actual_job_id:
+                return {"state": "unknown", "node_id": node_id}
+            receipt = self.control_results[rid]
+            if receipt["state"] == "pending":
+                if time.time() >= item["expires_at"]:
+                    receipt["state"] = "expired"
+                elif cancel_pending:
+                    receipt["state"] = "cancelled"
+            return dict(receipt, request_id=rid, job_id=actual_job_id)
 
     def _active_node_requests(self, node_id, now):
-        # Caller holds the existing store lock. A heartbeat never extends expires_at.
+        # Caller holds the existing store lock. A heartbeat never extends either deadline.
         active = []
         # Track only currently dispatched work, never rescan historical receipts.
         dispatched = getattr(self, "_heartbeat_dispatched", {}).get(node_id, {})
-        for rid, expiry in list(dispatched.items()):
+        for rid, (start_by, active_until) in list(dispatched.items()):
             state = self.control_results.get(rid)
             if (not isinstance(state, dict) or state.get("node_id") != node_id
                     or state.get("state") != "dispatched"):
@@ -146,8 +199,8 @@ class _NodeHeartbeatStore:
             if not isinstance(request, dict) or request.get("node_id") != node_id:
                 dispatched.pop(rid, None)
                 continue
-            if (type(expiry) not in (int, float) or not math.isfinite(expiry)
-                    or request.get("expires_at") != expiry or now >= expiry):
+            if (type(active_until) not in (int, float) or not math.isfinite(active_until)
+                    or request.get("expires_at") != start_by or now >= active_until):
                 dispatched.pop(rid, None)
                 continue
             active.append(rid)
@@ -322,10 +375,19 @@ def post_json(url, value, *, state_dir=None, timeout=10, control=False):
     return result
 
 
-def _control(path, payload):
+def _control(path, payload, *, timeout=_CONTROL_TIMEOUT):
     state, url, _ = _settings()
     return post_json(url + "/fbpair/v1/control/" + path, payload,
-                     state_dir=state, control=True)
+                     state_dir=state, control=True, timeout=timeout)
+
+
+def _control_until(path, payload, deadline):
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise BrokerError("BROKER_RESULT_TIMEOUT")
+    if remaining >= _CONTROL_TIMEOUT:
+        return _control(path, payload)
+    return _control(path, payload, timeout=remaining)
 
 
 def list_confirmed_nodes():
@@ -364,11 +426,55 @@ def revoke(node_id):
     return _control("revoke", {"node_id": node_id})
 
 
+def request_status(node_id, *, request_id="", job_id="", cancel_pending=False):
+    """Read the matching admin receipt on the authenticated control channel."""
+    return _control("request-status", {"node_id": node_id, "request_id": request_id,
+                                       "job_id": job_id, "cancel_pending": cancel_pending},
+                    timeout=2)
+
+
+def _complete_result(receipt, node_id, request_id):
+    if receipt.get("node_id") != node_id:
+        raise BrokerError("BROKER_RESULT_NODE_MISMATCH")
+    result = receipt.get("result")
+    if not isinstance(result, dict):
+        raise BrokerError("BROKER_RESULT_INVALID")
+    return dict(result, request_id=request_id, node_id=node_id)
+
+
+def _settle_admin_request(node_id, request_id, job_id):
+    receipt = {}
+    if request_id or job_id:
+        try:
+            receipt = request_status(node_id, request_id=request_id or "", job_id=job_id,
+                                     cancel_pending=True)
+        except BrokerError:
+            pass
+    if (receipt.get("ok") is True and receipt.get("node_id") == node_id
+            and receipt.get("request_id") and (not request_id or receipt["request_id"] == request_id)
+            and (not job_id or receipt.get("job_id") == job_id)):
+        request_id = receipt["request_id"]
+        state = receipt.get("state")
+        if state == "complete" and isinstance(receipt.get("result"), dict):
+            return _complete_result(receipt, node_id, request_id)
+        if state in {"expired", "cancelled"}:
+            message = "BROKER_REQUEST_CANCELLED" if state == "cancelled" else "BROKER_REQUEST_EXPIRED"
+            raise BrokerRequestError(message, request_id=request_id,
+                                     execution_state="expired_before_dispatch")
+        if state == "dispatched":
+            raise BrokerRequestError("BROKER_REQUEST_IN_FLIGHT", request_id=request_id,
+                                     execution_state="in_flight")
+    raise BrokerRequestError("BROKER_REQUEST_OUTCOME_UNKNOWN", request_id=request_id,
+                             execution_state="outcome_unknown")
+
+
 def request(node_id, capability, args, timeout_s=120):
     if type(timeout_s) is not int or not 1 <= timeout_s <= 600:
         raise BrokerError("INVALID_TIMEOUT")
     if not isinstance(args, dict):
         raise BrokerError("ARGS_NOT_OBJECT")
+    deadline = time.monotonic() + timeout_s + _RESULT_GRACE
+    start_by = time.time() + timeout_s + _RESULT_GRACE
     confirmed = {n["node_id"]: n for n in list_confirmed_nodes()}
     if node_id not in confirmed:
         raise BrokerError("NODE_NOT_CONFIRMED")
@@ -382,23 +488,56 @@ def request(node_id, capability, args, timeout_s=120):
         payload.update(capability=capability, args=args)
     else:
         payload["payload"] = args
-    created = _control(path, payload)
-    if created.get("ok") is not True or not created.get("request_id"):
+        payload["start_by"] = start_by
+    admin = path != "request"
+    if admin and confirmed[node_id].get("supports_start_deadline") is not True:
+        raise BrokerError("BROKER_START_DEADLINE_UNSUPPORTED")
+    job_id = args.get("job_id")
+    job_id = job_id if isinstance(job_id, str) and _JOB.fullmatch(job_id) else ""
+    if time.monotonic() >= deadline:
+        if admin:
+            raise BrokerRequestError("BROKER_REQUEST_EXPIRED", request_id=None,
+                                     execution_state="expired_before_dispatch")
+        raise BrokerError("BROKER_RESULT_TIMEOUT")
+    try:
+        created = _control_until(path, payload, deadline)
+    except BrokerError as exc:
+        if not admin or str(exc) == "BROKER_HTTP_REJECTED_400":
+            raise
+        return _settle_admin_request(node_id, None, job_id)
+    if created.get("ok") is not True:
+        if admin and created.get("ok") is not False:
+            return _settle_admin_request(node_id, None, job_id)
         raise BrokerError("BROKER_REQUEST_REJECTED")
-    rid = created["request_id"]
-    deadline = time.monotonic() + timeout_s + 10
+    rid = created.get("request_id")
+    if not isinstance(rid, str) or not rid:
+        if admin:
+            return _settle_admin_request(node_id, None, job_id)
+        raise BrokerError("BROKER_REQUEST_REJECTED")
     while time.monotonic() < deadline:
-        final = _control("result", {"request_id": rid})
-        if final.get("node_id") != node_id:
-            raise BrokerError("BROKER_RESULT_NODE_MISMATCH")
-        if final.get("state") == "complete":
-            result = final.get("result")
-            if not isinstance(result, dict):
-                raise BrokerError("BROKER_RESULT_INVALID")
-            return dict(result, request_id=rid, node_id=node_id)
-        if final.get("state") == "expired":
-            raise BrokerError("BROKER_REQUEST_EXPIRED")
-        time.sleep(0.2)
+        try:
+            final = _control_until("result", {"request_id": rid}, deadline)
+            if final.get("node_id") != node_id:
+                raise BrokerError("BROKER_RESULT_NODE_MISMATCH")
+            if final.get("state") == "complete":
+                return _complete_result(final, node_id, rid)
+        except BrokerError as exc:
+            if not admin:
+                raise
+            from .node import _retryable_broker_failure
+            if not _retryable_broker_failure(exc):
+                break
+        else:
+            if final.get("state") in {"expired", "cancelled"}:
+                if admin:
+                    message = ("BROKER_REQUEST_CANCELLED" if final["state"] == "cancelled"
+                               else "BROKER_REQUEST_EXPIRED")
+                    raise BrokerRequestError(message, request_id=rid,
+                                             execution_state="expired_before_dispatch")
+                raise BrokerError("BROKER_REQUEST_EXPIRED")
+        time.sleep(max(0, min(0.2, deadline - time.monotonic())))
+    if admin:
+        return _settle_admin_request(node_id, rid, job_id)
     raise BrokerError("BROKER_RESULT_TIMEOUT")
 
 
@@ -489,7 +628,7 @@ def make_server(host="127.0.0.1", port=20878, state_dir=None):
                     self.by_pair[pair_id]["receipt"] = dict(result)
             return result
 
-        def queue_admin(self, node_id, operation, payload):
+        def queue_admin(self, node_id, operation, payload, start_by=None):
             node = self._paired_node(node_id)
             if node is None:
                 return None, "node_not_paired"
@@ -499,14 +638,34 @@ def make_server(host="127.0.0.1", port=20878, state_dir=None):
                 value = _admin_payload(operation, payload)
             except BrokerError as exc:
                 return None, str(exc)
-            rid = secrets.token_hex(16)
-            item = {"schema": 1, "request_id": rid, "node_id": node_id,
-                    "operation": operation, "payload": value, "created_at": time.time(),
-                    "expires_at": time.time() + value["timeout_s"] + 90}
+            if start_by is not None and (type(start_by) not in (int, float)
+                                         or not -math.inf < start_by < math.inf):
+                return None, "INVALID_START_DEADLINE"
             with self.lock:
+                if not hasattr(self, "_admin_requests_by_job"):
+                    self._admin_requests_by_job = {}
+                key = (node_id, value["job_id"])
+                existing = self._admin_requests_by_job.get(key)
+                if existing:
+                    previous = self.control_requests[existing]
+                    if previous["operation"] != operation or previous["payload"] != value:
+                        return None, "JOB_ID_CONFLICT"
+                    return previous, None
+                now = time.time()
+                expires_at = now + value["timeout_s"] + _RESULT_GRACE
+                if start_by is not None:
+                    expires_at = min(expires_at, start_by)
+                rid = secrets.token_hex(16)
+                item = {"schema": 1, "request_id": rid, "node_id": node_id,
+                        "operation": operation, "payload": value, "created_at": now,
+                        "expires_at": expires_at}
+                pending = now < expires_at
+                self._admin_requests_by_job[key] = rid
                 self.control_requests[rid] = item
-                self.control_results[rid] = {"state": "pending", "node_id": node_id}
-                self.control_queue[node_id].append(rid)
+                self.control_results[rid] = {"state": "pending" if pending else "expired",
+                                             "node_id": node_id}
+                if pending:
+                    self.control_queue[node_id].append(rid)
             return item, None
 
     store = Store(discovery, public_base)
@@ -597,6 +756,7 @@ def make_server(host="127.0.0.1", port=20878, state_dir=None):
                     nodes.append({"node_id": n["node_id"], "alias": n["node_label"],
                                   "hostname": n["node_label"], "transport": "broker_outbound",
                                   "ready": status.get("ready") is True, "pairing_state": "paired",
+                                  "supports_start_deadline": True,
                                   "busy": status.get("busy") is True,
                                   "heartbeat_fresh": status.get("heartbeat_fresh") is True,
                                   "last_seen_age_seconds": status.get("last_seen_age_seconds"),
@@ -628,7 +788,8 @@ def make_server(host="127.0.0.1", port=20878, state_dir=None):
                     item, error = store.queue_read(node_id, body.get("capability"), body.get("args"))
                 else:
                     operation = "admin.exec" if route == "admin-exec" else "admin.cua"
-                    item, error = store.queue_admin(node_id, operation, body.get("payload"))
+                    item, error = store.queue_admin(node_id, operation, body.get("payload"),
+                                                    body.get("start_by"))
                 if error:
                     raise BrokerError(str(error))
                 self.send_json(200, {"ok": True, "request_id": item["request_id"]})
@@ -637,6 +798,17 @@ def make_server(host="127.0.0.1", port=20878, state_dir=None):
                 if result is None:
                     raise BrokerError("REQUEST_NOT_FOUND")
                 self.send_json(200, {"ok": True, **result})
+            elif route == "request-status":
+                node_id = body.get("node_id")
+                request_id, job_id = body.get("request_id", ""), body.get("job_id", "")
+                cancel_pending = body.get("cancel_pending", False)
+                if (not isinstance(node_id, str) or not node_id
+                        or any(not isinstance(value, str) or (value and not _JOB.fullmatch(value))
+                               for value in (request_id, job_id))
+                        or not (request_id or job_id) or type(cancel_pending) is not bool):
+                    raise BrokerError("REQUEST_SELECTOR_INVALID")
+                receipt = store.admin_request_status(node_id, request_id, job_id, cancel_pending)
+                self.send_json(200, {"ok": True, **receipt})
             else:
                 self.send_json(404, {"ok": False, "error": "ENDPOINT_NOT_AVAILABLE"})
 

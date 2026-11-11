@@ -218,15 +218,29 @@ GUIDE = {'start': {'title': 'Start with FrameBridge',
                                  'Conflicting selectors, unknown fields and unknown targets are '
                                  'rejected. For graphical CUA, capture_scope chooses WINDOW or ROOT. '
                                  'Legacy node:ALIAS scope works for observation only and must agree '
-                                 'with any explicit target. In receipts, target names the resolved '
-                                 'computer and hostname records its system name. The older node '
-                                 'field is retained for compatibility. Local dispatch is identified '
+                                 'with any explicit target. Execution receipts keep requested_target '
+                                 'and resolved_target separate. registered_label is the label in the '
+                                 'node registry and receiver_hostname is the machine receiving the '
+                                 'tool call. For remote execution, hostname and executed_hostname '
+                                 'are populated from a confirmed node result. The older node field '
+                                 'is retained for compatibility. Local dispatch is identified '
                                  'by transport_target=LOCAL. Do not guess SSH identities or use historical lab '
                                  'hostnames as defaults. CLI tty --node can use the authenticated '
                                  'node transport. The interactive console command is local; run it '
                                  'at the destination or use an explicitly configured SSH '
                                  'destination.',
                          'commands': []},
+                        {'heading': 'Check a remote execution receipt',
+                         'body': 'Use fb nodes execution or the read-only MCP tool '
+                                 'framebridge_exec_status with the original node and its request_id '
+                                 'or job_id. The receipt distinguishes a queued request, a request '
+                                 'that expired before dispatch, an in-flight operation, a completed '
+                                 'operation and an unknown outcome. A dispatched operation may '
+                                 'already be running. When do_not_replay is true, check the '
+                                 'existing receipt before deciding whether another execution is safe.',
+                         'commands': ['fb nodes execution --help',
+                                      'fb nodes execution --target ALIAS_OR_UUID --request-id REQUEST_ID',
+                                      'fb nodes execution --target ALIAS_OR_UUID --job-id JOB_ID']},
                         {'heading': 'Transport trust',
                          'body': 'certificates create manages a private central/node transport CA, '
                                  'not a public website certificate or ChatGPT account '

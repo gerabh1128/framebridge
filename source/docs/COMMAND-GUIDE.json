@@ -1,12 +1,12 @@
 {
   "product": "FrameBridge",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "guide_schema": 1,
   "topics": {
     "start": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.7",
+      "version": "0.3.8",
       "guide_schema": 1,
       "topic": "start",
       "title": "Start with FrameBridge",
@@ -63,12 +63,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "01fec3c9854708e783c87a591d9ed2933fae30523f76367517045cd83cbc3752"
+      "guide_sha256": "0c3a259709db5b0b877d743af74838af57d746cd813d287e34699c5b8750c5cd"
     },
     "commands": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.7",
+      "version": "0.3.8",
       "guide_schema": 1,
       "topic": "commands",
       "title": "Command reference",
@@ -146,12 +146,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "5bd9cd8c173ecfb02cf6e5fdb47234ac1e74cf9dce4c1374b32b9d0620d4e0fc"
+      "guide_sha256": "028a5550a27f73c071632f97361465d54263b5cb7e9ed965f9935571b4b4d7cb"
     },
     "connection": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.7",
+      "version": "0.3.8",
       "guide_schema": 1,
       "topic": "connection",
       "title": "Connect and disconnect ChatGPT",
@@ -200,12 +200,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "83d0de3084bd2968c8904bdcd9f8f3a41aa17d17d37d06427e4a210f82e8e868"
+      "guide_sha256": "038d710ba5ec5df40bf51cd0aef56d03f656f8fb9a763823237529dbb929d828"
     },
     "lifecycle": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.7",
+      "version": "0.3.8",
       "guide_schema": 1,
       "topic": "lifecycle",
       "title": "Services, connection intent and boot policy",
@@ -266,12 +266,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "8d4193301a71ff0156b0ed6aa77c7e693d750d7b6db3ed03d56be5a6ffcf4a99"
+      "guide_sha256": "698b7304601c6cec210add992ff33d8583dfdf6ae3b17af795a9165584439f69"
     },
     "nodes": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.7",
+      "version": "0.3.8",
       "guide_schema": 1,
       "topic": "nodes",
       "title": "Central and node operation",
@@ -295,8 +295,17 @@
         },
         {
           "heading": "Targets",
-          "body": "Use target to select one enrolled alias or ID for FBEXEC and CUA. LOCAL means the actual receiver and remains the default in the execution tools when the selector is omitted. Legacy node arguments alias target. Supply only one spelling, or identical values. Conflicting selectors, unknown fields and unknown targets are rejected. For graphical CUA, capture_scope chooses WINDOW or ROOT. Legacy node:ALIAS scope works for observation only and must agree with any explicit target. In receipts, target names the resolved computer and hostname records its system name. The older node field is retained for compatibility. Local dispatch is identified by transport_target=LOCAL. Do not guess SSH identities or use historical lab hostnames as defaults. CLI tty --node can use the authenticated node transport. The interactive console command is local; run it at the destination or use an explicitly configured SSH destination.",
+          "body": "Use target to select one enrolled alias or ID for FBEXEC and CUA. LOCAL means the actual receiver and remains the default in the execution tools when the selector is omitted. Legacy node arguments alias target. Supply only one spelling, or identical values. Conflicting selectors, unknown fields and unknown targets are rejected. For graphical CUA, capture_scope chooses WINDOW or ROOT. Legacy node:ALIAS scope works for observation only and must agree with any explicit target. Execution receipts keep requested_target and resolved_target separate. registered_label is the label in the node registry and receiver_hostname is the machine receiving the tool call. For remote execution, hostname and executed_hostname are populated from a confirmed node result. The older node field is retained for compatibility. Local dispatch is identified by transport_target=LOCAL. Do not guess SSH identities or use historical lab hostnames as defaults. CLI tty --node can use the authenticated node transport. The interactive console command is local; run it at the destination or use an explicitly configured SSH destination.",
           "commands": []
+        },
+        {
+          "heading": "Check a remote execution receipt",
+          "body": "Use fb nodes execution or the read-only MCP tool framebridge_exec_status with the original node and its request_id or job_id. The receipt distinguishes a queued request, a request that expired before dispatch, an in-flight operation, a completed operation and an unknown outcome. A dispatched operation may already be running. When do_not_replay is true, check the existing receipt before deciding whether another execution is safe.",
+          "commands": [
+            "fb nodes execution --help",
+            "fb nodes execution --target ALIAS_OR_UUID --request-id REQUEST_ID",
+            "fb nodes execution --target ALIAS_OR_UUID --job-id JOB_ID"
+          ]
         },
         {
           "heading": "Transport trust",
@@ -320,12 +329,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "2ca370e0684d0f752db46192c447dd68a600279edbb969f7d282b9da0db418ea"
+      "guide_sha256": "b8ed8c19bc10ca19f05ab34e23eb23f79164ca9eba9684463da78f12863e4066"
     },
     "terminals": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.7",
+      "version": "0.3.8",
       "guide_schema": 1,
       "topic": "terminals",
       "title": "Persistent Bash terminals",
@@ -394,12 +403,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "1889c69f72fe581b83136a57b6e31df649c69186043f8a0d5dc6d0aad3698c33"
+      "guide_sha256": "23d5c49930ba06be0021dad42659a9e38be5fa2c3f5655040fbd388901f73691"
     },
     "screens": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.7",
+      "version": "0.3.8",
       "guide_schema": 1,
       "topic": "screens",
       "title": "Authentic screen observation and input",
@@ -449,12 +458,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "14c4763e8bb2f59aaa203156d7f12c51085cb48876ffa5961620fdeb1addebfc"
+      "guide_sha256": "2fbd97da84777db33cf5419449ae4b7ea7f5094f4a44e50a97a7ec490c9c46c5"
     },
     "diagnostics": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.7",
+      "version": "0.3.8",
       "guide_schema": 1,
       "topic": "diagnostics",
       "title": "Status and diagnosis",
@@ -507,12 +516,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "b6b9679fad96b0af6cac966dddb8ce6e26aea891c9bfb5b582e6640dafbd5bf5"
+      "guide_sha256": "b7dbccd31348dfb60f8778cbfd25909954dc936d45222a4a856e6bfb27ddb393"
     },
     "security": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.7",
+      "version": "0.3.8",
       "guide_schema": 1,
       "topic": "security",
       "title": "Authorization, distribution and safe operation",
@@ -547,12 +556,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "271fc0c21f64216d4c26e5be0e1502a57ab5cb85d13e19c743d7756803e140a0"
+      "guide_sha256": "8e789e1bb2702876646039c56c805a37ee7b9395d2195a9355ee3ad37cc96a56"
     },
     "compatibility": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.7",
+      "version": "0.3.8",
       "guide_schema": 1,
       "topic": "compatibility",
       "title": "Compatibility with earlier commands",
@@ -595,8 +604,8 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "a4b65ac6fbcf43b25d30a6a3f526289b2831a251d5a3869e12243b387337396c"
+      "guide_sha256": "ca2dad565eb520e361380d55145cb580abccd029b629cc695227d8d96418de28"
     }
   },
-  "guide_sha256": "ef1c324732781464ff253df04775ab9057b9943b79f2000bcd1c6ffaa796c82b"
+  "guide_sha256": "85d90bdb17449d8bbc4f5688eeb07f34ac31b297b338b106d8cd2916c4915ada"
 }

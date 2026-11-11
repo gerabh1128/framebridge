@@ -3,10 +3,12 @@ from __future__ import annotations
 import importlib.util
 import base64
 import hashlib
+import math
 import os
 from pathlib import Path
 import sys
 import threading
+import time
 from . import display_context as display
 from .native_host import META
 
@@ -98,6 +100,25 @@ def install_adapter_guard(adapter, *, env=None, checker=None):
     adapter.native_cua_roundtrip = native_roundtrip
     adapter.handle_cua_request = handle
 
+
+def install_start_deadline_guard(adapter):
+    """Check the authenticated node's start deadline after the socket queue."""
+    original = adapter.handle
+
+    def handle(payload):
+        if isinstance(payload, dict) and "start_before" in payload:
+            deadline = payload["start_before"]
+            if type(deadline) not in (int, float) or not math.isfinite(deadline):
+                return {"ok": False, "error": "INVALID_START_DEADLINE",
+                        "execution_state": "not_started"}
+            if time.time() >= deadline:
+                return {"ok": False, "error": "REQUEST_EXPIRED",
+                        "execution_state": "expired_before_start"}
+            payload = {key: value for key, value in payload.items() if key != "start_before"}
+        return original(payload)
+
+    adapter.handle = handle
+
 def main(argv=None):
     if list(sys.argv[1:] if argv is None else argv) != ["serve"]:
         raise SystemExit("Usage: python3 -m framebridge_expanded.adapter serve")
@@ -111,6 +132,7 @@ def main(argv=None):
     install_adapter_guard(original)
     from .real_screen.screen_transport import install_adapter_route
     install_adapter_route(original)
+    install_start_deadline_guard(original)
     original.serve()
 
 if __name__ == "__main__":

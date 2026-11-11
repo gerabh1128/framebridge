@@ -24,7 +24,8 @@ This is operational guidance for reliable use, not a restriction on a recipient'
 
 ## Release records
 
-- **Current: 0.3.7.** Publicly promoted on 9 November 2026. Use the [official download page](https://framebridge.betancourt.one/download/) and [source-to-artifact record](docs/RELEASE-SOURCE-0.3.7.md) for the three package profiles, corresponding source, signatures and verification material. The [GitHub v0.3.7 source release](https://github.com/gerabh1128/framebridge/releases/tag/v0.3.7) identifies a repository snapshot, not a replacement for the signed release artifacts. Read the [0.3.7 notes](RELEASE-NOTES.md#037) for scope and the explicitly excluded supervision Site.
+- **Current: 0.3.8.** Publicly promoted on 11 November 2026. The release record identifies the frozen source, the three signed package profiles and the verification evidence for this release. [Official download page](https://framebridge.betancourt.one/download/) · [Release catalog](https://framebridge.betancourt.one/assets/release.json) · [Source-to-artifact record](docs/RELEASE-SOURCE-0.3.8.md) · [Release notes](RELEASE-NOTES.md#038)
+- **Historical: 0.3.7.** Publicly promoted on 9 November 2026. Its record identifies the three signed package profiles, the corresponding source and the verification material. [Source-to-artifact record](docs/RELEASE-SOURCE-0.3.7.md) · [GitHub v0.3.7 source release](https://github.com/gerabh1128/framebridge/releases/tag/v0.3.7) · [Release notes](RELEASE-NOTES.md#037)
 - **Historical: 0.3.5.** Its [source-to-artifact record](docs/RELEASE-SOURCE-0.3.5.md), original bytes and signatures remain unchanged. Historical evidence does not certify a later artifact.
 
 See the [reviewed source and release workflow](docs/RELEASE-WORKFLOW.md). A later documentation commit does not redefine the frozen source used for an existing signed package or justify moving an existing release tag.

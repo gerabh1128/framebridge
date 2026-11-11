@@ -4,7 +4,7 @@ This is a setup and verification workflow for an assistant that **already has au
 
 The currently tested connection is the manual ChatGPT workflow. A coding assistant can help prepare it through the CLI; this document does not claim drop-in integration with every AI client.
 
-Current release: **0.3.7**, for Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. Use the exact profile, signatures and source record from the [official download page](https://framebridge.betancourt.one/download/). A version label or later source checkout is not evidence that a package has been built, signed, published or accepted on the target computer; verify the actual release artifacts. Historical compatibility-candidate checks remain separate from validation of this release.
+**FrameBridge 0.3.8** has amd64 package profiles for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. Before installation, verify the package profile, checksum and signature. Before connecting to an existing node, check the version actually installed there. [Official download page](https://framebridge.betancourt.one/download/) · [0.3.8 source-to-artifact record](RELEASE-SOURCE-0.3.8.md)
 
 ## Before handing over
 
@@ -12,7 +12,7 @@ Give the assistant the computer you want to work on, the intended task, and the 
 
 Name both the computer receiving the assistant's tool call and the intended execution target. `LOCAL` means the current FrameBridge receiver, not a fixed computer called ASUS or the computer displaying the chat. Discover enrolled nodes and use their confirmed aliases or IDs. A legacy connector can have a different default target; changing endpoints does not preserve that default automatically.
 
-Select the computer with `target` in FBEXEC and CUA. The older `node` selector is an alias on the execution and screen tools that accept it. Pass one destination. For graphical input, observe with `framebridge_cua` and `capture_scope="WINDOW"`, then use the same target and the observed window ID and dimensions. The bound screen key and text tools require a visible TTY. A receipt's `hostname` records the system name.
+Select the computer with `target` in FBEXEC and CUA. The older `node` selector is an alias on the execution and screen tools that accept it. Pass one destination. For graphical input, observe with `framebridge_cua` and `capture_scope="WINDOW"`, then use the same target and the observed window ID and dimensions. The bound screen key and text tools require a visible TTY. Receipts identify the enrolled node by alias and UUID. `receiver_hostname` identifies the receiver, and `executed_hostname` gives the system name when reported by the executor. If the receipt reports `in_flight` or `outcome_unknown`, use `fb nodes execution` or `framebridge_exec_status` with the existing request or job ID before taking further action.
 
 Do not put passwords, tunnel IDs, server access keys or browser codes in the prompt. The owner will enter them in the local hidden prompts. An MCP server access key is not an OpenAI API key.
 

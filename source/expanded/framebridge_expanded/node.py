@@ -7,6 +7,7 @@ import http.client
 import importlib
 import json
 import logging
+import math
 import os
 import socket
 import ssl
@@ -177,29 +178,33 @@ def status(state_dir=None):
 def dispatch_request(request, adapter_request=None, state_dir=None):
     """Recheck binding and authorization before invoking the real local Original adapter."""
     if not isinstance(request, dict):
-        return {"ok": False, "error": "REQUEST_INVALID"}
+        return {"ok": False, "error": "REQUEST_INVALID", "execution_state": "not_started"}
+    operation = request.get("operation")
+    attempted = False
     try:
         _, _, _, identity = _context(state_dir)
         if request.get("node_id") != identity["node_id"]:
             raise NodeError("REQUEST_NODE_MISMATCH")
         expires = request.get("expires_at")
-        if isinstance(expires, bool) or not isinstance(expires, (int, float)) or not expires > time.time():
+        if type(expires) not in (int, float) or not time.time() < expires < math.inf:
             raise NodeError("REQUEST_EXPIRED")
         rid = request.get("request_id")
         if not isinstance(rid, str) or not rid or len(rid) > 80:
             raise NodeError("REQUEST_ID_INVALID")
-        operation = request.get("operation")
         if operation:
             payload = broker._admin_payload(operation, request.get("payload"))
-            payload = dict(payload, version=1, mode="EXEC")
+            payload = dict(payload, version=1, mode="EXEC", start_before=expires)
             if operation == "admin.cua":
                 payload["request_type"] = "cua"
             if adapter_request is None:
                 from .runtime import adapter_request
+            if expires <= time.time():
+                raise NodeError("REQUEST_EXPIRED")
+            attempted = True
             result = adapter_request(payload)
             if not isinstance(result, dict):
                 raise NodeError("ADAPTER_RESPONSE_INVALID")
-            result = dict(result, mcp_job_id=payload["job_id"])
+            result = dict(result, mcp_job_id=payload["job_id"], executed_hostname=socket.gethostname())
             if operation == "admin.exec":
                 result["mcp_script_sha256"] = payload["sha256"]
             if payload.get("include_stdout") is not True:
@@ -209,14 +214,27 @@ def dispatch_request(request, adapter_request=None, state_dir=None):
         cap, args = request.get("capability"), request.get("args")
         if cap not in broker.original_modules().READ_CAPS or not isinstance(args, dict):
             raise NodeError("CAPABILITY_NOT_ALLOWED")
-        value = _original("seed_capabilities").execute_capability(cap, args)
+        execute = _original("seed_capabilities").execute_capability
+        if expires <= time.time():
+            raise NodeError("REQUEST_EXPIRED")
+        attempted = True
+        value = execute(cap, args)
         if isinstance(value, dict) and value.get("ok") is False:
-            return {"ok": False, "capability": cap, "error": "READ_CAPABILITY_FAILED"}
-        return {"ok": True, "capability": cap, "result": value}
+            return {"ok": False, "capability": cap, "error": "READ_CAPABILITY_FAILED",
+                    "executed_hostname": socket.gethostname()}
+        return {"ok": True, "capability": cap, "result": value,
+                "executed_hostname": socket.gethostname()}
     except (NodeError, broker.BrokerError) as exc:
-        return {"ok": False, "error": str(exc)}
+        error = str(exc)
     except Exception:
-        return {"ok": False, "error": "NODE_DISPATCH_FAILED"}
+        error = "NODE_DISPATCH_FAILED"
+    if attempted:
+        failure = {"ok": False, "error": error, "execution_state": "outcome_unknown"}
+        if operation:
+            failure["do_not_replay"] = True
+        return failure
+    state = "expired_before_start" if error == "REQUEST_EXPIRED" else "not_started"
+    return {"ok": False, "error": error, "execution_state": state}
 
 
 def _retryable_broker_failure(exc):

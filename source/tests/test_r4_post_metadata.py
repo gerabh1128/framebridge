@@ -141,6 +141,14 @@ class PostMetadata(unittest.TestCase):
         self.assertEqual(meta['post_job_id'],'cua-post-'+hashlib.sha256(b'action-id').hexdigest())
         self.assertEqual(meta['post_resultado_final'],'CUA_VISUAL_OBSERVE_PASS')
         self.assertEqual([c['payload']['action'] for c in self.calls],['CLICK','OBSERVE'])
+        self.assertEqual([c['target'] for c in self.calls], ['NODE_A', self.before['node_id']])
+
+    def test_post_never_accepts_image_from_different_node(self):
+        self.after["node_id"] = "22222222-2222-4222-8222-222222222222"
+        meta, image = self.call()
+        self.assertEqual(meta["post_error"], "POST_OBSERVATION_NODE_MISMATCH")
+        self.assertEqual(meta["node_id"], self.before["node_id"])
+        self.assertEqual(image.data, self.before_data)
 
     def test_post_failure_does_not_replay_or_hoist_failed_snapshot(self):
         self.after=dict(ok=False,error='VISUAL_CAPTURE_CONTEXT_CHANGED',window_width='999')

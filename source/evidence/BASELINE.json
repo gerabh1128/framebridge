@@ -973,7 +973,7 @@
     "original-geranas/.local/share/framebridge/tool-adapter/bin/framebridge_tool_adapter.py": "2afb9bf8f789f42732a6aa6e50b5897174bfa1522ff032bc83533679c37551ec",
     "original-asus/tool-adapter/bin/framebridge_tool_client.py": "1d1514f08653c31f6b67ebcdcf61686947321bec96752a692b7e46cee6285f6e",
     "original-asus/tool-adapter/bin/framebridge_tool_adapter.py": "dca9bf3dfbae7881aa6824ca79a2922fb4ec7ab1b61b5696b39cb64630c4d86b",
-    "original-asus/fbterm/bin/fbterm_engine.py": "01ca3556b6e0d05ba95fa805fba70befbf765c8ae45fee75bce4131ab834a93a",
+    "original-asus/fbterm/bin/fbterm_engine.py": "dc810baddeaf526323fd7ca9bde12735a7e3eb0918e06606e9ef7fdc5fa894fe",
     "original-asus/fbterm/bin/fbx": "84589ad19ea0eab7cfc766ef4dba736be05c509c3918f572f4054585ee4c5efb",
     "original-asus/fbterm/bin/fbterm-run": "bbfc19c878746518e482adbe61cd6f8ae8560dca75a1e3db9921e1cb40b42e71",
     "original-asus/fbterm/bin/fbterm-prompt-ready": "276f657e23ff26c75f5e430731fdf5b095d777eabcbaad86e11c69b0919c691c",
@@ -1023,6 +1023,18 @@
       "patch": "provenance/patches/cua-window-0.3.6.patch",
       "patch_sha256": "5ef5b66341177d4e3f419bc52449d79ba796bc7b8a65095d9a2de06102e3c1d1",
       "reason": "Capture the verified visible X11 window intersection with stable geometry and identity."
+    },
+    {
+      "version": "0.3.7.10",
+      "date": "2026-11-10",
+      "path": "original-asus/fbterm/bin/fbterm_engine.py",
+      "previous_sha256": "01ca3556b6e0d05ba95fa805fba70befbf765c8ae45fee75bce4131ab834a93a",
+      "reviewed_sha256": "dc810baddeaf526323fd7ca9bde12735a7e3eb0918e06606e9ef7fdc5fa894fe",
+      "provenance": "provenance/FBTERM-VIEWER-HEADER-0.3.7-REVIEW.json",
+      "preserved_original": "provenance/originals/fbterm_engine-before-viewer-header-0.3.7.py",
+      "patch": "provenance/patches/fbterm-viewer-header-0.3.7.patch",
+      "patch_sha256": "46fe28a10e91cd6a2dbff74a6fb339590dcb61d0d990554411e952731597081d",
+      "reason": "Reconcile the already authorized fixed FBTERM version/license header from commit 02269108a1f0fec4efc22b7bc9a6bf336321f4d2; retain the complete previous source and reversible patch."
     }
   ]
 }

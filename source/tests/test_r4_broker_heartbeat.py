@@ -225,7 +225,9 @@ class HeartbeatTests(unittest.TestCase):
         def control(route, value):
             if route == 'admin-exec': return {'ok': True, 'request_id': 'new-rid'}
             return {'node_id': 'node-a', 'state': 'complete', 'result': {'ok': True}}
-        with patch.object(broker, 'list_confirmed_nodes', return_value=[{'node_id': 'node-a', 'ready': True, 'busy': True}]), patch.object(broker, '_control', side_effect=control):
+        with patch.object(broker, 'list_confirmed_nodes', return_value=[
+            {'node_id': 'node-a', 'ready': True, 'busy': True, 'supports_start_deadline': True}
+        ]), patch.object(broker, '_control', side_effect=control):
             self.assertEqual(broker.request('node-a', 'admin.exec', {}, timeout_s=10)['request_id'], 'new-rid')
 
     def test_expiry_crossed_during_real_signature_verification_cannot_refresh(self):

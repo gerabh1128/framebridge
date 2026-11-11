@@ -86,10 +86,11 @@ def portable(*, execute=None, screen_execute=None, cua=None, threaded=True):
                      PRODUCT_VERSION="test", GUIDE_SCHEMA=1,
                      _framebridge_exec_geranas_impl=execute, expanded_execute_node=execute,
                      local_target_identity=lambda: {"node": "central", "target": "central",
-                                                    "requested_target": "LOCAL", "transport_target": "LOCAL"},
+                                                    "requested_target": "LOCAL", "transport_target": "LOCAL",
+                                                    "hostname": "fb-central-lab"},
                      expanded_execute_screen_node=screen_execute,
                      register_framebridge_screen_tools=register_framebridge_screen_tools,
-                     resolve_profile_node=lambda target: target.upper(),
+                     resolve_profile_route=lambda target: (target.upper(), NODE_ID),
                      register_screen_presentation=register_screen_presentation,
                      register_tty_tools=tty_mcp.register_tools)
     exec(compile(ast.fix_missing_locations(ast.Module(body=selected, type_ignores=[])),
@@ -280,7 +281,7 @@ class DispatchTests(unittest.IsolatedAsyncioTestCase):
                 result = await mcp.call_tool("cua_tty_observe", {
                     "session_id": SESSION_ID, "authorized": True, "target": target})
                 self.assertTrue(any(item.type == "image" for item in result))
-                self.assertEqual(set(calls), {target})
+                self.assertEqual(set(calls), {NODE_ID})
                 self.assertGreaterEqual(len(calls), 2)
                 legacy.assert_not_called()
 

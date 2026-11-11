@@ -149,7 +149,9 @@ class FleetRoutingTests(unittest.TestCase):
         self.assertEqual(value["target"], value["node"])
         self.assertEqual(value["transport_target"], "LOCAL" if local else "test-node")
         self.assertEqual(value["node_id"], LOCAL_ID if local else REMOTE_ID)
-        self.assertEqual(value["hostname"], socket.gethostname() if local else "test-node")
+        self.assertEqual(value["registered_label"], value["resolved_target"])
+        self.assertEqual(value["receiver_hostname"], socket.gethostname())
+        self.assertEqual(value["hostname"], socket.gethostname() if local else None)
         self.assertEqual(value["transport"], "local" if local else "broker_outbound")
 
     @staticmethod
@@ -232,6 +234,60 @@ class FleetRoutingTests(unittest.TestCase):
         self.assertEqual(value["error"], "AUTHORIZED_TRUE_REQUIRED")
         for field in ("requested_target", "resolved_target", "node_id", "hostname", "transport"):
             self.assertNotIn(field, value)
+
+    def test_authenticated_executor_host_does_not_replace_target(self):
+        def remote_response(node_id, capability, payload, timeout_s):
+            self.assertEqual(node_id, REMOTE_ID)
+            return {**self.misleading_response(payload), "executed_hostname": "node-host.local"}
+        with mock.patch("framebridge_expanded.broker.request", side_effect=remote_response):
+            value = fleet.execute_node(REMOTE_ID, "printf ok", True, job_id="observed-host")
+        self.assertEqual(value["requested_target"], REMOTE_ID)
+        self.assertEqual(value["resolved_target"], "test-node")
+        self.assertEqual(value["registered_label"], "test-node")
+        self.assertEqual(value["receiver_hostname"], socket.gethostname())
+        self.assertEqual(value["executed_hostname"], "node-host.local")
+        self.assertEqual(value["hostname"], "node-host.local")
+
+    def test_uncertain_exec_preserves_receipt_and_forbids_replay(self):
+        from framebridge_expanded import broker
+        error = broker.BrokerRequestError("NODE_EXEC_IN_FLIGHT", request_id="req-a",
+                                          execution_state="in_flight")
+        with mock.patch.object(broker, "request", side_effect=error):
+            value = fleet.execute_node("test-node", "printf ok", True, job_id="job-a")
+        self.assertEqual(value["execution_state"], "in_flight")
+        self.assertEqual(value["request_id"], "req-a")
+        self.assertEqual(value["mcp_job_id"], "job-a")
+        self.assertTrue(value["do_not_replay"])
+        self.assertIsNone(value["executed_hostname"])
+
+    def test_status_reads_one_bound_job_and_omits_result_payload(self):
+        from framebridge_expanded import broker
+        entry = {"state": "complete", "request_id": "req-a", "job_id": "job-a",
+                 "result": {"ok": True, "exit_code": "1", "stdout": "private",
+                            "executed_hostname": "actual-node"}}
+        with mock.patch.object(broker, "request_status", return_value=entry) as read:
+            value = fleet.execution_status("test-node", request_id="req-a", job_id="job-a")
+        read.assert_called_once_with(REMOTE_ID, request_id="req-a", job_id="job-a")
+        self.assertEqual(value["execution_state"], "completed")
+        self.assertEqual(value["exit_code"], "1")
+        self.assertEqual(value["executed_hostname"], "actual-node")
+        self.assertNotIn("result", value)
+        self.assertNotIn("stdout", value)
+
+    def test_adapter_response_loss_is_unknown_in_exec_and_status(self):
+        from framebridge_expanded import broker
+        result = {"ok": False, "error": "ADAPTER_RESPONSE_INVALID",
+                  "request_id": "req-a", "executed_hostname": "unconfirmed-node"}
+        entry = {"state": "complete", "request_id": "req-a", "job_id": "job-a", "result": result}
+        with mock.patch.object(broker, "request", return_value=result), \
+                mock.patch.object(broker, "request_status", return_value=entry):
+            executed = fleet.execute_node("test-node", "printf ok", True, job_id="job-a")
+            queried = fleet.execution_status("test-node", job_id="job-a")
+        for receipt in (executed, queried):
+            self.assertEqual(receipt["execution_state"], "outcome_unknown")
+            self.assertEqual(receipt["request_id"], "req-a")
+            self.assertTrue(receipt["do_not_replay"])
+            self.assertIsNone(receipt["executed_hostname"])
 
 
 if __name__ == "__main__":
