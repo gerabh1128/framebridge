@@ -56,9 +56,10 @@ Reliability update for the existing three Linux profiles: concurrent bounded TLS
 
 Native persistent startup improvements, lower idle disk writes, local health reporting and confirmed Fleet destinations. The release has three amd64 distribution profiles and matching source with both Python ABIs. See [the complete 0.3.4 notes](docs/RELEASE-NOTES-0.3.4.md); signatures and actual lifecycle results are recorded with the release artifacts.
 
-## Unreleased — private production pilot fixes
+## Historical private production pilot
 
-Private pilot validation remains in progress; these changes are not a public release.
+This section records the behavior and validation of an earlier private pilot.
+See the versioned sections above for subsequent public releases.
 
 - Recover from classified transient broker failures with capped backoff and fresh signed nonces. Result acknowledgement retries retain the computed result and never reexecute a command. TLS, authentication and malformed-response failures remain terminal.
 - Dispatch blocking MCP operations in bounded workers, preserve synchronous internal callbacks, and protect shared initialization. Concurrent generated local job IDs are distinct.
@@ -68,7 +69,7 @@ Private pilot validation remains in progress; these changes are not a public rel
 
 Validation: 721 integrated source tests passed with zero failures, errors or skips. Frozen 0.3.2 source and signed Debian artifact remained unchanged. Focused tests cover real vendored MCP dispatch, retry/no-replay behavior, frozen screen-receiver compatibility and isolated maintainer-script semantics.
 
-Known limits: the cooperative capture budget can be exceeded by an already-running lower transport call. A broker restart can reject an unknown in-flight result; a lost poll reply can orphan a request. These cases do not reconstruct or replay commands. Live fleet acceptance remains separate from source-test success.
+Pilot limits: an already-running transport call could exceed the cooperative capture budget. A broker restart could reject an unknown in-flight result, and a lost poll reply could orphan a request. Recovery for those cases excluded command reconstruction and replay. The 0.3.9 section describes the later broker recovery behavior.
 
 ## 0.3.1 — Community Release
 

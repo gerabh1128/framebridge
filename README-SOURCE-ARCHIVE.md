@@ -1,10 +1,11 @@
-# FrameBridge 0.3.7 corresponding source
+# FrameBridge corresponding source
 
-This archive supplies the project source and the reviewed cp313 and cp312 vendor
-inputs for Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. Keep its matching
-SOURCE-ARCHIVE-MANIFEST.json sidecar beside the archive. Signatures, publication
-and actual OS lifecycle acceptance are recorded separately; assembly alone does
-not certify them. Historical signed assets retain their immutable identities.
+Use the [official releases index](OFFICIAL-RELEASES.md) to find the signed
+corresponding-source archive, matching manifest and lifecycle evidence for the
+installer version you received. The archive supplies the project source and
+reviewed cp313 and cp312 vendor inputs for Debian 13, Ubuntu 24.04 and Linux
+Mint 22.x on amd64. Keep its matching SOURCE-ARCHIVE-MANIFEST.json sidecar
+beside the archive. Historical signed assets retain their original identities.
 
 The offline builder needs Python 3, dpkg/dpkg-deb and the documented host build
 prerequisites. It never fetches dependencies, installs packages or starts services.

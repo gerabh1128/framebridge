@@ -30,6 +30,8 @@ class CatalogTests(unittest.TestCase):
 
     def test_preparation_has_no_install_or_download_claim(self):
         catalog["validate"](self.meta, False)
+        guide = json.loads((BASE.parent / "source/docs/COMMAND-GUIDE.json").read_text())
+        self.assertEqual(self.meta["version"], guide["version"])
         text = catalog["download"](self.meta)
         self.assertIn("Release preparation", text)
         self.assertNotIn("sudo apt install", text)
@@ -72,16 +74,31 @@ class CatalogTests(unittest.TestCase):
 
 class PublicGuideTests(unittest.TestCase):
     def setUp(self):
-        self.path = BASE.parent / "source/docs/COMMAND-GUIDE.json"
-        self.raw = self.path.read_bytes()
-        self.original = json.loads(self.raw)
+        # Keep the historical erratum fixture independent of the current guide.
+        diagnostics = {
+            "version": "0.3.7",
+            "sections": [{
+                "heading": "Doctor",
+                "body": "The published 0.3.3 scope is Debian 13 with cp313 and Ubuntu 24.04/Mint 22.x with cp312.",
+            }],
+        }
+        diagnostics["guide_sha256"] = catalog["guide_digest"](diagnostics)
+        self.original = {
+            "version": "0.3.7",
+            "topics": {
+                "diagnostics": diagnostics,
+                "start": {"version": "0.3.7", "title": "Start here"},
+            },
+        }
+        self.original["guide_sha256"] = catalog["guide_digest"](self.original)
+        self.raw = json.dumps(self.original).encode()
 
     def test_erratum_is_a_distinct_web_copy_without_mutating_frozen_guide(self):
         published = catalog["publication_guide"](self.raw)
         doctor = next(s for s in published["topics"]["diagnostics"]["sections"] if s["heading"] == "Doctor")
         self.assertIn("The 0.3.7 release profiles are", doctor["body"])
         self.assertNotIn("published 0.3.3", doctor["body"])
-        self.assertEqual(self.path.read_bytes(), self.raw)
+        self.assertEqual(json.loads(self.raw), self.original)
         self.assertEqual(published["publication"]["frozen_guide_file_sha256"], hashlib.sha256(self.raw).hexdigest())
         self.assertEqual(published["publication"]["frozen_guide_sha256"], self.original["guide_sha256"])
         self.assertNotEqual(published["guide_sha256"], self.original["guide_sha256"])
@@ -109,6 +126,8 @@ class PublicGuideTests(unittest.TestCase):
             catalog["publication_guide"](json.dumps(self.original).encode())
 
     def test_other_versions_are_not_relabelled(self):
+        current = (BASE.parent / "source/docs/COMMAND-GUIDE.json").read_bytes()
+        self.assertEqual(catalog["publication_guide"](current), json.loads(current))
         self.original["version"] = "0.3.5"
         self.assertEqual(catalog["publication_guide"](json.dumps(self.original).encode()), self.original)
 

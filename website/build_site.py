@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """Build the self-hosted FrameBridge website with the Python standard library."""
 from pathlib import Path
+from xml.etree import ElementTree
 import html,json,re,shutil,sys,runpy,hashlib
 
 BASE=Path(__file__).resolve().parent
@@ -127,5 +128,19 @@ else:hub+='<p><a href="/assets/command-guide.json">Read the versioned guide data
 hub+='</article>'
 (DIST/'docs/index.html').write_text(page('Command guide','<main id="content" class="wrap docs-layout">'+docs_nav('index')+hub+'</main>','docs',True))
 (DIST/'404.html').write_text(page('Page not found','<main id="content" class="wrap page-content prose"><p class="section-label">404 / Page not found</p><h1>This path ends here.</h1><p>Return to <a href="/">FrameBridge</a> or open the <a href="/docs/">command guide</a>.</p></main>'))
-(DIST/'robots.txt').write_text('User-agent: *\n'+('Allow: /\n' if READY else 'Disallow: /\n'))
+robots_path = DIST / 'robots.txt'
+sitemap_path = DIST / 'sitemap.xml'
+if READY:
+    site_url = META['site_url'].rstrip('/')
+    sitemap = ElementTree.Element('urlset', xmlns='http://www.sitemaps.org/schemas/sitemap/0.9')
+    public_paths = ('/', '/download/', '/docs/', '/blog/', '/blog/2026-10-26-opening-framebridge/',
+                    '/community/', '/support/', *(f'/docs/{topic}/' for topic in order))
+    for path in public_paths:
+        url = ElementTree.SubElement(sitemap, 'url')
+        ElementTree.SubElement(url, 'loc').text = site_url + path
+    ElementTree.ElementTree(sitemap).write(sitemap_path, encoding='utf-8', xml_declaration=True)
+    robots_path.write_text(f'User-agent: *\nAllow: /\nSitemap: {site_url}/sitemap.xml\n', encoding='utf-8')
+else:
+    sitemap_path.unlink(missing_ok=True)
+    robots_path.write_text('User-agent: *\nDisallow: /\n', encoding='utf-8')
 print(json.dumps({'web_root':str(DIST),'release_state':META['state'],'pages':len(list(DIST.rglob('*.html'))),'guide_topics':len(guides),'video_present':(DIST/'assets'/VIDEO).is_file(),'ready_metadata_validated':READY},indent=2))

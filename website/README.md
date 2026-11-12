@@ -9,8 +9,9 @@ https://framebridge.betancourt.one/git/gerardo/framebridge. CLOUD provides the
 existing HTTPS reverse proxy; GERANAS serves the website, downloads and APT
 repository. Do not substitute a static Git mirror or another hosting backend.
 
-Copy release.example.json to release.json, then fill it from the exact verified
-release inventory. Its three profiles are Debian 13 amd64/Python 3.13 (trixie),
+Copy release.example.json to release.json for a preparation preview. The example
+uses the current command guide version. Fill release.json from the exact verified
+release inventory before a public build. Its three profiles are Debian 13 amd64/Python 3.13 (trixie),
 Ubuntu 24.04 amd64/Python 3.12 (noble), and Linux Mint 22.x amd64/Python 3.12
 (mint22). A preparing catalog offers no new download or installation commands.
 Use ready only after verifying all DEBs, corresponding source, dependency
