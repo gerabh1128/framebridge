@@ -4,9 +4,9 @@
 
 Use a central gateway and enrolled nodes to administer Linux computers you control. Run commands and return to persistent Bash terminals; an existing X11 desktop adds optional graphical tools. ChatGPT remains hosted; FrameBridge runs the tools on your Linux computers.
 
-> **FrameBridge 0.3.8.** Builds cover Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. For installation, confirm that the official catalog lists 0.3.8 for your distribution and verify the matching package signature or signed APT metadata. See the [0.3.8 source-to-artifact record](docs/RELEASE-SOURCE-0.3.8.md) and [official download page](https://framebridge.betancourt.one/download/).
+> **FrameBridge 0.3.9.** Builds cover Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. For installation, confirm that the official catalog lists 0.3.9 for your distribution and verify the matching package signature or signed APT metadata. See the [0.3.9 source-to-artifact record](docs/RELEASE-SOURCE-0.3.9.md) and [official download page](https://framebridge.betancourt.one/download/).
 
-FrameBridge 0.3.8 bounds when a queued direct command can start and gives you a receipt when the connection ends before a final result arrives. Read the receipt with `fb nodes execution` before deciding whether to submit another command. Node receipts identify the requested selector, registered node and actual execution hostname when available. The Linux tray opens status, FBConsole and FBSetup. Each Linux profile uses the same package for central and node installations. See the [0.3.8 release notes](RELEASE-NOTES.md#038).
+FrameBridge 0.3.9 lets compatible Linux peers negotiate larger blocks for original PNG captures. After a broker restart, nodes can resume polling when the broker acknowledges an authenticated result whose request is no longer recorded. The release also corrects local TLS control, CLI exit status and managed-profile checks during package upgrades. Read an uncertain execution receipt with `fb nodes execution` before deciding whether to submit another command. See the [0.3.9 release notes](RELEASE-NOTES.md#039).
 
 ## Start here
 
@@ -32,10 +32,10 @@ Version-specific signed APT update and managed-service lifecycle results belong 
 
 Verify the signing-key fingerprint, package checksum and detached signature using the instructions on the [official download page](https://framebridge.betancourt.one/download/). Historical release records remain in [Official releases](OFFICIAL-RELEASES.md). A checksum identifies a file; the release signature authenticates it with the independently trusted project key.
 
-For **Mint**, run this from the directory containing the verified 0.3.8 package.
+For **Mint**, run this from the directory containing the verified 0.3.9 package.
 
 ~~~bash
-sudo apt install ./FrameBridge-0.3.8-mint22-amd64-py312.deb
+sudo apt install ./FrameBridge-0.3.9-mint22-amd64-py312.deb
 ~~~
 
 Use the corresponding profile filename on Debian or Ubuntu. Review APT's proposed changes for the actual computer. Installation places the software on disk; it does not establish a ChatGPT connection or replace the system Python.
@@ -114,7 +114,7 @@ The [claims and evidence boundaries](docs/CLAIMS-AND-LIMITS.md) distinguish pack
 
 Project home: https://framebridge.betancourt.one/
 
-For the exact 0.3.8 source, check the frozen commit and archive identity in the release record. Once 0.3.8 is listed in the official catalog, use its corresponding-source archive and verify the detached signature with the independently trusted release key. The repositories can contain later documentation or development. [Canonical Git repository](https://framebridge.betancourt.one/git/gerardo/framebridge) · [GitHub mirror](https://github.com/gerabh1128/framebridge) · [0.3.8 source-to-artifact record](docs/RELEASE-SOURCE-0.3.8.md) · [Official releases](OFFICIAL-RELEASES.md) · [Official download page](https://framebridge.betancourt.one/download/)
+For the exact 0.3.9 source, check the frozen commit and archive identity in the release record. Use its corresponding-source archive and verify the detached signature with the independently trusted release key. The repositories can contain later documentation or development. [Canonical Git repository](https://framebridge.betancourt.one/git/gerardo/framebridge) · [GitHub mirror](https://github.com/gerabh1128/framebridge) · [0.3.9 source-to-artifact record](docs/RELEASE-SOURCE-0.3.9.md) · [Official releases](OFFICIAL-RELEASES.md) · [Official download page](https://framebridge.betancourt.one/download/)
 
 Programming: **ChatGPT**.  
 Original concept and project coordination: **Gerardo Betancourt**.
