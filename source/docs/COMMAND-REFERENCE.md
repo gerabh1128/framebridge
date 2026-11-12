@@ -1,6 +1,6 @@
 # FrameBridge — command guide
 
-Version: 0.3.8 | Guide schema: 1
+Version: 0.3.9 | Guide schema: 1
 
 This reference is generated from the shared CLI/MCP guide. Use the matching installed version.
 
@@ -374,7 +374,7 @@ fb status boot
 
 ### Doctor
 
-doctor diagnoses prerequisites and reports findings with suggested next steps. It is not an implicit repair, and it is not a substitute for checking actual live connection state. Inspect the diagnosis and relevant private application logs before considering configuration changes. Eligibility checks the exact OS release, amd64 architecture, package profile and CPython ABI before starting native components. The published 0.3.3 scope is Debian 13 with cp313 and Ubuntu 24.04/Mint 22.x with cp312. LMDE 7 and Ubuntu 26.04 builder experiments remain outside that validated scope. A matching profile or a successful development build does not establish a tested installation; never repair an ABI mismatch by replacing system Python or weakening package dependencies.
+doctor diagnoses prerequisites and reports findings with suggested next steps. Inspect the diagnosis, the live connection state and relevant private application logs before considering configuration changes. Eligibility checks the exact OS release, amd64 architecture, package profile and CPython ABI before starting native components. The release profiles cover Debian 13 with cp313 and Ubuntu 24.04/Mint 22.x with cp312. LMDE 7 and Ubuntu 26.04 remain experimental build targets. Verify installation and runtime acceptance on the matching profile. Resolve an ABI mismatch by selecting the package built for the distribution and its system Python.
 
 ~~~sh
 fb doctor

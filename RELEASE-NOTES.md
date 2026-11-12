@@ -1,5 +1,19 @@
 # FrameBridge release notes
 
+## 0.3.9
+
+- Linux peers negotiate larger blocks when transferring original PNG captures.
+  The receiver verifies the complete image, and older nodes retain their
+  existing transfer format.
+- The broker acknowledges authenticated orphaned results after a restart so a
+  node can resume polling. The broker validates result and polling envelopes,
+  and the result wait for a read begins after it enters the queue.
+- The screen client preserves the Windows node's policy response and validates
+  capture provenance when the Windows screen operation is authorized.
+- Local TLS control uses the configured listener address. CLI commands report
+  failed operations with nonzero exits, and package upgrades ignore processes
+  that fail the managed-profile identity checks.
+
 ## 0.3.8
 
 The broker discards a queued direct execution request once its dispatch deadline

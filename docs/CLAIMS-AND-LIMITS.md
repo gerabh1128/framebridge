@@ -1,15 +1,15 @@
 # Claims and evidence boundaries
 
-**FrameBridge 0.3.8** has separate amd64 packages for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. It includes the Linux tray and automatic central/node role selection. The administrative supervision Site is outside the package scope. The release record identifies the frozen source, signed artifacts and verification evidence. [Official download page](https://framebridge.betancourt.one/download/) · [0.3.8 source-to-artifact record](RELEASE-SOURCE-0.3.8.md)
+**FrameBridge 0.3.9** has separate amd64 packages for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. It includes the Linux tray and automatic central/node role selection. The administrative supervision Site is outside the package scope. The release record identifies the frozen source, signed artifacts and verification evidence. [Official download page](https://framebridge.betancourt.one/download/) · [0.3.9 source-to-artifact record](RELEASE-SOURCE-0.3.9.md)
 
 ## Current release scope
 
 | Statement | Evidence and boundary |
 | --- | --- |
 | Distribution profiles | Debian 13 / CPython 3.13, Ubuntu 24.04 / CPython 3.12 and Mint 22.x / CPython 3.12, all amd64. Ubuntu 26.04, LMDE 7, other architectures and other distributions are outside this release's validated scope. |
-| Signed APT updates | The isolated local APT checks passed for `trixie`, `noble` and `mint22`. The release record tracks the public HTTPS catalog, signature and candidate checks. Installation, managed-service restart and reboot require separate evidence. [0.3.8 source-to-artifact record](RELEASE-SOURCE-0.3.8.md) |
-| Release identity | The frozen commit identifies the source. The signed corresponding-source archive, manifest, package signatures and release record identify the released bytes. [0.3.8 source-to-artifact record](RELEASE-SOURCE-0.3.8.md) |
-| Source tests and isolated QA | All 260 focused tests and all 133 isolated GERAMEG QA checks passed. The full suite and its environment-related results are recorded separately. Each result applies to its tested source and environment. Live graphical, upgrade and reboot acceptance apply to the specific systems checked. [0.3.8 source-to-artifact record](RELEASE-SOURCE-0.3.8.md) · [Run focused source tests](../CONTRIBUTING.md#run-focused-source-tests) |
+| Signed APT updates | Isolated APT checks against the public HTTPS repository verified the 0.3.9 candidate and package identity in `trixie`, `noble` and `mint22`. Installation, managed-service restart and reboot require separate evidence. [0.3.9 source-to-artifact record](RELEASE-SOURCE-0.3.9.md) |
+| Release identity | The frozen commit identifies the source. The signed corresponding-source archive, manifest, package signatures and release record identify the released bytes. [0.3.9 source-to-artifact record](RELEASE-SOURCE-0.3.9.md) |
+| Source tests and live upgrade | All 279 focused tests and 102 native Debian 13 tests passed. The live GERAMEG upgrade reached managed-profile readiness and completed a direct Fleet command. The full sandbox suite and its baseline comparison are recorded separately. Results apply to the tested source and systems. [0.3.9 source-to-artifact record](RELEASE-SOURCE-0.3.9.md) · [Run focused source tests](../CONTRIBUTING.md#run-focused-source-tests) |
 | Installed documentation | Read the guide matching the installed version. A newer repository README cannot update an older installed manual. Report contradictory release labels with the package version and file path. |
 
 ## Operation results

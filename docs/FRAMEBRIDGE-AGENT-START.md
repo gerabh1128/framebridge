@@ -4,7 +4,7 @@ This is a setup and verification workflow for an assistant that **already has au
 
 The currently tested connection is the manual ChatGPT workflow. A coding assistant can help prepare it through the CLI; this document does not claim drop-in integration with every AI client.
 
-**FrameBridge 0.3.8** has amd64 package profiles for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. Before installation, verify the package profile, checksum and signature. Before connecting to an existing node, check the version actually installed there. [Official download page](https://framebridge.betancourt.one/download/) · [0.3.8 source-to-artifact record](RELEASE-SOURCE-0.3.8.md)
+**FrameBridge 0.3.9** has amd64 package profiles for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. Before installation, verify the package profile, checksum and signature. Before connecting to an existing node, check the version actually installed there. [Official download page](https://framebridge.betancourt.one/download/) · [0.3.9 source-to-artifact record](RELEASE-SOURCE-0.3.9.md)
 
 ## Before handing over
 
