@@ -5,6 +5,7 @@ from html.parser import HTMLParser
 from urllib.parse import urlsplit,unquote
 from urllib.request import urlopen
 from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
+from xml.etree import ElementTree
 import json,hashlib,threading,tempfile,shutil,subprocess,html,os
 BASE=Path(__file__).resolve().parent
 DIST=BASE/'dist'
@@ -94,6 +95,15 @@ def main():
         result=subprocess.run(['/usr/bin/python3','-I','-S',str(web/'build_site.py')],capture_output=True,text=True,timeout=10)
         if result.returncode:failures.append('Synthetic-ready rendering failed: '+result.stderr[-600:])
         else:
+            site_url=fixture['site_url'].rstrip('/')
+            robots=(web/'dist/robots.txt').read_text()
+            if robots.splitlines()!=['User-agent: *','Allow: /','Sitemap: '+site_url+'/sitemap.xml']:
+                failures.append('Ready robots.txt must allow crawling and advertise the sitemap')
+            urls=ElementTree.parse(web/'dist/sitemap.xml').findall('.//{*}loc')
+            actual_urls={url.text for url in urls}
+            required_urls={site_url+path for path in ('/','/download/','/docs/','/support/')}
+            if not required_urls<=actual_urls or len(actual_urls)!=len(urls):
+                failures.append('Ready sitemap must list the canonical public pages once')
             q=Inspect();q.feed((web/'dist/download/index.html').read_text())
             blocks=[x for x in q.code if '\n' in x]
             for text in blocks:

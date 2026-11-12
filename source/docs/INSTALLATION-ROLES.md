@@ -1,4 +1,4 @@
-# FrameBridge Original Expanded 0.3.7 · installation roles
+# FrameBridge Original Expanded · installation roles
 
 APT installs one package name, `framebridge-original-expanded`. Use the build
 that matches the operating system and Python ABI. The central and nodes on
@@ -38,18 +38,22 @@ before enrolling nodes. ChatGPT account authorization remains separate.
 ## Updates and rollback
 
 Package transitions retain saved profiles, TLS material, credentials, and
-startup policy. The package snapshots previously running profiles. On an
-upgrade from 0.3.6, a captured central announces its broker port and a
+startup policy. The package snapshots eligible running managed profiles on
+upgrade or reinstall. A captured central announces its broker port and a
 captured node keeps node mode. An inactive or mixed legacy installation keeps
-its existing profiles. To capture an inactive profile, run the intended
-profile before an authorized reinstall.
+its existing profiles. To capture an inactive profile, run it before an
+authorized reinstall.
 
-Debian orders 0.3.7 below 0.4.0~rc1 through 0.4.0~rc3. Moving from those release
-candidates to 0.3.7 is an explicit package downgrade. The 0.3.7 hook snapshots
-those profiles as a compatible transition. Back up the active profile and
-retain the matching previous DEB before installing. A rollback to 0.3.6
-withdraws the central announcement. The earlier supervision journal is user
-data in its existing profile.
+Back up the active profile and retain the signed previous DEB before upgrading.
+Use the matching [official release record](../../OFFICIAL-RELEASES.md) to check
+the source and target versions before a rollback. After a rollback, check the
+managed profile, its startup service and a real call through the usual
+connection. Targets below 0.3.7 withdraw the central role announcement.
+The supervision journal remains user data in its existing profile.
+
+Debian orders 0.4.0~rc1 through 0.4.0~rc3 above the 0.3.x releases. Moving from
+those candidates to 0.3.x is an explicit downgrade. The compatibility snapshot
+for those three candidates belongs specifically to the 0.3.7 package.
 
 ## Routing response
 
