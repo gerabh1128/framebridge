@@ -1,12 +1,12 @@
 {
   "product": "FrameBridge",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "guide_schema": 1,
   "topics": {
     "start": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.8",
+      "version": "0.3.9",
       "guide_schema": 1,
       "topic": "start",
       "title": "Start with FrameBridge",
@@ -63,12 +63,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "0c3a259709db5b0b877d743af74838af57d746cd813d287e34699c5b8750c5cd"
+      "guide_sha256": "22bef0fed5e05daa3cb99a8155f992dce0898e2d72b9b92eb5a74bee04498eab"
     },
     "commands": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.8",
+      "version": "0.3.9",
       "guide_schema": 1,
       "topic": "commands",
       "title": "Command reference",
@@ -146,12 +146,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "028a5550a27f73c071632f97361465d54263b5cb7e9ed965f9935571b4b4d7cb"
+      "guide_sha256": "833504574dcb089fad98003be8f0403408c346a87496e2000b1658a99f618d97"
     },
     "connection": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.8",
+      "version": "0.3.9",
       "guide_schema": 1,
       "topic": "connection",
       "title": "Connect and disconnect ChatGPT",
@@ -200,12 +200,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "038d710ba5ec5df40bf51cd0aef56d03f656f8fb9a763823237529dbb929d828"
+      "guide_sha256": "d6416039800b31a9c17131a98de6e15671ef926d97b9e5e6bedbc3c4c926eb10"
     },
     "lifecycle": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.8",
+      "version": "0.3.9",
       "guide_schema": 1,
       "topic": "lifecycle",
       "title": "Services, connection intent and boot policy",
@@ -266,12 +266,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "698b7304601c6cec210add992ff33d8583dfdf6ae3b17af795a9165584439f69"
+      "guide_sha256": "ad1dff0c7c94ae5a8a5751e35af80d24e1a8b870592e56e7b2f66f50b60bc872"
     },
     "nodes": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.8",
+      "version": "0.3.9",
       "guide_schema": 1,
       "topic": "nodes",
       "title": "Central and node operation",
@@ -329,12 +329,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "b8ed8c19bc10ca19f05ab34e23eb23f79164ca9eba9684463da78f12863e4066"
+      "guide_sha256": "7a718b92782d117a9e47b911820b9777c3f5426517ecf988e4a0de5f814c608c"
     },
     "terminals": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.8",
+      "version": "0.3.9",
       "guide_schema": 1,
       "topic": "terminals",
       "title": "Persistent Bash terminals",
@@ -403,12 +403,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "23d5c49930ba06be0021dad42659a9e38be5fa2c3f5655040fbd388901f73691"
+      "guide_sha256": "c01c5729ef245c8d517fe3a08da688a2bd851fdc7e1392551f0b7fed24e44b1b"
     },
     "screens": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.8",
+      "version": "0.3.9",
       "guide_schema": 1,
       "topic": "screens",
       "title": "Authentic screen observation and input",
@@ -458,12 +458,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "2fbd97da84777db33cf5419449ae4b7ea7f5094f4a44e50a97a7ec490c9c46c5"
+      "guide_sha256": "1dd9ef3ac1c60fd04cb144e92c13a0fd2d337428fcdb9f5e6ddc7e568b78edcc"
     },
     "diagnostics": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.8",
+      "version": "0.3.9",
       "guide_schema": 1,
       "topic": "diagnostics",
       "title": "Status and diagnosis",
@@ -480,7 +480,7 @@
         },
         {
           "heading": "Doctor",
-          "body": "doctor diagnoses prerequisites and reports findings with suggested next steps. It is not an implicit repair, and it is not a substitute for checking actual live connection state. Inspect the diagnosis and relevant private application logs before considering configuration changes. Eligibility checks the exact OS release, amd64 architecture, package profile and CPython ABI before starting native components. The published 0.3.3 scope is Debian 13 with cp313 and Ubuntu 24.04/Mint 22.x with cp312. LMDE 7 and Ubuntu 26.04 builder experiments remain outside that validated scope. A matching profile or a successful development build does not establish a tested installation; never repair an ABI mismatch by replacing system Python or weakening package dependencies.",
+          "body": "doctor diagnoses prerequisites and reports findings with suggested next steps. Inspect the diagnosis, the live connection state and relevant private application logs before considering configuration changes. Eligibility checks the exact OS release, amd64 architecture, package profile and CPython ABI before starting native components. The release profiles cover Debian 13 with cp313 and Ubuntu 24.04/Mint 22.x with cp312. LMDE 7 and Ubuntu 26.04 remain experimental build targets. Verify installation and runtime acceptance on the matching profile. Resolve an ABI mismatch by selecting the package built for the distribution and its system Python.",
           "commands": [
             "fb doctor"
           ]
@@ -516,12 +516,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "b7dbccd31348dfb60f8778cbfd25909954dc936d45222a4a856e6bfb27ddb393"
+      "guide_sha256": "ae761a53cef45ad158995e869be6faee43a754c0390c196ee7d1f0b7c0d08a57"
     },
     "security": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.8",
+      "version": "0.3.9",
       "guide_schema": 1,
       "topic": "security",
       "title": "Authorization, distribution and safe operation",
@@ -556,12 +556,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "8e789e1bb2702876646039c56c805a37ee7b9395d2195a9355ee3ad37cc96a56"
+      "guide_sha256": "588818aa0d45683d5c24ef5125060144bc35899b9afd297eb5be7080ee563987"
     },
     "compatibility": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.8",
+      "version": "0.3.9",
       "guide_schema": 1,
       "topic": "compatibility",
       "title": "Compatibility with earlier commands",
@@ -604,8 +604,8 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "ca2dad565eb520e361380d55145cb580abccd029b629cc695227d8d96418de28"
+      "guide_sha256": "a455cf83ba615d6128569a57eab1f94945ddcfe83b2d2cf261efe0ec419594ec"
     }
   },
-  "guide_sha256": "85d90bdb17449d8bbc4f5688eeb07f34ac31b297b338b106d8cd2916c4915ada"
+  "guide_sha256": "8caf0f0d8833bd65d2c561c966dc529aa8884c91412b25511d7e9dd161e55805"
 }
