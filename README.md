@@ -72,6 +72,8 @@ sudo apt install xvfb openbox xauth
 
 Openbox can register itself as the generic window manager when installed. Review that desktop choice when opting in. Normal FrameBridge installation does not request Xvfb or Openbox; `xauth` remains a shared X11 dependency. `fb doctor` reports virtual-display availability separately. Read `fb help commands` for the explicit virtual mode.
 
+**Tried FrameBridge on Linux?** What worked for you? Where did you get stuck? Even one sentence helps. [Share your first impression on GitHub →](https://github.com/gerabh1128/framebridge/discussions/5)
+
 ## Use it with an assistant
 
 Give a coding assistant that already has shell access the [FrameBridge agent-start workflow](docs/FRAMEBRIDGE-AGENT-START.md). The same CLI is available for people and scripts:
