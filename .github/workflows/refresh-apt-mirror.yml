@@ -1,0 +1,82 @@
+name: Refresh signed FrameBridge APT mirror
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/refresh-apt-mirror.yml']
+  schedule:
+    - cron: '27 8 * * *'
+permissions: {}
+concurrency:
+  group: framebridge-public-apt-mirror
+  cancel-in-progress: false
+jobs:
+  refresh:
+    if: github.repository == 'gerabh1128/framebridge' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      MIRROR_REPO: https://github.com/gerabh1128/framebridge.git
+      REVIEWED_TOOLS: ebea7b3ebfae58236a58e76757072e94f607c63c
+    steps:
+      - name: Fetch the mirror and the reviewed importer
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init --quiet mirror
+          git -C mirror fetch --quiet --no-tags "$MIRROR_REPO" refs/heads/apt-mirror
+          git -C mirror checkout --quiet --detach FETCH_HEAD
+          git -C mirror merge-base --is-ancestor "$REVIEWED_TOOLS" HEAD
+          mkdir -p trusted/tools
+          for tool in refresh.py check-apt.sh; do
+            git -C mirror show "$REVIEWED_TOOLS:tools/$tool" > "trusted/tools/$tool"
+          done
+      - name: Verify signatures, all three APT suites and forward progress
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 trusted/tools/refresh.py
+          bash trusted/tools/check-apt.sh "file://$PWD/trusted/debian/"
+          python3 - <<'PY'
+          from datetime import datetime, timedelta, timezone
+          from email.parser import Parser
+          from email.utils import parsedate_to_datetime
+          from pathlib import Path
+
+          for suite in ("trixie", "noble", "mint22"):
+              path = Path("debian/dists") / suite / "Release"
+              old, new = [(Path(root) / path).read_bytes() for root in ("mirror", "trusted")]
+              previous, incoming = [Parser().parsestr(data.decode()) for data in (old, new)]
+              old_date, new_date = [parsedate_to_datetime(release["Date"]) for release in (previous, incoming)]
+              if new_date < old_date or (new_date == old_date and old != new):
+                  raise SystemExit("Refusing stale or conflicting signed metadata for " + suite)
+              if parsedate_to_datetime(incoming["Valid-Until"]) < datetime.now(timezone.utc) + timedelta(days=7):
+                  print("::warning::Signed metadata for " + suite + " expires within seven days")
+          PY
+          test -z "$(find mirror/debian -type l -print -quit)"
+          cp -a trusted/debian/. mirror/debian/
+          git -C mirror add -- debian
+      - name: Publish the verified data if changed
+        shell: bash
+        env:
+          MIRROR_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd mirror
+          if git diff --cached --quiet; then
+            echo 'Mirror is up to date.'
+            exit 0
+          fi
+          git -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m 'Refresh verified APT repository data'
+          cat > "$RUNNER_TEMP/mirror-askpass" <<'SH'
+          #!/bin/sh
+          case "$1" in
+            Username*) printf '%s\n' x-access-token ;;
+            Password*) printf '%s\n' "$MIRROR_TOKEN" ;;
+            *) exit 1 ;;
+          esac
+          SH
+          chmod 700 "$RUNNER_TEMP/mirror-askpass"
+          GIT_ASKPASS="$RUNNER_TEMP/mirror-askpass" GIT_TERMINAL_PROMPT=0 git push "$MIRROR_REPO" HEAD:refs/heads/apt-mirror
