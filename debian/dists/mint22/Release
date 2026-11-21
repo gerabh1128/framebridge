@@ -1,0 +1,16 @@
+Origin: FrameBridge
+Label: FrameBridge
+Suite: mint22
+Codename: mint22
+Date: Thu, 12 Nov 2026 00:11:19 +0000
+Valid-Until: Sat, 12 Dec 2026 00:11:19 +0000
+Architectures: amd64
+Components: main
+Description: FrameBridge for Linux Mint 22.x
+Acquire-By-Hash: yes
+SHA256:
+ edbd735a0fd07ffaa9baadd4d351b04051bcbdaf19586d84260d27fb0356a7aa             1699 main/binary-amd64/Packages
+ ec5be458d4d00d5da686d2e7fc3e93ade6712b7904e2238bf41552222e4ad27a             1044 main/binary-amd64/Packages.gz
+SHA512:
+ 758cf4f364b704134c1ceb88993ac339ab528ef977feab76c40a1875c31bd7b9f76515fe5342da83548d066f61647f51f23449c37f42ad18337ff7409ebc1814             1699 main/binary-amd64/Packages
+ 7c8ec004a41b578035fac316b6894364de744818db6b990396e7bba3be9011de0c63442fa6cb853f280fb248e385181f7ae50efe182d139d1da86da380d3395f             1044 main/binary-amd64/Packages.gz

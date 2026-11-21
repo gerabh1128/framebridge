@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://raw.githubusercontent.com/gerabh1128/framebridge/apt-mirror/debian/
+Suites: trixie
+Components: main
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/framebridge-archive-keyring.asc 2B1F01BC806C0B33CB6CEDDE52859CEBC91B8808

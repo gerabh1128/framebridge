@@ -1,0 +1,26 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+Origin: FrameBridge
+Label: FrameBridge
+Suite: noble
+Codename: noble
+Date: Thu, 12 Nov 2026 00:11:19 +0000
+Valid-Until: Sat, 12 Dec 2026 00:11:19 +0000
+Architectures: amd64
+Components: main
+Description: FrameBridge for Ubuntu 24.04
+Acquire-By-Hash: yes
+SHA256:
+ 80375ee0e137d516f8b5e527386ad401f5bacb190a8600bed0ea9ac85dddb8ac             1704 main/binary-amd64/Packages
+ eb4862fba89d928795f54896aedd6010dcab0c0ec55eade8d93a948c34162155             1046 main/binary-amd64/Packages.gz
+SHA512:
+ c75233cf8ed4de68201853150c9f00ab8b4bd92f842ba0cc4ac49ca195b5b7a1f12d9ae8ed052d5825f3399c54dd0378bcf909fe4da2db864578f087de52d520             1704 main/binary-amd64/Packages
+ 3a30a7b45e1227d9414f1808c71b29cad1d8a40db043917c5dd5a5bd505ef3527f3b57038b4138aa9eec13e7b462f361ad9aa73bd08170bb8795499faf147f75             1046 main/binary-amd64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iHUEARYIAB0WIQQrHwG8gGwLM8ts7d5ShZzryRuICAUCavUGnQAKCRBShZzryRuI
+CJB+AP956hATgFOFHkQ4aNMKLBl2cJ4QR8wGaALzNcgbUjcMUgEAnj+pEi2SUPhy
+7wTw9xIj/BKCgUrnvDDZVg2Tagcx+gw=
+=czUo
+-----END PGP SIGNATURE-----
