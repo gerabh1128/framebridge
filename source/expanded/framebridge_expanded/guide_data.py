@@ -231,7 +231,11 @@ GUIDE = {'start': {'title': 'Start with FrameBridge',
                                  'destination.',
                          'commands': []},
                         {'heading': 'Check a remote execution receipt',
-                         'body': 'Use fb nodes execution or the read-only MCP tool '
+                         'body': 'For concurrent EXEC use a stable session_id, job_id and declared read:name/write:name resources. '
+                                 'Inspect waiting, running and finished work with framebridge_jobs. '
+                                 'With include_stdout the adapter verifies the full capture against the job receipt, '
+                                 'then returns a bounded, sanitized preview. stdout_sha256 refers to raw bytes. '
+                                 'Check stdout_integrity and stdout_omitted_reason separately from the command exit. Use '
                                  'framebridge_exec_status with the original node and its request_id '
                                  'or job_id. The receipt distinguishes a queued request, a request '
                                  'that expired before dispatch, an in-flight operation, a completed '

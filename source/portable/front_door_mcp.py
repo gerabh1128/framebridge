@@ -23,13 +23,12 @@ from framebridge_expanded import __version__ as PRODUCT_VERSION
 from framebridge_expanded.guide import GUIDE_SCHEMA, get_guide
 from framebridge_expanded.fleet import execute_node as expanded_execute_node, cua_node as expanded_cua_node, bootstrap_original
 from framebridge_expanded.fleet import execute_screen_node as expanded_execute_screen_node
-from framebridge_expanded.fleet import FleetError, execution_status, local_target_identity, select_target
+from framebridge_expanded.fleet import FleetError, execution_status, local_target_identity, select_target, managed_job
 from framebridge_expanded.runtime import adapter_request as checked_cua_adapter_request
 bootstrap_original()
 
 HOME = Path.home()
 ADAPTER_SOCKET = Path(os.environ.get("FRAMEBRIDGE_TOOL_ROOT", str(HOME / ".local/share/framebridge/tool-adapter"))) / "adapter.sock"
-JOBS_ROOT = HOME / ".local/share/framebridge/fbterm/jobs"
 HUB_URL = os.environ.get("FRAMEBRIDGE_HUB_MCP_URL", "http://127.0.0.1:20877/mcp")
 BROKER_CONTROL = os.environ.get("FRAMEBRIDGE_BROKER_CONTROL", "http://127.0.0.1:20878")
 ASUS_NODE_ID = os.environ.get("FRAMEBRIDGE_ASUS_NODE_ID", "")
@@ -49,6 +48,7 @@ mcp = FastMCP(
         "then read the relevant topic. Confirm the receiver, selected target, installed version and available capabilities. "
         "Use target to select one enrolled alias or ID for execution and CUA. LOCAL means this receiver. "
         "The receiver hostname, registered node label and observed execution hostname are separate. "
+        "For parallel EXEC provide a stable session_id, job_id and explicit resource claims, then inspect framebridge_jobs. "
         "When an operation reports do_not_replay, check framebridge_exec_status before taking further action. "
         "Use capture_scope to choose the graphical view. For X11 input use framebridge_cua with a fresh window observation. "
         "Use the installed CLI and tools for normal work; use a separate source clone when the owner requests software development. "
@@ -164,20 +164,6 @@ def sanitize_text(text: str) -> str:
         else:
             out.append(line)
     return "\n".join(out)
-
-def stdout_result(job_id: str) -> dict:
-    p=JOBS_ROOT/job_id/"stdout.bin"
-    if not p.is_file():
-        return {"stdout":"","stdout_sanitized":False,"stdout_truncated":False,"stdout_omitted_reason":"NOT_AVAILABLE"}
-    b=p.read_bytes()
-    truncated=len(b)>1_048_576
-    if truncated:
-        b=b[:1_048_576]
-    text=sanitize_text(b.decode("utf-8","replace"))
-    if len(text)>4096:
-        text=text[:4096]
-        truncated=True
-    return {"stdout":text,"stdout_sanitized":True,"stdout_truncated":truncated,"stdout_omitted_reason":None}
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
                                      idempotentHint=True, openWorldHint=False))
@@ -454,16 +440,26 @@ def _framebridge_exec_geranas_impl(
         "timeout_s":timeout_s,
         "sha256":digest,
         "script":script,
+        "include_stdout":include_stdout is True,
     }
     result=adapter_request(req)
     result["mcp_job_id"]=job_id
     result["mcp_script_sha256"]=digest
     if isinstance(result.get("result_final"),str):
         result["result_final"]=sanitize_text(result["result_final"])
+    result.pop("stdout_path", None)
+    result.pop("stderr_path", None)
     if include_stdout is True:
-        result.update(stdout_result(job_id))
+        text = result.get("stdout")
+        if isinstance(text, str):
+            # Preserve the classic MCP presentation cap and line formatting.
+            text = sanitize_text(text)
+            result["stdout_truncated"] = result.get("stdout_truncated") is True or len(text) > 4096
+            result["stdout"] = text[:4096]
+        elif not result.get("stdout_omitted_reason"):
+            result["stdout_omitted_reason"] = "ADAPTER_OUTPUT_UNSUPPORTED"
     else:
-        result.update({"stdout":"","stdout_sanitized":False,"stdout_truncated":False,"stdout_omitted_reason":"NOT_REQUESTED"})
+        result.update(stdout="", stdout_sanitized=False, stdout_truncated=False, stdout_omitted_reason="NOT_REQUESTED")
     return result
 
 
@@ -526,14 +522,23 @@ def framebridge_exec(
     include_stdout: bool = False,
     target: str = None,
     node: str = None,
+    session_id: str = "",
+    resources: list[str] | None = None,
 ) -> dict:
-    """Execute on the requested node alias or ID. Omitted target means this receiver (LOCAL)."""
+    """Run an authorized job. For concurrent work supply a stable session_id and job_id.
+    This returns a durable acknowledgement. Use framebridge_jobs to list or follow its result.
+    Declare shared read:name and exclusive write:name resources consistently across clients.
+    Omitted resources reserve the whole node. Without session_id execution is synchronous."""
     if authorized is not True:
         return {"ok":False,"error":"AUTHORIZED_TRUE_REQUIRED"}
     try:
         target = select_target(target, node, default="LOCAL")
     except FleetError as exc:
         return {"ok":False,"error":str(exc)}
+    if session_id or resources is not None:
+        return managed_job(target, "submit", job_id=job_id, session_id=session_id, resources=resources,
+                           script=script, authorized=authorized, timeout_s=timeout_s, sha256=sha256,
+                           include_stdout=include_stdout)
     if target == "LOCAL":
         try:
             identity = local_target_identity()
@@ -541,6 +546,8 @@ def framebridge_exec(
             return {"ok":False,"error":"LOCAL_TARGET_IDENTITY_UNAVAILABLE"}
         result = _framebridge_exec_geranas_impl(script, authorized, timeout_s, job_id, sha256, include_stdout)
         if isinstance(result, dict):
+            if result.get("engine_rc") == 75 and result.get("exit_code") is None:
+                result.update(ok=False, error=result.get("error") or "FBTERM_BUSY", execution_state="not_started")
             if result.get("ok") is True:
                 identity["executed_hostname"] = identity["hostname"]
                 result.setdefault("execution_state", "completed")
@@ -554,6 +561,15 @@ def framebridge_exec(
 def framebridge_exec_status(target: str, request_id: str = "", job_id: str = "") -> dict:
     """Read a remote EXEC or CUA receipt by ID on the same node. Does not replay the operation."""
     return execution_status(target, request_id=request_id, job_id=job_id)
+
+
+@_blocking_tools.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                                                   idempotentHint=True, openWorldHint=False))
+def framebridge_jobs(target: str, job_id: str = "", session_id: str = "", include_stdout: bool = False) -> dict:
+    """Inspect the node's 100 latest jobs, or one durable result with optional stdout.
+    A session label is for correlation. A lookup never resubmits the original command."""
+    return managed_job(target, "status" if job_id else "list", job_id=job_id,
+                       session_id=session_id, include_stdout=include_stdout)
 
 
 def _cua_frame_fields(frame_output: str) -> dict:

@@ -8,7 +8,6 @@ import importlib.util
 import json
 import os
 import platform
-import re
 import secrets
 import shutil
 import signal
@@ -283,15 +282,14 @@ def adapter_request(payload):
             is_input = str(payload.get("cua", {}).get("action", "")).upper() != "OBSERVE"
             return _blocked("CUA_ADAPTER_RESPONSE_INVALID", is_input)
         return {"ok": False, "error": "ADAPTER_RESPONSE_INVALID"}
-    if request.get("include_stdout") and result.get("stdout_path"):
-        stdout_path = Path(result["stdout_path"]).resolve()
-        allowed = Path(env["FBTERM_ROOT"]).resolve() / "jobs"
-        if stdout_path.is_relative_to(allowed) and stdout_path.is_file():
-            data = stdout_path.read_bytes()
-            text = data[:65536].decode("utf-8", "replace")
-            text = re.sub(r"(?i)sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{16,}", "[REDACTED]", text)
-            result["stdout"] = text
-            result["stdout_truncated"] = len(data) > 65536
+    if str(request.get("request_type", "exec")).strip().lower() in ("exec", "fbterm_jobs_v2"):
+        result.pop("stdout_path", None)
+        result.pop("stderr_path", None)
+        if (request.get("include_stdout") is True and "stdout" not in result
+                and (result.get("execution_state") == "completed" or result.get("exit_code") is not None)
+                and not result.get("stdout_omitted_reason")):
+            result.pop("result_final", None)
+            result.update(stdout_omitted_reason="ADAPTER_OUTPUT_UNSUPPORTED", stdout_integrity="unverified")
     if is_cua:
         try:
             check(env)

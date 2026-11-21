@@ -8,6 +8,8 @@ Use a central gateway and enrolled nodes to administer Linux computers you contr
 
 FrameBridge 0.3.9 lets compatible Linux peers negotiate larger blocks for original PNG captures. After a broker restart, nodes can resume polling when the broker acknowledges an authenticated result whose request is no longer recorded. The release also corrects local TLS control, CLI exit status and managed-profile checks during package upgrades. Read an uncertain execution receipt with `fb nodes execution` before deciding whether to submit another command. See the [0.3.9 release notes](RELEASE-NOTES.md#039).
 
+The `main` branch includes the **0.3.9+fbterm.3** Linux job updates. Each managed job has an ID and an execution receipt. Independent jobs can share a node, and callers can retrieve verified output from the node that ran the command. See the [job changes and validation scope](RELEASE-NOTES.md#linux-job-updates).
+
 ## Start here
 
 Start on the Linux computer you want to connect, with a person at its terminal or an assistant already given shell access there. Your ChatGPT account and manual browser approval complete the connection. No phone pairing is required.

@@ -101,7 +101,7 @@ def install_adapter_guard(adapter, *, env=None, checker=None):
     adapter.handle_cua_request = handle
 
 
-def install_start_deadline_guard(adapter):
+def install_start_deadline_guard(adapter, *, jobs=False):
     """Check the authenticated node's start deadline after the socket queue."""
     original = adapter.handle
 
@@ -114,7 +114,8 @@ def install_start_deadline_guard(adapter):
             if time.time() >= deadline:
                 return {"ok": False, "error": "REQUEST_EXPIRED",
                         "execution_state": "expired_before_start"}
-            payload = {key: value for key, value in payload.items() if key != "start_before"}
+            if not jobs or str(payload.get("request_type", "exec")).strip().lower() not in ("exec", "fbterm_jobs_v2"):
+                payload = {key: value for key, value in payload.items() if key != "start_before"}
         return original(payload)
 
     adapter.handle = handle
@@ -129,11 +130,17 @@ def main(argv=None):
     spec = importlib.util.spec_from_file_location("_framebridge_original_adapter", path)
     original = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(original)
+    original.execute_original = original.handle
     install_adapter_guard(original)
     from .real_screen.screen_transport import install_adapter_route
     install_adapter_route(original)
-    install_start_deadline_guard(original)
-    original.serve()
+    from . import jobs
+    queue = jobs.install(original)
+    install_start_deadline_guard(original, jobs=True)
+    try:
+        original.serve()
+    finally:
+        queue.close()
 
 if __name__ == "__main__":
     main()

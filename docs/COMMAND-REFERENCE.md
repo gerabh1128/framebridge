@@ -1,6 +1,6 @@
 # FrameBridge — command guide
 
-Version: 0.3.9 | Guide schema: 1
+Version: 0.3.9+fbterm.3 | Guide schema: 1
 
 This reference is generated from the shared CLI/MCP guide. Use the matching installed version.
 
@@ -246,7 +246,7 @@ Use target to select one enrolled alias or ID for FBEXEC and CUA. LOCAL means th
 
 ### Check a remote execution receipt
 
-Use fb nodes execution or the read-only MCP tool framebridge_exec_status with the original node and its request_id or job_id. The receipt distinguishes a queued request, a request that expired before dispatch, an in-flight operation, a completed operation and an unknown outcome. A dispatched operation may already be running. When do_not_replay is true, check the existing receipt before deciding whether another execution is safe.
+For concurrent EXEC use a stable session_id, job_id and declared read:name/write:name resources. Inspect waiting, running and finished work with framebridge_jobs. With include_stdout the adapter verifies the full capture against the job receipt, then returns a bounded, sanitized preview. stdout_sha256 refers to raw bytes. Check stdout_integrity and stdout_omitted_reason separately from the command exit. Use framebridge_exec_status with the original node and its request_id or job_id. The receipt distinguishes a queued request, a request that expired before dispatch, an in-flight operation, a completed operation and an unknown outcome. A dispatched operation may already be running. When do_not_replay is true, check the existing receipt before deciding whether another execution is safe.
 
 ~~~sh
 fb nodes execution --help

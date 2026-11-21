@@ -290,8 +290,26 @@ def _heartbeat_supported(poll):
     return type(features) is list and _HEARTBEAT_FEATURE in features
 
 
-def _dispatch_with_heartbeat(request, *, url, ctx, state, outbound, contact=None):
-    """Execute once while the signing thread reports liveness, without polling.
+def _service_job_control(url, ctx, state, outbound):
+    """One short, authenticated scheduler operation during a classic synchronous EXEC."""
+    transport = dict(ctx=ctx, state=state, outbound=outbound)
+    poll = _post_with_recovery(url + "/fbpair/v1/node/poll", "node.poll",
+                               {"jobs_only": True}, **transport, recover=False)
+    req = poll.get("request")
+    if poll.get("ok") is not True or req is None:
+        return
+    if not broker.is_job_control(req):
+        raise NodeError("JOB_CONTROL_ROUTE_MISMATCH")
+    result = dispatch_request(req, state_dir=state)
+    ack = _post_with_recovery(url + "/fbpair/v1/node/result", "node.result",
+                              {"request_id": req["request_id"], "result": result},
+                              **transport, recover=True)
+    if ack.get("ok") is not True:
+        raise NodeError("NODE_RESULT_REJECTED")
+
+
+def _dispatch_with_heartbeat(request, *, url, ctx, state, outbound, contact=None, job_control=False):
+    """Execute the original command once while the signing thread reports liveness.
 
     The worker is the only dispatcher; it never signs envelopes or starts the
     next request. A failed heartbeat does not imply that input was not sent and
@@ -345,6 +363,11 @@ def _dispatch_with_heartbeat(request, *, url, ctx, state, outbound, contact=None
             if heartbeat_enabled and unavailable_reported:
                 _LOG.warning("NODE_HEARTBEAT_RECOVERED")
                 unavailable_reported = False
+        if job_control and heartbeat_enabled and not finished.is_set():
+            try:
+                _service_job_control(url, ctx, state, outbound)
+            except (NodeError, broker.BrokerError):
+                _LOG.warning("JOB_CONTROL_TEMPORARILY_UNAVAILABLE")
     # Event publication happens after the value/exception is appended; a join is
     # unnecessary and cannot prolong shutdown after a completed dispatcher.
     successful, value = outcome[0]
@@ -375,7 +398,10 @@ def run(state_dir=None, once=False):
         if isinstance(req, dict):
             if supports_heartbeat:
                 value = _dispatch_with_heartbeat(req, url=url, ctx=ctx,
-                                                 state=state, outbound=outbound, contact=contact)
+                                                 state=state, outbound=outbound, contact=contact,
+                                                 job_control=(not once and req.get("operation") == "admin.exec"
+                                                              and not broker.is_job_control(req)
+                                                              and broker.JOB_CONTROL_FEATURE in poll["protocol_features"]))
             else:
                 # Compatibility with a frozen central: never invent another
                 # poll while executing or downgrade a signed request to shell.

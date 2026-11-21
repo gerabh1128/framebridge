@@ -1,12 +1,12 @@
 {
   "product": "FrameBridge",
-  "version": "0.3.9",
+  "version": "0.3.9+fbterm.3",
   "guide_schema": 1,
   "topics": {
     "start": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9",
+      "version": "0.3.9+fbterm.3",
       "guide_schema": 1,
       "topic": "start",
       "title": "Start with FrameBridge",
@@ -63,12 +63,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "22bef0fed5e05daa3cb99a8155f992dce0898e2d72b9b92eb5a74bee04498eab"
+      "guide_sha256": "5e5161f548083c529537cd431ec3b3f0384e9bee4e1808d3b5298746b8fd64f3"
     },
     "commands": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9",
+      "version": "0.3.9+fbterm.3",
       "guide_schema": 1,
       "topic": "commands",
       "title": "Command reference",
@@ -146,12 +146,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "833504574dcb089fad98003be8f0403408c346a87496e2000b1658a99f618d97"
+      "guide_sha256": "252f52d78a2d48581c07afe555220dcf7621d2c4cb84efb3969165ae09e00e42"
     },
     "connection": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9",
+      "version": "0.3.9+fbterm.3",
       "guide_schema": 1,
       "topic": "connection",
       "title": "Connect and disconnect ChatGPT",
@@ -200,12 +200,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "d6416039800b31a9c17131a98de6e15671ef926d97b9e5e6bedbc3c4c926eb10"
+      "guide_sha256": "ff60b88fe045afccc757651ec588715e97ab45e228b3c118aa74eb501088afbc"
     },
     "lifecycle": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9",
+      "version": "0.3.9+fbterm.3",
       "guide_schema": 1,
       "topic": "lifecycle",
       "title": "Services, connection intent and boot policy",
@@ -266,12 +266,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "ad1dff0c7c94ae5a8a5751e35af80d24e1a8b870592e56e7b2f66f50b60bc872"
+      "guide_sha256": "47695e8ca2374a49c3c8b89f3f22f1f872a799012f6d2a0b136391db639a7c87"
     },
     "nodes": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9",
+      "version": "0.3.9+fbterm.3",
       "guide_schema": 1,
       "topic": "nodes",
       "title": "Central and node operation",
@@ -300,7 +300,7 @@
         },
         {
           "heading": "Check a remote execution receipt",
-          "body": "Use fb nodes execution or the read-only MCP tool framebridge_exec_status with the original node and its request_id or job_id. The receipt distinguishes a queued request, a request that expired before dispatch, an in-flight operation, a completed operation and an unknown outcome. A dispatched operation may already be running. When do_not_replay is true, check the existing receipt before deciding whether another execution is safe.",
+          "body": "For concurrent EXEC use a stable session_id, job_id and declared read:name/write:name resources. Inspect waiting, running and finished work with framebridge_jobs. With include_stdout the adapter verifies the full capture against the job receipt, then returns a bounded, sanitized preview. stdout_sha256 refers to raw bytes. Check stdout_integrity and stdout_omitted_reason separately from the command exit. Use framebridge_exec_status with the original node and its request_id or job_id. The receipt distinguishes a queued request, a request that expired before dispatch, an in-flight operation, a completed operation and an unknown outcome. A dispatched operation may already be running. When do_not_replay is true, check the existing receipt before deciding whether another execution is safe.",
           "commands": [
             "fb nodes execution --help",
             "fb nodes execution --target ALIAS_OR_UUID --request-id REQUEST_ID",
@@ -329,12 +329,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "7a718b92782d117a9e47b911820b9777c3f5426517ecf988e4a0de5f814c608c"
+      "guide_sha256": "c8561591f51a15e35eb1e2ae9b1ee644abd7dcc041f95622464525dd4ca0440a"
     },
     "terminals": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9",
+      "version": "0.3.9+fbterm.3",
       "guide_schema": 1,
       "topic": "terminals",
       "title": "Persistent Bash terminals",
@@ -403,12 +403,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "c01c5729ef245c8d517fe3a08da688a2bd851fdc7e1392551f0b7fed24e44b1b"
+      "guide_sha256": "8d1a72f11f547bd955c617f4c307c0fb077dd4b3e35e8162dfddd5ddff816212"
     },
     "screens": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9",
+      "version": "0.3.9+fbterm.3",
       "guide_schema": 1,
       "topic": "screens",
       "title": "Authentic screen observation and input",
@@ -458,12 +458,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "1dd9ef3ac1c60fd04cb144e92c13a0fd2d337428fcdb9f5e6ddc7e568b78edcc"
+      "guide_sha256": "56fb081f8b31d8be49b561bdfaed8d49a377b3d6cffb72526ff857c9d2b994b8"
     },
     "diagnostics": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9",
+      "version": "0.3.9+fbterm.3",
       "guide_schema": 1,
       "topic": "diagnostics",
       "title": "Status and diagnosis",
@@ -516,12 +516,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "ae761a53cef45ad158995e869be6faee43a754c0390c196ee7d1f0b7c0d08a57"
+      "guide_sha256": "27d7dd6f668e5ffc3dbb0032c34d8e00bc7d561cb1822d378f79f7fb4328c3b2"
     },
     "security": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9",
+      "version": "0.3.9+fbterm.3",
       "guide_schema": 1,
       "topic": "security",
       "title": "Authorization, distribution and safe operation",
@@ -556,12 +556,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "588818aa0d45683d5c24ef5125060144bc35899b9afd297eb5be7080ee563987"
+      "guide_sha256": "c4e02edf2d0497d63c0db0b90c6b4e28e83230ba1798440a8c1892b6b4937ff0"
     },
     "compatibility": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9",
+      "version": "0.3.9+fbterm.3",
       "guide_schema": 1,
       "topic": "compatibility",
       "title": "Compatibility with earlier commands",
@@ -604,8 +604,8 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "a455cf83ba615d6128569a57eab1f94945ddcfe83b2d2cf261efe0ec419594ec"
+      "guide_sha256": "d62655b15ae9f86a937d8d37c987aeb8159cd1e3bbce4cebd62af56fadd24fca"
     }
   },
-  "guide_sha256": "8caf0f0d8833bd65d2c561c966dc529aa8884c91412b25511d7e9dd161e55805"
+  "guide_sha256": "eb46481a194fe089bd97365c5dd6ebb19f68502b9c40e454224620a20ce6ff2d"
 }
