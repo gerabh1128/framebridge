@@ -6,6 +6,8 @@ Use a central gateway and enrolled nodes to administer Linux computers you contr
 
 > **FrameBridge 0.3.9.** Builds cover Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. For installation, confirm that the official catalog lists 0.3.9 for your distribution and verify the matching package signature or signed APT metadata. See the [0.3.9 source-to-artifact record](docs/RELEASE-SOURCE-0.3.9.md) and [official download page](https://framebridge.betancourt.one/download/).
 
+APT users can select the signed source for their distribution from the [public APT mirror](https://github.com/gerabh1128/framebridge/tree/apt-mirror#framebridge-linux-apt-mirror). It refreshes daily from the official origin.
+
 FrameBridge 0.3.9 lets compatible Linux peers negotiate larger blocks for original PNG captures. After a broker restart, nodes can resume polling when the broker acknowledges an authenticated result whose request is no longer recorded. The release also corrects local TLS control, CLI exit status and managed-profile checks during package upgrades. Read an uncertain execution receipt with `fb nodes execution` before deciding whether to submit another command. See the [0.3.9 release notes](RELEASE-NOTES.md#039).
 
 The `main` branch includes the **0.3.9+fbterm.3** Linux job updates. Each managed job has an ID and an execution receipt. Independent jobs can share a node, and callers can retrieve verified output from the node that ran the command. See the [job changes and validation scope](RELEASE-NOTES.md#linux-job-updates).
