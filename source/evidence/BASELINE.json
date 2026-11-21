@@ -1,7 +1,7 @@
 {
   "base_workspace": ".",
   "base_deb_sha256": "9517e405725a4c514841822eee3344392c13f21a171823edd9f45f2e955b96b7",
-  "source_file_count": 982,
+  "source_file_count": 983,
   "source_hashes": {
     "original-asus/SOURCE-MANIFEST.json": "4735bc196b324423ba9579185cbe094164c5c2c58eff1975364e47fa6a57f322",
     "original-geranas/MANIFEST.json": "a39c8364800da04ca48eb0ce4ce7781346d22f85110f110462340ff0229d3d6a",
@@ -972,19 +972,20 @@
     "original-geranas/FrameBridge-Fleet-Hub/app/framebridge_linux_chatgpt/fleet_hub.py": "8301ea08c402a77f23ab354b5d600cd808120f6572ad8b6830e255e367f6fa89",
     "original-geranas/.local/share/framebridge/tool-adapter/bin/framebridge_tool_adapter.py": "2afb9bf8f789f42732a6aa6e50b5897174bfa1522ff032bc83533679c37551ec",
     "original-asus/tool-adapter/bin/framebridge_tool_client.py": "1d1514f08653c31f6b67ebcdcf61686947321bec96752a692b7e46cee6285f6e",
-    "original-asus/tool-adapter/bin/framebridge_tool_adapter.py": "dca9bf3dfbae7881aa6824ca79a2922fb4ec7ab1b61b5696b39cb64630c4d86b",
-    "original-asus/fbterm/bin/fbterm_engine.py": "dc810baddeaf526323fd7ca9bde12735a7e3eb0918e06606e9ef7fdc5fa894fe",
+    "original-asus/tool-adapter/bin/framebridge_tool_adapter.py": "8f274697039946b3d648acd1fbb4f261c35bc3dc41bd594acb7697bf8be55e74",
+    "original-asus/fbterm/bin/fbterm_engine.py": "52681c04b0b9694af7eaa8d7962183e231c625b6fdcb83670e3889f3229dab8f",
     "original-asus/fbterm/bin/fbx": "84589ad19ea0eab7cfc766ef4dba736be05c509c3918f572f4054585ee4c5efb",
-    "original-asus/fbterm/bin/fbterm-run": "bbfc19c878746518e482adbe61cd6f8ae8560dca75a1e3db9921e1cb40b42e71",
+    "original-asus/fbterm/bin/fbterm-run": "c9d42c5448cf53337bf82732875af310e4cb78febfe0eb6b475ef2381fe97acc",
     "original-asus/fbterm/bin/fbterm-prompt-ready": "276f657e23ff26c75f5e430731fdf5b095d777eabcbaad86e11c69b0919c691c",
-    "original-asus/fbterm/bin/fbterm-shell": "eb6de30bfd6430165f7ebc982021f3565b2e80c4b82480b4e01e64e15e65957a",
+    "original-asus/fbterm/bin/fbterm-shell": "0a6df860feecd6b1462caf306881e022eb934b36e9c408ccf4aedd3e0c6fbe48",
     "original-asus/framebridge-native/host/open-progress-console.sh": "cb519186ce299e21381e4698faf5490a3e947ad01187b9674f78d4e8bc21ef65",
     "original-asus/framebridge-native/host/framebridge_host.py": "85d165bf8875fa8f9b202b129f985ca4cf040a1f4778ef43ed4c9f5b0164b3eb",
     "original-asus/framebridge-native/host/open-terminal.sh": "facaea7a5ca6635311a4c05e18edecdec98a137ce552fce39bdbc0ee755aa34c",
     "original-asus/framebridge-native/host/open-interactive-terminal.sh": "e5c191c9cc354fd4d88a23c02e5eafbe454a7d3b3586265288d5f89ee9d8c602",
     "original-asus/framebridge-native/host/framebridge_voice_status.py": "f8520095e973a91249876d733143399fe40a0d72cd64c741c5cf85d8898a3ffb",
     "original-asus/framebridge-native/host/framebridge_voice_command.py": "ed0aff0070799d437a5570b16dbfa0a3878e51b73166c14bebaf8df45ebdc86c",
-    "original-asus/framebridge-native/host/framebridge_cua_linux.py": "be75dadacfda129109e40c56e8da488f0bdda565c4455f4c12196f3e08d08073"
+    "original-asus/framebridge-native/host/framebridge_cua_linux.py": "be75dadacfda129109e40c56e8da488f0bdda565c4455f4c12196f3e08d08073",
+    "original-asus/fbterm/bin/fbterm-output": "6545cf1bf034a702936ccf776c7f6eb241273faf46713090f1bcd017176cf3a7"
   },
   "created": "2026-10-21",
   "base_deb_sha256_role": "Historical pre-RC7 input package; not this community candidate",
@@ -1035,6 +1036,76 @@
       "patch": "provenance/patches/fbterm-viewer-header-0.3.7.patch",
       "patch_sha256": "46fe28a10e91cd6a2dbff74a6fb339590dcb61d0d990554411e952731597081d",
       "reason": "Reconcile the already authorized fixed FBTERM version/license header from commit 02269108a1f0fec4efc22b7bc9a6bf336321f4d2; retain the complete previous source and reversible patch."
+    },
+    {
+      "version": "0.3.9+fbterm.1",
+      "date": "2026-11-18",
+      "path": "original-asus/fbterm/bin/fbterm-output",
+      "previous_sha256": null,
+      "reviewed_sha256": "6545cf1bf034a702936ccf776c7f6eb241273faf46713090f1bcd017176cf3a7",
+      "provenance": "provenance/FBTERM-DISPATCH-0.3.9+fbterm.1-CANDIDATE.json",
+      "reason": "Render streamed job output safely for a terminal and retain byte-for-byte execution output."
+    },
+    {
+      "version": "0.3.9+fbterm.1",
+      "date": "2026-11-18",
+      "path": "original-asus/fbterm/bin/fbterm-run",
+      "previous_sha256": "bbfc19c878746518e482adbe61cd6f8ae8560dca75a1e3db9921e1cb40b42e71",
+      "reviewed_sha256": "c9d42c5448cf53337bf82732875af310e4cb78febfe0eb6b475ef2381fe97acc",
+      "provenance": "provenance/FBTERM-DISPATCH-0.3.9+fbterm.1-CANDIDATE.json",
+      "reason": "Route viewer output through a safe renderer while preserving the recorded output bytes."
+    },
+    {
+      "version": "0.3.9+fbterm.1",
+      "date": "2026-11-18",
+      "path": "original-asus/fbterm/bin/fbterm-shell",
+      "previous_sha256": "eb6de30bfd6430165f7ebc982021f3565b2e80c4b82480b4e01e64e15e65957a",
+      "reviewed_sha256": "0a6df860feecd6b1462caf306881e022eb934b36e9c408ccf4aedd3e0c6fbe48",
+      "provenance": "provenance/FBTERM-DISPATCH-0.3.9+fbterm.1-CANDIDATE.json",
+      "reason": "Run the private dispatcher in the viewer pane instead of an interactive command prompt."
+    },
+    {
+      "version": "0.3.9+fbterm.1",
+      "date": "2026-11-18",
+      "path": "original-asus/fbterm/bin/fbterm_engine.py",
+      "previous_sha256": "dc810baddeaf526323fd7ca9bde12735a7e3eb0918e06606e9ef7fdc5fa894fe",
+      "reviewed_sha256": "970914757292ca17380136eca1596df58caa9627ddd68b18b3293071c7df0827",
+      "provenance": "provenance/FBTERM-DISPATCH-0.3.9+fbterm.1-CANDIDATE.json",
+      "reason": "Dispatch jobs outside the terminal input stream and reconcile only confirmed pre-execution cancellations.",
+      "preserved_original": "provenance/originals/fbterm_engine-before-hardening-0.3.9.py"
+    },
+    {
+      "version": "0.3.9+fbterm.1",
+      "date": "2026-11-18",
+      "path": "original-asus/tool-adapter/bin/framebridge_tool_adapter.py",
+      "previous_sha256": "dca9bf3dfbae7881aa6824ca79a2922fb4ec7ab1b61b5696b39cb64630c4d86b",
+      "reviewed_sha256": "c580bbb4eae919bd7add8ce4654d75d9a2623a0a6f8754b21ff011973c51b663",
+      "provenance": "provenance/FBTERM-DISPATCH-0.3.9+fbterm.1-CANDIDATE.json",
+      "reason": "Preserve the engine distinction between a canceled launch and an uncertain execution outcome."
+    },
+    {
+      "version": "0.3.9+fbterm.2",
+      "date": "2026-11-20",
+      "path": "original-asus/tool-adapter/bin/framebridge_tool_adapter.py",
+      "previous_sha256": "c580bbb4eae919bd7add8ce4654d75d9a2623a0a6f8754b21ff011973c51b663",
+      "reviewed_sha256": "921cfbb2751e9ef9c7f671248ec8e559edab0bd6c743d5ce7bcd4b075ce22808",
+      "reason": "Bind job receipts and coordinate concurrent, resource-scoped FBTERM work."
+    },
+    {
+      "version": "0.3.9+fbterm.2",
+      "date": "2026-11-20",
+      "path": "original-asus/fbterm/bin/fbterm_engine.py",
+      "previous_sha256": "970914757292ca17380136eca1596df58caa9627ddd68b18b3293071c7df0827",
+      "reviewed_sha256": "52681c04b0b9694af7eaa8d7962183e231c625b6fdcb83670e3889f3229dab8f",
+      "reason": "Bind job receipts and coordinate concurrent, resource-scoped FBTERM work."
+    },
+    {
+      "version": "0.3.9+fbterm.3",
+      "date": "2026-11-20",
+      "path": "original-asus/tool-adapter/bin/framebridge_tool_adapter.py",
+      "previous_sha256": "921cfbb2751e9ef9c7f671248ec8e559edab0bd6c743d5ce7bcd4b075ce22808",
+      "reviewed_sha256": "8f274697039946b3d648acd1fbb4f261c35bc3dc41bd594acb7697bf8be55e74",
+      "reason": "Verify and deliver bounded captured output in the producing adapter."
     }
   ]
 }

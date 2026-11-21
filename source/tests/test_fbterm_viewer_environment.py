@@ -260,7 +260,8 @@ class ViewerEnvironment(unittest.TestCase):
         # Our serializer, rather than ast.dump's version-dependent defaults,
         # handles the two supported CPython ABIs (3.12 and 3.13).
         expected = {'__init__': 'ec60f92a1d737961d23e1250bd04df0683978db55385a019fdbe67391a76cb89', '_run': '1200a06bb7c164d34464fe884aca06d16d257d780f37124ea4a3a2492a7f63ea', 'has_session': 'd938d8aac50a140a2838b1223ab14ff8e6a69847a7c1b1d1346b2aedb0dfde48', 'status': 'a4f3185627fbc1fb36174d055dd4421254776ebcdc73a087fb4124e086bcafa6', 'execute': '4a562e7a0cb75d3c7a84b5945044b63df16296da6e766f24c0430bde2684313c'}
-        tree = ast.parse(ENGINE_SOURCE.read_text())
+        original_039 = ENGINE_SOURCE.parents[5] / 'provenance/originals/fbterm_engine-before-hardening-0.3.9.py'
+        tree = ast.parse(original_039.read_text())
         klass = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'FBTerm')
         methods = {n.name: n for n in klass.body if isinstance(n, ast.FunctionDef)}
         old_source = ENGINE_SOURCE.parents[4] / 'tests/fixtures/r4-035/fbterm_engine.py'
@@ -290,6 +291,11 @@ class ViewerEnvironment(unittest.TestCase):
             self.assertEqual(semantic_ast_digest(method), expected_hash, name)
         # Creation/initialization of tmux and Bash precedes the viewer branch.
         self.assertEqual(semantic_ast_digest(methods['ensure'].body[2]), '0aecdc60e1a1647fa9ce02ff56d21c3fe082148227029112d259d99de42ef150')
+        candidate = ast.parse(ENGINE_SOURCE.read_text())
+        klass = next(n for n in candidate.body if isinstance(n, ast.ClassDef) and n.name == 'FBTerm')
+        for method in klass.body:
+            if isinstance(method, ast.FunctionDef) and method.name in {'_run', 'has_session', 'status'}:
+                self.assertEqual(semantic_ast_digest(method), expected[method.name], method.name)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

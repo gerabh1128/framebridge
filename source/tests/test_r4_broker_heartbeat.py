@@ -172,7 +172,22 @@ class HeartbeatTests(unittest.TestCase):
         code, response = self.call('poll', self.message(kind='node.poll'))
         self.assertEqual(code, 200)
         self.assertEqual(response['request']['request_id'], 'queued-a')
-        self.assertEqual(response['protocol_features'], ['node-heartbeat-v1'])
+        self.assertEqual(response['protocol_features'], ['node-heartbeat-v1', 'job-control-v2'])
+
+    def test_jobs_only_poll_preserves_order_and_excludes_other_nodes(self):
+        self.enqueue('normal-one')
+        self.enqueue('normal-two')
+        for ident, node_id in [('foreign', 'node-b'), ('managed', 'node-a')]:
+            self.enqueue(ident, node_id)
+            self.store.control_requests[ident].update(operation='admin.exec', payload={
+                'request_type':'fbterm_jobs_v2', 'job_action':'list',
+                'script':'# FrameBridge job protocol v2', 'timeout_s':10})
+        poll = self.message(kind='node.poll', payload={'jobs_only':True})
+        code, response = self.call('poll', poll)
+        self.assertEqual(code, 200)
+        self.assertEqual(response['request']['request_id'], 'managed')
+        self.assertEqual(list(self.store.control_queue['node-a']), ['normal-one', 'normal-two'])
+        self.assertEqual(list(self.store.control_queue['node-b']), ['foreign'])
 
     def test_legacy_result_acknowledges_once_without_executing(self):
         code, response = self.call('result', self.message(kind='node.result'))

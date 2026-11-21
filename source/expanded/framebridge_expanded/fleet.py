@@ -87,8 +87,15 @@ def _operation_error(exc, fallback, attempted=False, *public_types):
 
 
 def _received_execution_state(result):
+    state = result.get("execution_state")
+    if result.get("job_protocol") == 2 and state in ("queued","in_flight","completed","not_started","expired_before_start","outcome_unknown"):
+        return state
+    # Frozen .1 nodes can wrap a busy engine as a successful operation with no EXIT.
+    if result.get("command_hash_gate") == "FAIL":
+        return "outcome_unknown"
+    if result.get("engine_rc") == 75 and result.get("exit_code") is None:
+        return "not_started"
     if result.get("ok") is False:
-        state = result.get("execution_state")
         if state in ("not_started", "expired_before_start", "outcome_unknown"):
             return state
         if result.get("error") == "REQUEST_EXPIRED":
@@ -108,6 +115,10 @@ def _received_execution_receipt(result):
     receipt = {"execution_state": state}
     if state in _UNCERTAIN_EXECUTION:
         receipt["do_not_replay"] = True
+    if result.get("command_hash_gate") == "FAIL":
+        receipt.update(ok=False, error="FBTERM_RECEIPT_INVALID")
+    if result.get("engine_rc") == 75 and state == "not_started":
+        receipt.update(ok=False, error=result.get("error") or "FBTERM_BUSY")
     return receipt
 
 
@@ -348,6 +359,14 @@ def _exec_payload(script: str, authorized: bool, timeout_s: int, job_id: str,
             "include_stdout": include_stdout is True}
 
 
+def _output_compatibility(result, requested):
+    """An older paired node can supply text without the producer's new integrity check."""
+    if requested and result.get("exit_code") is not None and "stdout_integrity" not in result:
+        result["stdout_integrity"] = "unverified"
+        if "stdout" not in result:
+            result.setdefault("stdout_omitted_reason", "ADAPTER_OUTPUT_UNSUPPORTED")
+
+
 def execute_node(alias: str, script: str, authorized: bool, timeout_s: int = 120,
                  job_id: str = "", sha256: str = "", include_stdout: bool = False) -> dict[str, Any]:
     node = payload = None
@@ -373,6 +392,7 @@ def execute_node(alias: str, script: str, authorized: bool, timeout_s: int = 120
                      "NODE_EXEC_HASH_BINDING_INVALID")
         response.update(_target_identity(alias, node, result))
         response.update(_received_execution_receipt(result))
+        _output_compatibility(response, include_stdout)
         response.update(mcp_job_id=payload["job_id"],
                         mcp_script_sha256=payload["sha256"])
         if include_stdout is not True:
@@ -494,6 +514,11 @@ def execution_status(alias: str, request_id: str = "", job_id: str = "") -> dict
         _require(all(type(value) is str and (not value or JOB_RE.fullmatch(value))
                      for value in (request_id, job_id)), "EXEC_STATUS_ID_INVALID")
         node = resolve_node(alias)
+        if node["transport"] == "local" and job_id:
+            entry = managed_job(alias, "status", job_id=job_id)
+            if request_id and entry.get("origin_request_id") != request_id:
+                return {"ok":False, "error":"JOB_REQUEST_MISMATCH", "execution_state":"outcome_unknown", "do_not_replay":True}
+            return entry
         _require(node["transport"] == "broker_outbound", "EXEC_STATUS_REMOTE_REQUIRED")
         from . import broker
         entry = broker.request_status(node["node_id"], request_id=request_id, job_id=job_id)
@@ -504,17 +529,32 @@ def execution_status(alias: str, request_id: str = "", job_id: str = "") -> dict
             "expired": "expired_before_dispatch",
             "cancelled": "expired_before_dispatch",
         }
+        if job_id and entry.get("state") == "unknown":
+            durable = managed_job(alias, "status", job_id=job_id)
+            if request_id and durable.get("origin_request_id") != request_id:
+                return {"ok":False, "error":"JOB_REQUEST_MISMATCH", "execution_state":"outcome_unknown", "do_not_replay":True}
+            if durable.get("error") != "JOB_PROTOCOL_UNSUPPORTED":
+                return durable
         state = states.get(entry.get("state"), "outcome_unknown")
         result = entry.get("result")
         if not isinstance(result, dict):
             result = None
-        if state == "completed" and result is not None:
-            state = _received_execution_state(result)
+        if state == "completed":
+            state = _received_execution_state(result) if result is not None else "outcome_unknown"
+        if result and result.get("job_protocol") == 2 and result.get("execution_state") in ("queued","in_flight"):
+            return managed_job(alias, "status", job_id=result["job_id"])
         response = {"ok": True, "execution_state": state,
                     "request_id": entry.get("request_id") or request_id or None,
                     "mcp_job_id": entry.get("job_id") or job_id or None,
                     "do_not_replay": state in _UNCERTAIN_EXECUTION or state == "queued"}
         response.update(_target_identity(alias, node, result if state == "completed" else None))
+        if result:
+            from .jobs import TRACE_FIELDS
+            for key in (*TRACE_FIELDS, "error", "engine_rc"):
+                if key in result:
+                    response[key] = result[key]
+            if result.get("engine_rc") == 75 and state == "not_started":
+                response.setdefault("error", "FBTERM_BUSY")
         if state == "completed" and result is not None:
             response["operation_ok"] = result.get("ok") is True
             if isinstance(result.get("exit_code"), (str, int)):
@@ -548,3 +588,81 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def managed_job(alias, action, *, job_id="", session_id="", resources=None, script="",
+                authorized=False, timeout_s=120, include_stdout=False, sha256=""):
+    """Submit or query the node's durable registry using the enrolled EXEC route."""
+    from . import broker, jobs, runtime
+    node = None
+    attempted = False
+    submit = action == "submit"
+    try:
+        _require(action in ("submit", "status", "list"), "INVALID_JOB_ACTION")
+        _require(not submit or authorized is True, "AUTHORIZED_TRUE_REQUIRED")
+        _require(isinstance(session_id, str) and ((not session_id and not submit)
+                 or jobs.ID.fullmatch(session_id)), "INVALID_JOB_SESSION")
+        if submit and not job_id:
+            job_id = "job-" + uuid.uuid4().hex
+        if action != "list":
+            _require(isinstance(job_id, str) and JOB_RE.fullmatch(job_id)
+                     and job_id not in (".", ".."), "INVALID_JOB_ID")
+        if submit:
+            _require(isinstance(script, str) and 0 < len(script.encode()) <= 262144, "SCRIPT_INVALID")
+            _require(type(timeout_s) is int and 1 <= timeout_s <= 600, "INVALID_TIMEOUT")
+            resources = [] if resources is None else resources
+            try:
+                jobs.claims(resources)
+            except ValueError as exc:
+                raise FleetError(str(exc)) from exc
+            digest = hashlib.sha256(script.encode()).hexdigest()
+            _require(not sha256 or sha256 == digest, "SCRIPT_SHA256_MISMATCH")
+        node = resolve_node(alias)
+        # A fresh transport ID allows the durable node ledger to answer resubmissions
+        # after a stale acknowledgement, a central restart or a previous conflict.
+        transport_job = "job-rpc-" + uuid.uuid4().hex
+        payload = _exec_payload(jobs.WIRE_SCRIPT, True, timeout_s if submit else 10,
+                                transport_job, "", include_stdout is True)
+        payload.update(request_type=jobs.WIRE_TYPE, job_action=action, session_id=session_id,
+                       subject_job_id=job_id)
+        if submit:
+            payload.update(job_script=script, job_sha256=digest, resources=resources)
+        if node["transport"] == "local":
+            attempted = True
+            payload["origin_request_id"] = transport_job
+            value = runtime.adapter_request(payload)
+        else:
+            _require_transport_ready(node)
+            attempted = True
+            value = broker.request(node["node_id"], "admin.exec", payload, timeout_s=15)
+        _require(isinstance(value, dict), "NODE_EXEC_RESPONSE_INVALID")
+        if value.get("job_protocol") != 2:
+            if value.get("error") == "JOB_NOT_FOUND" or value.get("error") == "JOB_ID_CONFLICT":
+                return dict(value, **_target_identity(alias, node))
+            # The wire script is a comment. Legacy adapters can never execute the job body.
+            if value.get("ok") is True or value.get("adapter_error") == "ValueError:UNSUPPORTED_REQUEST_TYPE":
+                return dict(jobs.failure("JOB_PROTOCOL_UNSUPPORTED", job_id), **_target_identity(alias,node))
+            state = _received_execution_state(value)
+            return dict(jobs.failure(value.get("error","JOB_REQUEST_FAILED"), job_id,
+                        state if state != "completed" else "outcome_unknown"), **_target_identity(alias,node))
+        if action != "list":
+            _require(value.get("job_id") == job_id, "NODE_EXEC_JOB_BINDING_INVALID")
+        if submit and value.get("ok") is True:
+            _require(value.get("command_sha256") == digest, "NODE_EXEC_HASH_BINDING_INVALID")
+        result = {k:v for k,v in value.items() if k not in ("stdout_path","stderr_path","mcp_script_sha256","mcp_job_id")}
+        result.update(_target_identity(alias,node,value))
+        if action != "list":
+            result.update(mcp_job_id=job_id, mcp_script_sha256=value.get("command_sha256"))
+            result["transport_request_id"] = value.get("request_id")
+            result["request_id"] = value.get("origin_request_id")
+        _output_compatibility(result, include_stdout)
+        if not include_stdout:
+            result.pop("stdout", None)
+            result.pop("result_final", None)
+        return result
+    except Exception as exc:
+        result = _operation_error(exc, "JOB_TRANSPORT_FAILED", attempted)
+        result.update(job_id=job_id, mcp_job_id=job_id)
+        if node:
+            result.update(_target_identity(alias,node))
+        return result

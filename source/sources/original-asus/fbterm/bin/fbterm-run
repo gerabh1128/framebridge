@@ -4,8 +4,6 @@ umask 077
 
 ROOT="${FBTERM_ROOT:?FBTERM_ROOT no definido}"
 
-# R2: mientras fbterm-run esta activo, el pane no esta disponible.
-rm -f "$ROOT/prompt.ready"
 JOB_ID="${1:-}"
 
 case "$JOB_ID" in
@@ -59,10 +57,10 @@ date -Ins > "$JOB/started.at"
 sha256sum "$CMD" |
     awk '{print $1}' > "$JOB/command.sha256"
 
-tee "$STDOUT" < "$OUT_FIFO" &
+"$ROOT/bin/fbterm-output" "$STDOUT" < "$OUT_FIFO" &
 OUT_TEE_PID=$!
 
-tee "$STDERR" < "$ERR_FIFO" >&2 &
+"$ROOT/bin/fbterm-output" "$STDERR" < "$ERR_FIFO" >&2 &
 ERR_TEE_PID=$!
 
 /usr/bin/timeout \

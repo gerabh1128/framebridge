@@ -1,5 +1,15 @@
 # FrameBridge release notes
 
+## Linux job updates
+
+**0.3.9+fbterm.3** incorporates three revisions on top of 0.3.9.
+
+- **fbterm.1** separates command dispatch from terminal input and preserves the recorded output bytes. Launch receipts distinguish a confirmed cancellation before execution from an uncertain outcome.
+- **fbterm.2** records job and request identities. Independent resources can run concurrently. Conflicting requests wait for their resource and expose the blocking job. Repeating an identical submission retrieves the existing job. Reusing the identifier for different content returns a conflict.
+- **fbterm.3** retrieves captured output at the adapter that ran the job. The adapter checks the full capture against the recorded SHA-256 before returning a bounded view. A verified empty result, a missing capture and an integrity mismatch have distinct responses.
+
+The package acceptance tests exercised concurrent work, duplicate requests and remote output retrieval on Debian 13 and Linux Mint 22.3 amd64. The Ubuntu 24.04 amd64 package was built and checked against its manifest. Native execution and package upgrade on Ubuntu remain to be verified for this revision. The [download catalog](https://framebridge.betancourt.one/assets/release.json) identifies the version available through the signed distribution channel.
+
 ## 0.3.9
 
 - Linux peers negotiate larger blocks when transferring original PNG captures.

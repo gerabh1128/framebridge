@@ -22,6 +22,10 @@ An agent using FrameBridge should treat installed program files as the applicati
 
 This is operational guidance for reliable use, not a restriction on a recipient's GPL rights or an additional owner-device/phone pairing mechanism.
 
+## Development source
+
+The Linux job changes through `0.3.9+fbterm.3` are available on `main`. Use the official download catalog to identify the version offered by APT. [Linux job updates](RELEASE-NOTES.md#linux-job-updates)
+
 ## Release records
 
 - **Current release 0.3.9.** Published on 11 November 2026 Eastern Time. The release record identifies the frozen source, the three signed package profiles and the public HTTPS and APT verification evidence. [Official download page](https://framebridge.betancourt.one/download/) · [Release catalog](https://framebridge.betancourt.one/assets/release.json) · [Source-to-artifact record](docs/RELEASE-SOURCE-0.3.9.md) · [Release notes](RELEASE-NOTES.md#039)

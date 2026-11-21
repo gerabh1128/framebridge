@@ -19,7 +19,7 @@
   },
   "role": "public 0.3.5 source structural guards, not runtime identities",
   "runtime": {
-    "adapter_request": "2d59b00e43312b1fbc5296ed20cebb8f6fb05ae115dea8a3069fa5066abc0130"
+    "adapter_request": "c46ddc44c0677326f54aefb53da3277e55b956cfd9938a37fdfbe8bfa9b326bc"
   },
   "schema": 1,
   "screen_capture_without_chunk_transfer_ast": "066940e490cf617c7306fe6d0253dda3c49d4422c2992bf5154221e0b5f2f3bd",

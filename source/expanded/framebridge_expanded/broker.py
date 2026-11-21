@@ -96,7 +96,17 @@ def validate_endpoint(url):
 
 
 NODE_HEARTBEAT_FEATURE = "node-heartbeat-v1"
+JOB_CONTROL_FEATURE = "job-control-v2"
 NODE_HEARTBEAT_PATH = "/fbpair/v1/node/heartbeat"
+
+
+def is_job_control(request):
+    if not isinstance(request, dict) or request.get("operation") != "admin.exec":
+        return False
+    body = request.get("payload")
+    return (isinstance(body, dict) and body.get("request_type") == "fbterm_jobs_v2"
+            and body.get("script") == "# FrameBridge job protocol v2"
+            and body.get("job_action") in ("submit", "status", "list"))
 
 
 class _NodeHeartbeatStore:
@@ -134,12 +144,20 @@ class _NodeHeartbeatStore:
             shadow.node_last_seen = {}
             return super(_NodeHeartbeatStore, shadow).verify_node_envelope(envelope)
 
-    def next_read(self, node_id):
+    def next_read(self, node_id, *, jobs_only=False):
         node_id = str(node_id)
         with self.lock:
             queue = self.control_queue[node_id]
+            # Select only negotiated job RPCs while a synchronous command is busy.
+            # Leave ordinary commands and their FIFO order untouched.
             while queue:
-                rid = queue.popleft()
+                if jobs_only:
+                    rid = next((rid for rid in queue if is_job_control(self.control_requests.get(rid))), None)
+                    if rid is None:
+                        return None
+                    queue.remove(rid)
+                else:
+                    rid = queue.popleft()
                 item = self.control_requests.get(rid)
                 receipt = self.control_results.get(rid)
                 if not item or not receipt or receipt.get("state") != "pending":
@@ -322,9 +340,13 @@ def _node_message_response(store, path, body):
     if not ok:
         return 403, {"ok": False, "error": detail}
     if poll:
-        item = store.next_read(body["node_id"])
+        if payload and (set(payload) != {"jobs_only"} or payload["jobs_only"] is not True):
+            return 400, {"ok": False, "error": "node_poll_payload_invalid"}
+        item = store.next_read(body["node_id"], jobs_only=True) if payload else store.next_read(body["node_id"])
+        if item and item.get("operation") == "admin.exec" and item["payload"].get("request_type","exec") in ("exec","fbterm_jobs_v2"):
+            item = dict(item, payload=dict(item["payload"], origin_request_id=item["request_id"]))
         return 200, {"ok": True, "request": item,
-                     "protocol_features": [NODE_HEARTBEAT_FEATURE]}
+                     "protocol_features": [NODE_HEARTBEAT_FEATURE, JOB_CONTROL_FEATURE]}
     response = store.receive_node_result(body["node_id"], request_id, result)
     return (200 if response["ok"] else 400), response
 

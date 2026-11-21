@@ -3,6 +3,7 @@
 # select the validated graphical session for the read-only FBTERM viewer.
 # Original FrameBridge material remains GPL-3.0-only; see the project LICENSE.
 
+import errno
 import fcntl
 import hashlib
 import os
@@ -11,7 +12,9 @@ import stat
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 import time
+import uuid
 
 
 class FBTermError(RuntimeError):
@@ -19,6 +22,16 @@ class FBTermError(RuntimeError):
 
 
 class FBTermBusy(FBTermError):
+    def __init__(self, message, blocker=None):
+        super().__init__(message)
+        self.blocker = blocker
+
+
+class FBTermNotStarted(FBTermError):
+    pass
+
+
+class FBTermOutcomeUnknown(FBTermError):
     pass
 
 
@@ -36,6 +49,7 @@ class FBTerm:
         self.runner = self.bin / "fbterm-run"
         self.shell = self.bin / "fbterm-shell"
         self.lock_path = self.root / "controller.lock"
+        self.dispatch = self.root / "dispatch.fifo"
 
     @staticmethod
     def _run(args, **kwargs):
@@ -127,6 +141,7 @@ class FBTerm:
             env = os.environ.copy()
             env["FBTERM_ROOT"] = str(self.root)
             env["FBTERM_SESSION"] = self.session
+            env["FBTERM_TITLE"] = self.title
             env["PATH"] = str(self.bin) + os.pathsep + env.get("PATH", "")
 
             p = subprocess.run(
@@ -136,6 +151,11 @@ class FBTerm:
                     "-d",
                     "-s",
                     self.session,
+                    "/usr/bin/env",
+                    "FBTERM_ROOT=" + env["FBTERM_ROOT"],
+                    "FBTERM_SESSION=" + env["FBTERM_SESSION"],
+                    "FBTERM_TITLE=" + env["FBTERM_TITLE"],
+                    "PATH=" + env["PATH"],
                     str(self.shell),
                 ],
                 env=env,
@@ -200,30 +220,6 @@ class FBTerm:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-
-            subprocess.run(
-                [
-                    "tmux",
-                    "send-keys",
-                    "-t",
-                    self.session + ":0.0",
-                    (
-                        "export FBTERM_ROOT="
-                        + subprocess.list2cmdline([str(self.root)])
-                        + "; export FBTERM_SESSION="
-                        + subprocess.list2cmdline([self.session])
-                        + "; export PATH="
-                        + subprocess.list2cmdline(
-                            [str(self.bin) + ":$PATH"]
-                        )
-                    ),
-                    "C-m",
-                ],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-
-            time.sleep(0.5)
 
         viewer_env = self._viewer_environment() if visible else None
         if viewer_env is not None and not self.visible_window(viewer_env):
@@ -336,8 +332,136 @@ class FBTerm:
             "readonly_clients": readonly,
         }
 
+    @staticmethod
+    def _sync_directory(directory):
+        fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+
+    @staticmethod
+    def _write_job_file(path, value):
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(value)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+    def _prepare_job(self, job, command, timeout_s, token):
+        # Only complete preparations participate in the durable jobs audit.
+        with tempfile.TemporaryDirectory(prefix=".job-", dir=self.root) as temporary:
+            prepared = Path(temporary) / "prepared"
+            prepared.mkdir(mode=0o700)
+            if deadline := os.environ.get("FBTERM_START_BEFORE"):
+                self._write_job_file(prepared / "start.before", deadline)
+            self._write_job_file(prepared / "command.bash", command)
+            self._write_job_file(prepared / "timeout.seconds", str(timeout_s) + "\n")
+            self._write_job_file(prepared / "dispatch.pending", token)
+            self._sync_directory(prepared)
+            prepared.rename(job)
+            self._sync_directory(self.jobs)
+
+    def _open_fifo(self, flags):
+        fd = os.open(self.dispatch, flags | os.O_NOFOLLOW)
+        try:
+            info = os.fstat(fd)
+            if (not stat.S_ISFIFO(info.st_mode) or info.st_uid != os.getuid()
+                    or info.st_mode & 0o077):
+                raise FBTermError("FBTERM invalid dispatch FIFO")
+        except BaseException:
+            os.close(fd)
+            raise
+        return fd
+
+    def _open_dispatch(self):
+        deadline = time.monotonic() + 3
+        while True:
+            try:
+                return self._open_fifo(os.O_WRONLY | os.O_NONBLOCK)
+            except OSError as exc:
+                if exc.errno not in (errno.ENOENT, errno.ENXIO):
+                    raise FBTermNotStarted("FBTERM dispatch unavailable") from exc
+                if time.monotonic() >= deadline:
+                    raise FBTermNotStarted("FBTERM worker unavailable") from exc
+                time.sleep(0.02)
+            except FBTermError as exc:
+                raise FBTermNotStarted(str(exc)) from exc
+
+    def _transition_pending(self, job, state):
+        # The launch and the cancellation contend for the same inode. Once
+        # either rename wins, the other cannot succeed, even after a timeout.
+        try:
+            (job / "dispatch.pending").rename(job / state)
+        except FileNotFoundError:
+            return False
+        self._sync_directory(job)
+        return True
+
+    def _cancel_unstarted(self, job):
+        if any((job / name).exists() for name in
+               ("dispatch.started", "started.at", "DONE", "result.env")):
+            return False
+        if self._transition_pending(job, "dispatch.cancelled"):
+            return True
+        return (job / "dispatch.cancelled").is_file()
+
+    def _run_dispatched_job(self, job_id, token):
+        if not self.JOB_RE.fullmatch(job_id) or job_id in (".", ".."):
+            return
+        job = self.jobs / job_id
+        try:
+            pending = (job / "dispatch.pending").read_text(encoding="ascii")
+        except FileNotFoundError:
+            return
+        if pending != token:
+            return
+        deadline = job / "start.before"
+        if deadline.exists() and time.time() >= float(deadline.read_text()):
+            self._cancel_unstarted(job)
+            return
+        if not self._transition_pending(job, "dispatch.started"):
+            return
+        # From this point an interruption leaves an uncertain job, never a
+        # retryable one. Only the original runner produces a completed receipt.
+        subprocess.run([str(self.runner), job_id], check=False)
+
+    def serve(self):
+        lock = self.root / "worker.lock"
+        with lock.open("ab") as worker_lock:
+            fcntl.flock(worker_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            try:
+                os.mkfifo(self.dispatch, 0o600)
+            except FileExistsError:
+                pass
+            # Linux permits an O_RDWR FIFO open. Hold it while idle so there is
+            # no polling and disconnecting writers do not terminate the worker.
+            with os.fdopen(self._open_fifo(os.O_RDWR), "rb") as inbox:
+                while record := inbox.readline(164):
+                    if not record.endswith(b"\n"):
+                        while record and not record.endswith(b"\n"):
+                            record = inbox.readline(164)
+                        continue
+                    fields = record.split()
+                    if len(fields) != 2 or not record.isascii():
+                        continue
+                    job_id, token = (field.decode("ascii") for field in fields)
+                    try:
+                        self._run_dispatched_job(job_id, token)
+                    except (OSError, UnicodeError):
+                        print("FBTERM_DISPATCH_ERROR", flush=True)
+
+    @staticmethod
+    def _wait_for_completion(job, timeout_s):
+        deadline = time.monotonic() + timeout_s + 8
+        while not (job / "DONE").exists():
+            if (job / "dispatch.cancelled").exists() or time.monotonic() >= deadline:
+                return False
+            time.sleep(0.05)
+        return True
+
     def execute(self, job_id, command, timeout_s=120):
-        if not self.JOB_RE.fullmatch(job_id):
+        if not self.JOB_RE.fullmatch(job_id) or job_id in (".", ".."):
             raise FBTermError("JOB_ID invalido")
 
         if not isinstance(command, str) or not command:
@@ -348,7 +472,8 @@ class FBTerm:
         if timeout_s < 1 or timeout_s > 3600:
             raise FBTermError("timeout fuera de rango")
 
-        self.ensure(visible=True)
+        self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self.jobs.mkdir(mode=0o700, exist_ok=True)
 
         lock_fd = os.open(
             self.lock_path,
@@ -382,7 +507,8 @@ class FBTerm:
                                 or not os.path.exists(os.path.join(prior.path, "result.env"))
                             )
                         ):
-                            incomplete_jobs.append(prior.name)
+                            if not self._cancel_unstarted(Path(prior.path)):
+                                incomplete_jobs.append(prior.name)
             except OSError as exc:
                 raise FBTermError(
                     "no se pudo auditar jobs previos: " + str(exc)
@@ -391,7 +517,7 @@ class FBTerm:
             if incomplete_jobs:
                 sample = ", ".join(sorted(incomplete_jobs)[:3])
                 raise FBTermBusy(
-                    "FBTERM tiene job incompleto: " + sample
+                    "FBTERM tiene job incompleto: " + sample, sorted(incomplete_jobs)[0]
                 )
 
             job = self.jobs / job_id
@@ -399,109 +525,39 @@ class FBTerm:
             if job.exists():
                 raise FBTermError("JOB_ID ya existe")
 
-            job.mkdir(mode=0o700)
-
-            command_file = job / "command.bash"
-            command_file.write_text(
-                command,
-                encoding="utf-8",
-            )
-            os.chmod(command_file, 0o600)
-
-            (job / "timeout.seconds").write_text(
-                str(timeout_s) + "\n",
-                encoding="ascii",
-            )
-
-            expected_command_sha = hashlib.sha256(
-                command.encode("utf-8")
-            ).hexdigest()
-
-            # R2 idle gate: prompt.ready existe solo cuando el shell
-            # persistente esta realmente esperando el siguiente comando.
-            ready_path = self.jobs.parent / "prompt.ready"
-            ready_deadline = time.monotonic() + 3.0
-
-            while time.monotonic() < ready_deadline:
-                if ready_path.exists():
-                    break
-                time.sleep(0.02)
-            else:
-                raise FBTermBusy(
-                    "FBTERM pane no esta en prompt"
-                )
-
             try:
-                ready_path.unlink()
-            except FileNotFoundError:
-                raise FBTermBusy(
-                    "FBTERM prompt cambio antes del envio"
-                )
-            except OSError as exc:
-                raise FBTermError(
-                    "no se pudo reservar prompt: " + str(exc)
-                )
+                self.ensure(visible=os.environ.get("FBTERM_JOB_VIEWER") != "0")
+            except (FBTermError, OSError, subprocess.TimeoutExpired) as exc:
+                raise FBTermNotStarted("FBTERM session unavailable") from exc
+            try:
+                with os.fdopen(self._open_dispatch(), "wb", buffering=0) as dispatch:
+                    token = uuid.uuid4().hex
+                    try:
+                        self._prepare_job(job, command, timeout_s, token)
+                    except (OSError, UnicodeError) as exc:
+                        raise FBTermNotStarted("FBTERM job preparation failed") from exc
+                    record = f"{job_id} {token}\n".encode("ascii")
+                    try:
+                        if dispatch.write(record) != len(record):
+                            raise OSError("short dispatch write")
+                    except OSError as exc:
+                        if self._cancel_unstarted(job):
+                            raise FBTermNotStarted("FBTERM dispatch failed before start") from exc
+                        raise FBTermOutcomeUnknown("FBTERM dispatch result unknown") from exc
+                if not self._wait_for_completion(job, timeout_s):
+                    if self._cancel_unstarted(job):
+                        raise FBTermNotStarted("FBTERM dispatch expired before start")
+                    if not (job / "DONE").exists():
+                        raise FBTermOutcomeUnknown("resultado durable no aparecio")
+                lines = (job / "result.env").read_text(encoding="utf-8").splitlines()
+            except (OSError, UnicodeError) as exc:
+                raise FBTermOutcomeUnknown("no se pudo verificar el resultado durable") from exc
 
-            send = self._run(
-                [
-                    "tmux",
-                    "send-keys",
-                    "-t",
-                    self.session + ":0.0",
-                    "fbterm-run " + job_id,
-                    "C-m",
-                ]
-            )
-
-            if send.returncode != 0:
-                raise FBTermError(
-                    "tmux send-keys fallo: "
-                    + send.stderr.strip()
-                )
-
-            deadline = time.monotonic() + timeout_s + 8
-
-            while time.monotonic() < deadline:
-                if (job / "DONE").exists():
-                    break
-                time.sleep(0.05)
-
-            if not (job / "DONE").exists():
-                raise FBTermError(
-                    "resultado durable no aparecio"
-                )
-
-            # R2: no liberar el lock hasta que bash haya vuelto realmente
-            # al prompt. fbterm-shell actualiza prompt.ready mediante
-            # PROMPT_COMMAND despues de que fbterm-run haya terminado.
-            done_path = job / "DONE"
-            prompt_deadline = time.monotonic() + 5.0
-            prompt_ready = False
-
-            while time.monotonic() < prompt_deadline:
-                try:
-                    if (
-                        ready_path.exists()
-                        and ready_path.stat().st_mtime_ns
-                        > done_path.stat().st_mtime_ns
-                    ):
-                        prompt_ready = True
-                        break
-                except OSError:
-                    pass
-
-                time.sleep(0.02)
-
-            if not prompt_ready:
-                raise FBTermError(
-                    "prompt durable no aparecio"
-                )
+            expected_command_sha = hashlib.sha256(command.encode("utf-8")).hexdigest()
 
             result = {}
 
-            for line in (job / "result.env").read_text(
-                encoding="utf-8"
-            ).splitlines():
+            for line in lines:
                 if "=" in line:
                     k, v = line.split("=", 1)
                     result[k] = v
@@ -561,6 +617,9 @@ if __name__ == "__main__":
     elif action == "status":
         print(json.dumps(term.status(), sort_keys=True))
 
+    elif action == "serve":
+        term.serve()
+
     elif action == "exec":
         job_id = sys.argv[2]
         timeout_s = int(sys.argv[3])
@@ -573,9 +632,17 @@ if __name__ == "__main__":
                 timeout_s,
             )
             print(json.dumps(r, sort_keys=True))
+        except FBTermNotStarted as e:
+            print(json.dumps({"ERROR": "NOT_STARTED", "MESSAGE": str(e)}))
+            sys.exit(70)
+        except FBTermOutcomeUnknown as e:
+            print(json.dumps({"ERROR": "OUTCOME_UNKNOWN", "MESSAGE": str(e)}))
+            sys.exit(74)
         except FBTermBusy as e:
             print(json.dumps({
                 "ERROR": "BUSY",
+                "REASON": "unresolved_job" if e.blocker else "controller_busy",
+                "BLOCKING_JOB_ID": e.blocker,
                 "MESSAGE": str(e),
             }))
             sys.exit(75)

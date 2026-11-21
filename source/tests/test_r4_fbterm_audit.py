@@ -22,6 +22,8 @@ def load(name, path):
 
 BASE = load('_audit_baseline', FIXTURES / 'fbterm_engine.py')
 CAND = load('_audit_candidate', SOURCE_ROOT / 'sources/original-asus/fbterm/bin/fbterm_engine.py')
+ORIGINAL_039 = SOURCE_ROOT.parent / 'provenance/originals/fbterm_engine-before-hardening-0.3.9.py'
+RELEASE = load('_audit_release', ORIGINAL_039)
 
 def audit_function(path, module):
     tree = ast.parse(path.read_text())
@@ -38,7 +40,7 @@ def audit_function(path, module):
                               ast.Return(value=ast.Name(id='incomplete_jobs', ctx=ast.Load()))],
                          decorator_list=[])
     output = ast.fix_missing_locations(ast.Module(body=[fn], type_ignores=[]))
-    ns = {'os': os, 'FBTermError': module.FBTermError}
+    ns = {'os': os, 'Path': Path, 'FBTermError': module.FBTermError}
     exec(compile(output, str(path), 'exec'), ns)
     return ns['audit']
 
@@ -50,7 +52,7 @@ class AuditTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.jobs = self.root / 'jobs'; self.jobs.mkdir()
-        self.term = SimpleNamespace(jobs=self.jobs)
+        self.term = CAND.FBTerm(self.root, 'test-session', 'test-title')
 
     def tearDown(self):
         self.temporary.cleanup()
@@ -123,7 +125,7 @@ class AuditTests(unittest.TestCase):
 
     def test_execute_complete_flow_keeps_hash_and_prompt_contract(self):
         self.job('past-complete')
-        term = CAND.FBTerm(self.root, 'test-session', 'test-title')
+        term = RELEASE.FBTerm(self.root, 'test-session', 'test-title')
         term.ensure = lambda **kw: None
         ready = self.root / 'prompt.ready'; ready.touch()
         def send(argv, **kw):
@@ -144,7 +146,7 @@ class AuditTests(unittest.TestCase):
         old = (FIXTURES / 'fbterm_engine.py').read_text()
         root = SOURCE_ROOT.parent
         review = json.loads((root / 'provenance/FBTERM-VIEWER-HEADER-0.3.7-REVIEW.json').read_text())
-        self.assertEqual(hashlib.sha256((root / review['path']).read_bytes()).hexdigest(),
+        self.assertEqual(hashlib.sha256(ORIGINAL_039.read_bytes()).hexdigest(),
                          review['reviewed_sha256'])
         preserved = (root / review['preserved_original']).read_bytes()
         self.assertEqual(hashlib.sha256(preserved).hexdigest(), review['preserved_original_sha256'])

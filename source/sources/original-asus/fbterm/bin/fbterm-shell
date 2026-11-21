@@ -12,10 +12,5 @@ printf ' PTY persistente / comandos controlados\n'
 printf '========================================\n'
 printf '\n'
 
-export FRAMEBRIDGE_FBTERM_ROOT="$HOME/.local/share/framebridge/fbterm"
-if [ -n "$FRAMEBRIDGE_FBTERM_ROOT_OVERRIDE" ]; then
-    export FRAMEBRIDGE_FBTERM_ROOT="$FRAMEBRIDGE_FBTERM_ROOT_OVERRIDE"
-fi
-export PROMPT_COMMAND='"$FRAMEBRIDGE_FBTERM_ROOT/bin/fbterm-prompt-ready"'
-
-exec bash --noprofile --norc
+# This pane displays jobs. Control records arrive over the private FIFO.
+exec /usr/bin/python3 "${FBTERM_ROOT:?}/bin/fbterm_engine.py" serve

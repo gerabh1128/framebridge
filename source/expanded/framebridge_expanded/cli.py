@@ -245,14 +245,18 @@ def connect_chatgpt(state, *, foreground=False, replace=False):
 
 def nodes_command(args, state):
     config = load_config(state)
-    if args.node_command in {"list", "execution"}:
+    if args.node_command in {"list", "execution", "jobs"}:
         broker = _module("broker")
         broker.configure(None, state_dir=state)
         previous = os.environ.get("FRAMEBRIDGE_EXPANDED_STATE")
         try:
             os.environ["FRAMEBRIDGE_EXPANDED_STATE"] = str(state)
             fleet = _module("fleet")
-            if args.node_command == "execution":
+            if args.node_command == "jobs":
+                result = fleet.managed_job(args.target, "status" if args.job_id else "list",
+                                          job_id=args.job_id, session_id=args.session_id,
+                                          include_stdout=args.include_stdout)
+            elif args.node_command == "execution":
                 result = fleet.execution_status(args.target, args.request_id, args.job_id)
             else:
                 result = fleet.discover_nodes()
@@ -637,6 +641,11 @@ def build_parser():
     ns = nodes.add_subparsers(dest="node_command", required=True)
     for name in ("list", "pending", "status", "poll"):
         ns.add_parser(name)
+    jobs = ns.add_parser("jobs", help="List durable jobs or inspect one result.")
+    jobs.add_argument("--target", required=True)
+    jobs.add_argument("--job-id", default="")
+    jobs.add_argument("--session-id", default="")
+    jobs.add_argument("--include-stdout", action="store_true")
     execution = ns.add_parser("execution", help="Check a remote operation receipt without replaying it.")
     execution.add_argument("--target", required=True, help="Enrolled node alias or UUID.")
     execution.add_argument("--request-id", default="")
