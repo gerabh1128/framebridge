@@ -13,6 +13,7 @@ import shutil
 import shlex
 import subprocess
 
+import bundled_runtime
 from build_profiles import CANDIDATE_VERSION, PROFILES, SOURCE_VENDOR, VENDOR_RELATIVE, target_profile, validate_vendor, vendor_versions
 from release_metadata import release_source
 
@@ -156,7 +157,7 @@ def install_legal_material(docs):
         "dependency_source_archives": DEPENDENCY_SOURCE_ASSETS
     }, indent=2) + "\n")
 
-def maintainer_prerm(version):
+def maintainer_prerm(version, *, bundled=False):
     """Revoke helper grants before a downgrade removes the helper's code.
 
     The argument is the fixed helper compatibility floor, not the package version.
@@ -171,9 +172,15 @@ def maintainer_prerm(version):
         '"/usr/lib/framebridge-expanded/expanded/framebridge_expanded/uninstall.py")'
         '["purge_credential_helpers"]()'
     )
+    cleanup = ""
+    if bundled:
+        cleanup = ('case "$1" in remove|deconfigure|upgrade)\n'
+                   "/usr/bin/python3 -I -S - <<'FRAMEBRIDGE_RUNTIME_CACHE'\n"
+                   + bytecode_cleanup_source("/usr/lib/framebridge-expanded/python", prune_cache_dirs=True)
+                   + "FRAMEBRIDGE_RUNTIME_CACHE\n;;\nesac\n")
     return (
         "#!/bin/sh\nset -eu\n"
-        'case "$1" in\n'
+        + cleanup + 'case "$1" in\n'
         "  remove|deconfigure)\n"
         "    /usr/bin/python3 -I -S /usr/lib/framebridge-expanded/expanded/framebridge_expanded/uninstall.py --all-users\n"
         "    if [ -e /etc/framebridge-expanded/screen-access.json ] || [ -L /etc/framebridge-expanded/screen-access.json ]; then\n"
@@ -212,7 +219,7 @@ def maintainer_preinst(version=None):
             + "FRAMEBRIDGE_UPGRADE_SNAPSHOT\nfi\n    ;;\nesac\n")
 
 
-def bytecode_cleanup_source(prefix="/usr/lib/framebridge-expanded"):
+def bytecode_cleanup_source(prefix="/usr/lib/framebridge-expanded", *, prune_cache_dirs=False):
     """Standalone post-install cleanup, before importing newly installed code.
 
     Package timestamps are reproducible, so equal-size source updates can leave
@@ -223,7 +230,16 @@ def bytecode_cleanup_source(prefix="/usr/lib/framebridge-expanded"):
     prefix = str(prefix)
     if not prefix.startswith("/") or prefix == "/" or os.path.normpath(prefix) != prefix:
         raise ValueError("Invalid installed bytecode prefix")
-    return '''import os
+    cache_pruning = '''
+            if name == "__pycache__":
+                try:
+                    os.rmdir(name, dir_fd=fd)
+                except OSError as exc:
+                    if exc.errno not in (errno.ENOTEMPTY, errno.EEXIST, errno.ENOENT):
+                        raise
+''' if prune_cache_dirs else ""
+    return '''import errno
+import os
 import stat
 
 PREFIX = @PREFIX@
@@ -252,7 +268,7 @@ def clear_bytecode(fd):
                 count += clear_bytecode(child)
             finally:
                 os.close(child)
-        elif stat.S_ISREG(info.st_mode) and name.endswith((".pyc", ".pyo")):
+@CACHE_DIR_PRUNING@        elif stat.S_ISREG(info.st_mode) and name.endswith((".pyc", ".pyo")):
             # unlinkat does not follow a final symlink, including a raced one.
             try:
                 os.unlink(name, dir_fd=fd)
@@ -272,7 +288,7 @@ try:
 finally:
     os.close(descriptor)
 print("FRAMEBRIDGE_BYTECODE_INVALIDATED=" + str(removed))
-'''.replace("@PREFIX@", repr(prefix))
+'''.replace("@PREFIX@", repr(prefix)).replace("@CACHE_DIR_PRUNING@", cache_pruning)
 
 
 def maintainer_postinst():
@@ -287,8 +303,12 @@ def maintainer_postinst():
 
 def package_relationships(profile):
     """Keep the opt-in virtual window manager out of automatic APT installs."""
+    runtime_dependencies = "python3, openssh-client" if profile.get("profile_id") == bundled_runtime.PROFILE else (
+        "python3 (>= " + profile["python_minor"] + "), python3 (<< 3."
+        + str(int(profile["python_minor"].split(".")[1]) + 1) + ")"
+    )
     return {
-        "Depends": "python3 (>= " + profile["python_minor"] + "), python3 (<< 3." + str(int(profile["python_minor"].split(".")[1]) + 1) + "), libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core, avahi-daemon, avahi-utils, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1",
+        "Depends": runtime_dependencies + ", libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core, avahi-daemon, avahi-utils, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1",
         "Suggests": "xvfb, openbox",
     }
 
@@ -302,7 +322,12 @@ def main(argv=None):
     parser.add_argument("--public-release", action="store_true", help="Bind an official release profile to its assembled corresponding-source archive")
     parser.add_argument("--source-manifest", type=Path, help="Matching SOURCE-ARCHIVE-MANIFEST.json kept beside its source archive")
     parser.add_argument("--check-vendor", action="store_true", help="Validate inputs without staging or building a package")
+    parser.add_argument("--bundled-runtime", nargs=2, type=Path, metavar=("INSTALL_ARCHIVE", "FULL_ARCHIVE"),
+                        help="Build the amd64 candidate with pinned private CPython and upstream notices")
     args = parser.parse_args(argv)
+    bundled = bool(args.bundled_runtime)
+    if bundled and (args.target != "debian13-amd64-py313" or args.public_release):
+        parser.error("Bundled runtime requires the cp313 base and candidate mode")
     if not re.fullmatch(r"[0-9][0-9A-Za-z.+:~\-]*", args.version) or args.version == "0.3.1":
         parser.error("A distinct valid Debian candidate version is required")
     subprocess.run(["dpkg", "--validate-version", args.version], check=True)
@@ -318,6 +343,9 @@ def main(argv=None):
     if len(version_assignments) != 1 or ast.literal_eval(version_assignments[0].value) != VERSION:
         raise RuntimeError("Candidate package version differs from application __version__")
     profile = target_profile(args.target)
+    if bundled:
+        VERSION += bundled_runtime.SUFFIX
+        profile.update(profile_id=bundled_runtime.PROFILE, os_id="linux", os_version="multiple")
     profile["package_version"] = VERSION
     original_vendor = BASE / SOURCE_VENDOR
     vendor = args.vendor_dir.resolve() if args.vendor_dir else original_vendor
@@ -330,9 +358,10 @@ def main(argv=None):
         SOURCE_ARCHIVE = release_source(args.source_manifest, VERSION, args.target, source_files(), vendor_evidence)
         profile["validation_status"] = "release_build"
         profile["source_archive"] = SOURCE_ARCHIVE
-    PUBLIC_FILENAME = "FrameBridge-" + VERSION + "-" + args.target + ".deb"
-    RELEASE = BASE / "release" / args.target
-    STAGE = BASE / "build" / args.target / "package-root"
+    artifact = profile["profile_id"]
+    PUBLIC_FILENAME = "FrameBridge-" + VERSION + "-" + artifact + ".deb"
+    RELEASE = BASE / "release" / artifact
+    STAGE = BASE / "build" / artifact / "package-root"
     PREFIX = STAGE / "usr/lib/framebridge-expanded"
     legal_preflight()
     baseline = json.loads((BASE / "evidence/BASELINE.json").read_text())
@@ -411,6 +440,11 @@ def main(argv=None):
     readme = (BASE / "docs/DEBIAN-TUTORIAL.md").read_bytes()
     (docs / "README.Debian.gz").write_bytes(gzip.compress(readme, mtime=EPOCH))
     install_legal_material(docs)
+    if bundled:
+        profile["runtime"] = bundled_runtime.install(PREFIX, docs, args.bundled_runtime)
+        (PREFIX / "release-profile.json").write_text(json.dumps(profile, indent=2, sort_keys=True) + "\n")
+        init = PREFIX / "expanded/framebridge_expanded/__init__.py"
+        init.write_text('__version__ = ' + json.dumps(VERSION) + "\n")
     man = STAGE / "usr/share/man/man1"
     man.mkdir(parents=True)
     man_source = (BASE / "docs/framebridge.1").read_bytes() if (BASE / "docs/framebridge.1").exists() else b".TH FRAMEBRIDGE 1\n.SH NAME\nframebridge - FrameBridge Original Expanded\n.SH SYNOPSIS\nframebridge [--state-dir PATH] setup|start|stop|status|doctor\n.SH DESCRIPTION\nRun framebridge tutorial for the Debian installation and usage guide.\n"
@@ -437,7 +471,7 @@ def main(argv=None):
         " No phone or Owner Device pairing. Services start after connection setup.\n"
         " LAN discovery chooses a role on fresh installation.\n"
         " Enrollment remains explicit. Includes a graphical notification-area launcher.\n")
-    (control / "prerm").write_text(maintainer_prerm(PRIVILEGED_HELPER_FLOOR))
+    (control / "prerm").write_text(maintainer_prerm(PRIVILEGED_HELPER_FLOOR, bundled=bundled))
     (control / "prerm").chmod(0o755)
     for hook, contents in (("preinst", maintainer_preinst()), ("postinst", maintainer_postinst())):
         (control / hook).write_text(contents)
@@ -463,9 +497,11 @@ def main(argv=None):
     (RELEASE / "PACKAGE-MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n")
     output = RELEASE / ("framebridge-expanded_" + VERSION + "_amd64.deb")
     env = dict(os.environ, SOURCE_DATE_EPOCH=str(EPOCH))
-    subprocess.run(["dpkg-deb", "--root-owner-group", "-Zxz", "-z6", "--build", str(STAGE), str(output)], check=True, env=env)
+    if bundled:
+        env["DPKG_DEB_THREADS_MAX"] = "2"
+    subprocess.run(["dpkg-deb", "--root-owner-group", "-Zzstd" if bundled else "-Zxz", "-z6", "--build", str(STAGE), str(output)], check=True, env=env)
     shutil.copy2(output, RELEASE / PUBLIC_FILENAME)
-    print(json.dumps({"package": str(output), "bytes": output.stat().st_size, "sha256": sha(output), "payload_entries": len(manifest), "profile_id": args.target, "validation_status": "release_build" if PUBLIC_RELEASE else "candidate", "public_filename": PUBLIC_FILENAME, "status": "PUBLIC_RELEASE_BUILD_ASSEMBLED" if PUBLIC_RELEASE else "COMPATIBILITY_CANDIDATE_BUILD"}))
+    print(json.dumps({"package": str(output), "bytes": output.stat().st_size, "sha256": sha(output), "payload_entries": len(manifest), "profile_id": profile["profile_id"], "validation_status": "release_build" if PUBLIC_RELEASE else "candidate", "public_filename": PUBLIC_FILENAME, "status": "PUBLIC_RELEASE_BUILD_ASSEMBLED" if PUBLIC_RELEASE else "COMPATIBILITY_CANDIDATE_BUILD"}))
 
 if __name__ == "__main__":
     main()

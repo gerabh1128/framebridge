@@ -26,7 +26,8 @@ import time
 ROOT = Path('/var/lib/framebridge-expanded/package-upgrade')
 MODULE = '/usr/lib/framebridge-expanded/expanded/framebridge_expanded/package_upgrade.py'
 PREFIX = '/usr/lib/framebridge-expanded'
-PYTHONS = {'/usr/bin/python3', '/usr/bin/python3.12', '/usr/bin/python3.13', '/usr/bin/python3.14'}
+PYTHONS = {'/usr/bin/python3', '/usr/bin/python3.12', '/usr/bin/python3.13', '/usr/bin/python3.14',
+           '/usr/lib/framebridge-expanded/python/bin/python3.13'}
 ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8'}
 UNIT = re.compile(r'framebridge-(?:autostart-[0-9a-f]{16}|profile-[0-9a-f]{20}|qa-[A-Za-z0-9-]{1,100})\.service\Z')
 MAXIMUM = 2 * 1024 * 1024

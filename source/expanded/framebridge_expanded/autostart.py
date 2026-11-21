@@ -269,9 +269,15 @@ def _quote(value, *, command=False):
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%") + '"'
 
 
+def _bundled_python():
+    return Path("/usr/lib/framebridge-expanded/python/bin/python3.13")
+
+
 def unit_text(state, encrypted, *, node=False):
     module_path = Path(__file__).resolve().parents[1]
-    executable = [sys.executable, "-B", "-m", "framebridge_expanded.autostart", "_run", "--state", str(state)]
+    # A saved user unit must also work after a rollback to a system-Python build.
+    python = "/usr/bin/python3" if sys.executable == os.fspath(_bundled_python()) else sys.executable
+    executable = [python, "-B", "-m", "framebridge_expanded.autostart", "_run", "--state", str(state)]
     lines = ["# FrameBridge managed autostart v1", "[Unit]", "Description=FrameBridge profile and ChatGPT connection", "StartLimitIntervalSec=0", "ConditionPathExists=" + _quote(module_path / "framebridge_expanded/autostart.py"), "", "[Service]", "Type=simple", "UMask=0077", "LimitCORE=0", "Environment=" + _quote("PYTHONPATH=" + str(module_path)), "Environment=LANG=C.UTF-8", "Environment=LC_ALL=C.UTF-8"]
     lines += ["ExecStart=" + " ".join(_quote(x, command=True) for x in executable), "Restart=on-failure", "RestartSec=15", "TimeoutStopSec=25", "KillMode=control-group", "StandardInput=null", "StandardOutput=null", "StandardError=null", "", "[Install]", "WantedBy=default.target", ""]
     return "\n".join(lines)
@@ -1125,4 +1131,8 @@ def main():
 
 
 if __name__ == "__main__":
+    bundled_python = _bundled_python()
+    packaged_module = Path(__file__).resolve().parents[2] == bundled_python.parents[2]
+    if packaged_module and bundled_python.is_file() and Path(sys.executable).resolve() != bundled_python.resolve():
+        os.execv(str(bundled_python), [str(bundled_python), "-B", "-m", "framebridge_expanded.autostart", *sys.argv[1:]])
     raise SystemExit(main())

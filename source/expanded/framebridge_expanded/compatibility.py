@@ -91,8 +91,7 @@ def assess(prefix, *, os_release=None, machine=None, python_version=None, libc=N
         issues.append("No candidate profile for this release. Choose Debian 13, Ubuntu 24.04/26.04, Linux Mint 22.x or LMDE 7.")
     if machine not in {"x86_64", "amd64"}:
         issues.append("This artifact supports amd64 only; ARM and other architectures need separate artifacts.")
-    if selected and minor != PROFILES[selected][2]:
-        issues.append("Profile " + selected + " requires Python " + PROFILES[selected][2] + "; running " + minor + ". Install its matching artifact without replacing the system Python.")
+    bundled = False
     libc_name, libc_version = _libc() if libc is None else libc
     match = re.match(r"(\d+)\.(\d+)", libc_version)
     if libc_name != "glibc" or not match or tuple(map(int, match.groups())) < (2, 34):
@@ -106,14 +105,28 @@ def assess(prefix, *, os_release=None, machine=None, python_version=None, libc=N
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             if not isinstance(manifest, dict) or type(manifest.get("schema")) is not int or manifest["schema"] != 1:
                 raise ValueError("unsupported schema")
-            if manifest.get("profile_id") not in PROFILES:
-                raise ValueError("unknown profile")
-            expected = PROFILES[manifest["profile_id"]]
+            bundled = manifest.get("profile_id") == "linux-amd64-cp313"
+            if bundled:
+                runtime = manifest.get("runtime")
+                if not isinstance(runtime, dict) or runtime.get("implementation") != "CPython":
+                    raise ValueError("invalid bundled runtime metadata")
+                expected = PROFILES["debian13-amd64-py313"]
+                executable = prefix / "python/bin/python3.13"
+                if selected not in {"debian13-amd64-py313", "ubuntu24.04-amd64-py312", "mint22-amd64-py312"}:
+                    issues.append("This private-runtime candidate targets Debian 13, Ubuntu 24.04 and Mint 22.x.")
+                if (not executable.is_file() or not executable.resolve().is_relative_to((prefix / "python").resolve())
+                        or Path(sys.executable).resolve() != executable.resolve()
+                        or runtime.get("version") != platform.python_version()):
+                    issues.append("This artifact requires its installed private CPython interpreter.")
+            else:
+                if manifest.get("profile_id") not in PROFILES:
+                    raise ValueError("unknown profile")
+                expected = PROFILES[manifest["profile_id"]]
             if (manifest.get("architecture"), manifest.get("python_minor"), manifest.get("python_abi")) != ("amd64", expected[2], expected[3]):
                 raise ValueError("inconsistent profile ABI")
             if manifest.get("validation_status") not in {"candidate", "release_build", "validated"}:
                 raise ValueError("missing validation status")
-            if manifest["profile_id"] != selected or manifest["python_minor"] != minor or manifest["python_abi"] != abi:
+            if (not bundled and manifest["profile_id"] != selected) or manifest["python_minor"] != minor or manifest["python_abi"] != abi:
                 issues.append("Installed artifact profile/ABI does not match this operating system and interpreter.")
         except (OSError, UnicodeError, ValueError, TypeError):
             issues.append("Invalid release-profile.json; install a complete matching artifact.")
@@ -124,6 +137,8 @@ def assess(prefix, *, os_release=None, machine=None, python_version=None, libc=N
             issues.append("Missing release-profile.json; this target requires a profile-specific artifact.")
         else:
             warnings.append("Source checkout has no artifact manifest; only the legacy Debian 13/cp313 profile is eligible.")
+    if selected and not bundled and minor != PROFILES[selected][2]:
+        issues.append("Profile " + selected + " requires Python " + PROFILES[selected][2] + "; running " + minor + ". Install its matching artifact without replacing the system Python.")
     issues.extend(_vendor_issues(prefix, abi))
     validation = manifest.get("validation_status") if manifest else "source-unvalidated"
     if validation == "release_build":

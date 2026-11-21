@@ -59,6 +59,18 @@ class PackageBytecodeTests(unittest.TestCase):
         self.assertFalse(self.cache.exists())
         self.assertEqual(self.interpreter_version(), "0.3.5")
 
+    def test_private_runtime_drops_only_empty_cache_directories(self):
+        other = self.prefix / "other" / "__pycache__"
+        other.mkdir(parents=True)
+        marker = other / "keep.txt"
+        marker.write_text("operator-owned file")
+        result = subprocess.run([sys.executable, "-I", "-S", "-"],
+                                input=bytecode_cleanup_source(self.prefix, prune_cache_dirs=True),
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self.cache.parent.exists())
+        self.assertEqual(marker.read_text(), "operator-owned file")
+
     def test_source_native_payload_and_user_profile_are_untouched(self):
         native = self.prefix / "native-extension.so"
         native.write_bytes(b"native-payload")
