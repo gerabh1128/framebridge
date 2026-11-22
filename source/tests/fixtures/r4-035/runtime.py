@@ -53,8 +53,8 @@ def environment(state, config=None, prepare=False):
         upper = key.upper()
         if upper.startswith(("CONTROL_PLANE_", "OPENAI_", "MCP_TUNNEL_", "TUNNEL_")) or upper in ("HARPOON_API_KEY", "RUNTIMES_API_KEY"):
             env.pop(key, None)
-    broker_source = PREFIX / "original/geranas/FrameBridge-Broker-RC1/src"
-    fleet_source = PREFIX / "original/geranas/FrameBridge-Fleet-Hub/app"
+    broker_source = PREFIX / "original/hub/FrameBridge-Broker-RC1/src"
+    fleet_source = PREFIX / "original/hub/FrameBridge-Fleet-Hub/app"
     env.update({
         "FRAMEBRIDGE_EXPANDED_STATE": str(state), "FRAMEBRIDGE_STATE_DIR": str(state),
         "FRAMEBRIDGE_EXPANDED_PREFIX": str(PREFIX),
@@ -66,7 +66,7 @@ def environment(state, config=None, prepare=False):
         "FRAMEBRIDGE_HUB_MCP_URL": "http://127.0.0.1:" + str(config["ports"]["hub"]) + "/mcp",
         "FRAMEBRIDGE_BROKER_CONTROL": config.get("broker_url") or "http://127.0.0.1:" + str(config["ports"]["broker"]),
         "PYTHONPATH": os.pathsep.join(map(str, [PREFIX / "expanded", PREFIX / "portable",
-            PREFIX / "original/geranas/FrameBridge-Fleet-Hub/vendor", broker_source, fleet_source])),
+            PREFIX / "original/hub/FrameBridge-Fleet-Hub/vendor", broker_source, fleet_source])),
         "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1",
         "FBTERM_TITLE": "FrameBridge Expanded", "FRAMEBRIDGE_FBTERM_TITLE": "FrameBridge Expanded",
     })

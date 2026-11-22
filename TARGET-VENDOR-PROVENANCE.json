@@ -443,7 +443,7 @@
           ]
         }
       ],
-      "path": "source/sources/original-geranas/FrameBridge-Fleet-Hub/vendor",
+      "path": "source/sources/original-hub/FrameBridge-Fleet-Hub/vendor",
       "vendor_sha256": "80e2917f19003e95f74a6250ee08043cb90681100faf510c0e034843740c0950"
     }
   },

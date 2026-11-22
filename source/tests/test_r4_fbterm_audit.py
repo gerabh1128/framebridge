@@ -21,7 +21,7 @@ def load(name, path):
     return module
 
 BASE = load('_audit_baseline', FIXTURES / 'fbterm_engine.py')
-CAND = load('_audit_candidate', SOURCE_ROOT / 'sources/original-asus/fbterm/bin/fbterm_engine.py')
+CAND = load('_audit_candidate', SOURCE_ROOT / 'sources/original-workstation/fbterm/bin/fbterm_engine.py')
 ORIGINAL_039 = SOURCE_ROOT.parent / 'provenance/originals/fbterm_engine-before-hardening-0.3.9.py'
 RELEASE = load('_audit_release', ORIGINAL_039)
 
@@ -45,7 +45,7 @@ def audit_function(path, module):
     return ns['audit']
 
 OLD_AUDIT = audit_function(FIXTURES / 'fbterm_engine.py', BASE)
-NEW_AUDIT = audit_function(SOURCE_ROOT / 'sources/original-asus/fbterm/bin/fbterm_engine.py', CAND)
+NEW_AUDIT = audit_function(SOURCE_ROOT / 'sources/original-workstation/fbterm/bin/fbterm_engine.py', CAND)
 
 class AuditTests(unittest.TestCase):
     def setUp(self):

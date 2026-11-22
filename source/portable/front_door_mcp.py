@@ -31,8 +31,8 @@ HOME = Path.home()
 ADAPTER_SOCKET = Path(os.environ.get("FRAMEBRIDGE_TOOL_ROOT", str(HOME / ".local/share/framebridge/tool-adapter"))) / "adapter.sock"
 HUB_URL = os.environ.get("FRAMEBRIDGE_HUB_MCP_URL", "http://127.0.0.1:20877/mcp")
 BROKER_CONTROL = os.environ.get("FRAMEBRIDGE_BROKER_CONTROL", "http://127.0.0.1:20878")
-ASUS_NODE_ID = os.environ.get("FRAMEBRIDGE_ASUS_NODE_ID", "")
-GERAMEG_NODE_ID = os.environ.get("FRAMEBRIDGE_GERAMEG_NODE_ID", "")
+WORKSTATION_NODE_ID = os.environ.get("FRAMEBRIDGE_WORKSTATION_NODE_ID", "")
+TERMINAL_NODE_NODE_ID = os.environ.get("FRAMEBRIDGE_TERMINAL_NODE_NODE_ID", "")
 HOST = os.environ.get("FRAMEBRIDGE_FRONT_DOOR_HOST", "127.0.0.1")
 PORT = int(os.environ.get("FRAMEBRIDGE_FRONT_DOOR_PORT", "20865"))
 JOB_RE = re.compile(r"^[A-Za-z0-9._-]{1,80}$")
@@ -210,7 +210,7 @@ def broker_post(path: str, payload: dict, timeout_s: float=10.0) -> dict:
     return out if isinstance(out,dict) else {"ok":False,"error":"BROKER_RESPONSE_INVALID"}
 
 
-def asus_exec_request(
+def workstation_exec_request(
     script: str,
     authorized: bool,
     timeout_s: int = 120,
@@ -234,16 +234,16 @@ def asus_exec_request(
     if not 1<=timeout_s<=600:
         return {"ok":False,"error":"INVALID_TIMEOUT"}
     if not job_id:
-        job_id="asus-mcp-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
+        job_id="workstation-mcp-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
     if not JOB_RE.fullmatch(job_id):
         return {"ok":False,"error":"INVALID_JOB_ID"}
 
-    if not ASUS_NODE_ID:
+    if not WORKSTATION_NODE_ID:
         return {"ok":False,"error":"REMOTE_NODE_NOT_CONFIGURED"}
     queued=broker_post(
         "/fbpair/v1/control/admin-exec",
         {
-            "node_id":ASUS_NODE_ID,
+            "node_id":WORKSTATION_NODE_ID,
             "payload":{
                 "authorized":True,
                 "job_id":job_id,
@@ -255,10 +255,10 @@ def asus_exec_request(
         timeout_s=10.0,
     )
     if queued.get("ok") is not True:
-        return {"ok":False,"error":"ASUS_EXEC_QUEUE_FAILED","broker":queued}
+        return {"ok":False,"error":"WORKSTATION_EXEC_QUEUE_FAILED","broker":queued}
     request_id=str(queued.get("request_id") or "")
     if not request_id:
-        return {"ok":False,"error":"ASUS_EXEC_REQUEST_ID_MISSING"}
+        return {"ok":False,"error":"WORKSTATION_EXEC_REQUEST_ID_MISSING"}
 
     deadline=time.monotonic()+timeout_s+75
     while time.monotonic()<deadline:
@@ -274,30 +274,30 @@ def asus_exec_request(
         if state=="complete":
             outer=status.get("result") or {}
             if not isinstance(outer,dict):
-                return {"ok":False,"error":"ASUS_EXEC_RESULT_INVALID","request_id":request_id}
+                return {"ok":False,"error":"WORKSTATION_EXEC_RESULT_INVALID","request_id":request_id}
             if outer.get("ok") is not True:
                 return {
                     "ok":False,
-                    "error":"ASUS_EXEC_NODE_FAILED",
+                    "error":"WORKSTATION_EXEC_NODE_FAILED",
                     "request_id":request_id,
                     "node_result":outer,
                 }
             value=outer.get("result") or {}
             if not isinstance(value,dict):
-                return {"ok":False,"error":"ASUS_EXEC_ADAPTER_RESULT_INVALID","request_id":request_id}
+                return {"ok":False,"error":"WORKSTATION_EXEC_ADAPTER_RESULT_INVALID","request_id":request_id}
             value=dict(value)
             value["mcp_job_id"]=job_id
             value["mcp_script_sha256"]=digest
             value["broker_request_id"]=request_id
-            value["target"]="ASUS"
+            value["target"]="WORKSTATION"
             return value
         if state in {"expired","failed","denied"}:
-            return {"ok":False,"error":"ASUS_EXEC_"+state.upper(),"request_id":request_id}
+            return {"ok":False,"error":"WORKSTATION_EXEC_"+state.upper(),"request_id":request_id}
         time.sleep(0.25)
-    return {"ok":False,"error":"ASUS_EXEC_TIMEOUT","request_id":request_id}
+    return {"ok":False,"error":"WORKSTATION_EXEC_TIMEOUT","request_id":request_id}
 
 
-def gerameg_exec_request(
+def terminal_node_exec_request(
     script: str,
     authorized: bool,
     timeout_s: int = 120,
@@ -321,16 +321,16 @@ def gerameg_exec_request(
     if not 1<=timeout_s<=600:
         return {"ok":False,"error":"INVALID_TIMEOUT"}
     if not job_id:
-        job_id="gerameg-mcp-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
+        job_id="terminal_node-mcp-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
     if not JOB_RE.fullmatch(job_id):
         return {"ok":False,"error":"INVALID_JOB_ID"}
 
-    if not GERAMEG_NODE_ID:
+    if not TERMINAL_NODE_NODE_ID:
         return {"ok":False,"error":"REMOTE_NODE_NOT_CONFIGURED"}
     queued=broker_post(
         "/fbpair/v1/control/admin-exec",
         {
-            "node_id":GERAMEG_NODE_ID,
+            "node_id":TERMINAL_NODE_NODE_ID,
             "payload":{
                 "authorized":True,
                 "job_id":job_id,
@@ -342,10 +342,10 @@ def gerameg_exec_request(
         timeout_s=10.0,
     )
     if queued.get("ok") is not True:
-        return {"ok":False,"error":"GERAMEG_EXEC_QUEUE_FAILED","broker":queued}
+        return {"ok":False,"error":"TERMINAL_NODE_EXEC_QUEUE_FAILED","broker":queued}
     request_id=str(queued.get("request_id") or "")
     if not request_id:
-        return {"ok":False,"error":"GERAMEG_EXEC_REQUEST_ID_MISSING"}
+        return {"ok":False,"error":"TERMINAL_NODE_EXEC_REQUEST_ID_MISSING"}
 
     deadline=time.monotonic()+timeout_s+75
     while time.monotonic()<deadline:
@@ -361,31 +361,31 @@ def gerameg_exec_request(
         if state=="complete":
             outer=status.get("result") or {}
             if not isinstance(outer,dict):
-                return {"ok":False,"error":"GERAMEG_EXEC_RESULT_INVALID","request_id":request_id}
+                return {"ok":False,"error":"TERMINAL_NODE_EXEC_RESULT_INVALID","request_id":request_id}
             if outer.get("ok") is not True:
                 return {
                     "ok":False,
-                    "error":"GERAMEG_EXEC_NODE_FAILED",
+                    "error":"TERMINAL_NODE_EXEC_NODE_FAILED",
                     "request_id":request_id,
                     "node_result":outer,
                 }
             value=outer.get("result") or {}
             if not isinstance(value,dict):
-                return {"ok":False,"error":"GERAMEG_EXEC_ADAPTER_RESULT_INVALID","request_id":request_id}
+                return {"ok":False,"error":"TERMINAL_NODE_EXEC_ADAPTER_RESULT_INVALID","request_id":request_id}
             value=dict(value)
             value["mcp_job_id"]=job_id
             value["mcp_script_sha256"]=digest
             value["broker_request_id"]=request_id
-            value["target"]="GERAMEG"
+            value["target"]="TERMINAL_NODE"
             return value
         if state in {"expired","failed","denied"}:
-            return {"ok":False,"error":"GERAMEG_EXEC_"+state.upper(),"request_id":request_id}
+            return {"ok":False,"error":"TERMINAL_NODE_EXEC_"+state.upper(),"request_id":request_id}
         time.sleep(0.25)
-    return {"ok":False,"error":"GERAMEG_EXEC_TIMEOUT","request_id":request_id}
+    return {"ok":False,"error":"TERMINAL_NODE_EXEC_TIMEOUT","request_id":request_id}
 
 
 
-def framebridge_exec_geranas(
+def framebridge_exec_hub(
     script: str,
     authorized: bool,
     timeout_s: int = 120,
@@ -394,7 +394,7 @@ def framebridge_exec_geranas(
     include_stdout: bool = False,
 ) -> dict:
     """Historical alias for original local FBTERM execution on this receiver."""
-    return _framebridge_exec_geranas_impl(
+    return _framebridge_exec_hub_impl(
         script=script,
         authorized=authorized,
         timeout_s=timeout_s,
@@ -404,7 +404,7 @@ def framebridge_exec_geranas(
     )
 
 
-def _framebridge_exec_geranas_impl(
+def _framebridge_exec_hub_impl(
     script: str,
     authorized: bool,
     timeout_s: int = 120,
@@ -544,7 +544,7 @@ def framebridge_exec(
             identity = local_target_identity()
         except (OSError, ValueError):
             return {"ok":False,"error":"LOCAL_TARGET_IDENTITY_UNAVAILABLE"}
-        result = _framebridge_exec_geranas_impl(script, authorized, timeout_s, job_id, sha256, include_stdout)
+        result = _framebridge_exec_hub_impl(script, authorized, timeout_s, job_id, sha256, include_stdout)
         if isinstance(result, dict):
             if result.get("engine_rc") == 75 and result.get("exit_code") is None:
                 result.update(ok=False, error=result.get("error") or "FBTERM_BUSY", execution_state="not_started")
@@ -659,7 +659,7 @@ def dispatch_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: st
     return result
 
 
-def asus_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -> dict:
+def workstation_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -> dict:
     if authorized is not True:
         return {"ok":False,"error":"AUTHORIZED_TRUE_REQUIRED"}
     if not isinstance(cua,dict):
@@ -676,16 +676,16 @@ def asus_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -
     if not job_id:
         seed=json.dumps({"action":action,"time":time.time_ns()},sort_keys=True).encode()
         digest=hashlib.sha256(seed).hexdigest()
-        job_id="cua-geranas-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
+        job_id="cua-hub-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
     if not JOB_RE.fullmatch(job_id):
         return {"ok":False,"error":"INVALID_JOB_ID"}
 
-    if not ASUS_NODE_ID:
+    if not WORKSTATION_NODE_ID:
         return {"ok":False,"error":"REMOTE_NODE_NOT_CONFIGURED"}
     queued=broker_post(
         "/fbpair/v1/control/admin-cua",
         {
-            "node_id":ASUS_NODE_ID,
+            "node_id":WORKSTATION_NODE_ID,
             "payload":{
                 "authorized":True,
                 "job_id":job_id,
@@ -696,7 +696,7 @@ def asus_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -
         timeout_s=10.0,
     )
     if queued.get("ok") is not True:
-        return {"ok":False,"error":"ASUS_CUA_QUEUE_FAILED","broker":queued}
+        return {"ok":False,"error":"WORKSTATION_CUA_QUEUE_FAILED","broker":queued}
     rid=str(queued.get("request_id") or "")
     deadline=time.monotonic()+timeout_s+75
     while time.monotonic()<deadline:
@@ -708,23 +708,23 @@ def asus_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -
         if state=="complete":
             outer=status.get("result") or {}
             if not isinstance(outer,dict):
-                return {"ok":False,"error":"ASUS_CUA_RESULT_INVALID","request_id":rid}
+                return {"ok":False,"error":"WORKSTATION_CUA_RESULT_INVALID","request_id":rid}
             if outer.get("ok") is not True:
-                return {"ok":False,"error":"ASUS_CUA_NODE_FAILED","request_id":rid,"node_result":outer}
+                return {"ok":False,"error":"WORKSTATION_CUA_NODE_FAILED","request_id":rid,"node_result":outer}
             value=outer.get("result") or {}
             if not isinstance(value,dict):
-                return {"ok":False,"error":"ASUS_CUA_ADAPTER_RESULT_INVALID","request_id":rid}
+                return {"ok":False,"error":"WORKSTATION_CUA_ADAPTER_RESULT_INVALID","request_id":rid}
             value=dict(value)
             frame_output=str(value.pop("frame_output",""))
             if frame_output:
                 value.update(_cua_frame_fields(frame_output))
             value["broker_request_id"]=rid
-            value["target"]="ASUS"
+            value["target"]="WORKSTATION"
             return value
         if state in {"expired","failed","denied"}:
-            return {"ok":False,"error":"ASUS_CUA_"+state.upper(),"request_id":rid}
+            return {"ok":False,"error":"WORKSTATION_CUA_"+state.upper(),"request_id":rid}
         time.sleep(.2)
-    return {"ok":False,"error":"ASUS_CUA_TIMEOUT","request_id":rid}
+    return {"ok":False,"error":"WORKSTATION_CUA_TIMEOUT","request_id":rid}
 
 
 def _verified_cua_image(result):

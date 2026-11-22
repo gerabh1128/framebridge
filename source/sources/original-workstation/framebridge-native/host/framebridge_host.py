@@ -752,7 +752,7 @@ def handle_ui_request(msg, op):
     authorized = str(msg.get("authorized", "")).upper()
     action = str(msg.get("action", "")).upper()
 
-    if target != "ASUS":
+    if target != "WORKSTATION":
         return 73, "UI_TARGET_MISMATCH"
 
     if authorized != "YES":
@@ -827,7 +827,7 @@ def main():
                 request_id = str(msg.get("_fb_voice_request_id", ""))[:128]
                 target = str(msg.get("target", ""))
 
-                if target != "ASUS":
+                if target != "WORKSTATION":
                     send_message({
                         "executed": False,
                         "exit_code": 53,
@@ -1140,8 +1140,8 @@ def main():
                 })
                 continue
 
-            target = str(msg.get("target", "ASUS")).upper()
-            if target != "ASUS":
+            target = str(msg.get("target", "WORKSTATION")).upper()
+            if target != "WORKSTATION":
                 if str(msg.get("lang", "")).upper() == "FRAMEBRIDGE-PLAN-V1":
                     send_message(route_classic_plan(msg))
                 else:

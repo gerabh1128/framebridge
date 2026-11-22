@@ -18,8 +18,8 @@ def _crypto():
     # The original network_security module has network policy helpers, but no
     # certificate generator. Reuse the captured SDK's cryptography dependency.
     from .runtime import PREFIX
-    for vendor in (Path(PREFIX) / "original/geranas/FrameBridge-Fleet-Hub/vendor",
-                   Path(PREFIX) / "sources/original-geranas/FrameBridge-Fleet-Hub/vendor"):
+    for vendor in (Path(PREFIX) / "original/hub/FrameBridge-Fleet-Hub/vendor",
+                   Path(PREFIX) / "sources/original-hub/FrameBridge-Fleet-Hub/vendor"):
         if vendor.is_dir():
             value = str(vendor)
             if value not in sys.path:

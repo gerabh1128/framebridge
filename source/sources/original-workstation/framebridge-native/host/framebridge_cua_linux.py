@@ -1030,10 +1030,10 @@ def handle_cua_message(msg):
         )
 
     target = str(
-        msg.get("target", "ASUS")
+        msg.get("target", "WORKSTATION")
     ).upper()
 
-    if target != "ASUS":
+    if target != "WORKSTATION":
         raise CuaTransportError(
             "TARGET_MISMATCH"
         )
@@ -1828,10 +1828,10 @@ def handle_cua_message(msg):
         )
 
     target = str(
-        msg.get("target", "ASUS")
+        msg.get("target", "WORKSTATION")
     ).upper()
 
-    if target != "ASUS":
+    if target != "WORKSTATION":
         raise CuaTransportError(
             "TARGET_MISMATCH"
         )

@@ -1,4 +1,4 @@
-"""Siete herramientas CUA-TTY ligadas a GERAMEG, sobre FBEXEC original."""
+"""Siete herramientas CUA-TTY ligadas a TERMINAL_NODE, sobre FBEXEC original."""
 from __future__ import annotations
 import base64
 import hashlib
@@ -7,7 +7,7 @@ import re
 import shlex
 import uuid
 
-RPC_PATH = ".local/lib/framebridge-gerameg-original/cua_tty_rpc.py"
+RPC_PATH = ".local/lib/framebridge-terminal-node-original/cua_tty_rpc.py"
 PROTOCOL = "FB-CUA-TTY-RPC/1"
 MAX_BYTES = 65536
 CHUNK_BYTES = 2100
@@ -47,13 +47,13 @@ def register_tools(mcp, exec_request):
 
     def remote(argv):
         script = _remote_script(argv)
-        job_id = "cua-gerameg-" + uuid.uuid4().hex
+        job_id = "cua-terminal_node-" + uuid.uuid4().hex
         digest = hashlib.sha256(script.encode("utf-8")).hexdigest()
         result = exec_request(script=script, authorized=True, timeout_s=15, job_id=job_id, sha256=digest)
         require(type(result) is dict and result.get("ok") is True, "CUA_TTY_EXEC_FAILED")
         exit_code = result.get("exit_code")
         require(type(exit_code) in (int, str) and str(exit_code) == "0", "CUA_TTY_EXEC_FAILED")
-        require(result.get("target") == "GERAMEG" and result.get("mcp_job_id") == job_id and result.get("mcp_script_sha256") == digest, "CUA_TTY_EXEC_BINDING_INVALID")
+        require(result.get("target") == "TERMINAL_NODE" and result.get("mcp_job_id") == job_id and result.get("mcp_script_sha256") == digest, "CUA_TTY_EXEC_BINDING_INVALID")
         stdout = result.get("stdout")
         require(type(stdout) is str and len(stdout) <= 4096 and result.get("stdout_truncated") is not True, "CUA_TTY_STDOUT_INVALID")
         try:
@@ -108,66 +108,66 @@ def register_tools(mcp, exec_request):
 
     def call(op, authorized, **kwargs):
         if authorized is not True:
-            return {"ok": False, "target": "GERAMEG", "error": "AUTHORIZED_TRUE_REQUIRED"}
+            return {"ok": False, "target": "TERMINAL_NODE", "error": "AUTHORIZED_TRUE_REQUIRED"}
         try:
             payload = base64.b64encode(encode({"op": op, **kwargs})).decode("ascii")
             reply, total, digest = unpack(remote(["invoke", payload]))
             if reply.get("ok") is not True:
                 error = reply.get("error")
                 code = error if type(error) is str and re.fullmatch(r"[A-Z0-9_]{1,80}", error) else "CUA_TTY_REQUEST_DENIED"
-                return {"ok": False, "target": "GERAMEG", "error": code}
+                return {"ok": False, "target": "TERMINAL_NODE", "error": code}
             require(type(reply.get("result")) is dict, "CUA_TTY_RESPONSE_INVALID")
-            return {"ok": True, "target": "GERAMEG", "result": reply["result"], "response_bytes": total, "response_sha256": digest}
+            return {"ok": True, "target": "TERMINAL_NODE", "result": reply["result"], "response_bytes": total, "response_sha256": digest}
         except CuaError as exc:
-            return {"ok": False, "target": "GERAMEG", "error": str(exc)}
+            return {"ok": False, "target": "TERMINAL_NODE", "error": str(exc)}
         except Exception:
-            return {"ok": False, "target": "GERAMEG", "error": "CUA_TTY_BACKEND_UNAVAILABLE"}
+            return {"ok": False, "target": "TERMINAL_NODE", "error": "CUA_TTY_BACKEND_UNAVAILABLE"}
 
     def valid_sid(session_id):
         return type(session_id) is str and SID.fullmatch(session_id) is not None
 
     def denied(authorized, valid=True, error="CUA_TTY_ARGUMENT_INVALID"):
         if authorized is not True:
-            return {"ok": False, "target": "GERAMEG", "error": "AUTHORIZED_TRUE_REQUIRED"}
+            return {"ok": False, "target": "TERMINAL_NODE", "error": "AUTHORIZED_TRUE_REQUIRED"}
         if not valid:
-            return {"ok": False, "target": "GERAMEG", "error": error}
+            return {"ok": False, "target": "TERMINAL_NODE", "error": error}
         return None
 
     @mcp.tool(annotations=dict(READ))
     def framebridge_cua_tty_status(authorized: bool) -> dict:
-        """Estado CUA-TTY de GERAMEG; requiere autorización explícita del chat."""
+        """Estado CUA-TTY de TERMINAL_NODE; requiere autorización explícita del chat."""
         return call("status", authorized)
 
     @mcp.tool(annotations=dict(CHANGE))
     def framebridge_cua_tty_open_demo(authorized: bool) -> dict:
-        """Abre demo-readonly sin privilegios en GERAMEG; no abre una shell general."""
+        """Abre demo-readonly sin privilegios en TERMINAL_NODE; no abre una shell general."""
         return call("open_demo", authorized)
 
     @mcp.tool(annotations=dict(READ))
     def framebridge_cua_tty_observe(session_id: str, authorized: bool) -> dict:
-        """Lee la pantalla textual de una sesión CUA-TTY de GERAMEG."""
+        """Lee la pantalla textual de una sesión CUA-TTY de TERMINAL_NODE."""
         return denied(authorized, valid_sid(session_id), "CUA_TTY_SESSION_INVALID") or call("observe", authorized, session_id=session_id)
 
     @mcp.tool(annotations=dict(CHANGE))
     def framebridge_cua_tty_resize(session_id: str, rows: int, cols: int, authorized: bool) -> dict:
-        """Redimensiona una sesión de GERAMEG dentro de 5–100 filas y 20–220 columnas."""
+        """Redimensiona una sesión de TERMINAL_NODE dentro de 5–100 filas y 20–220 columnas."""
         valid = valid_sid(session_id) and type(rows) is int and type(cols) is int and 5 <= rows <= 100 and 20 <= cols <= 220
         return denied(authorized, valid) or call("resize", authorized, session_id=session_id, rows=rows, cols=cols)
 
     @mcp.tool(annotations=dict(STOP))
     def framebridge_cua_tty_abort(session_id: str, authorized: bool) -> dict:
-        """Cierra exclusivamente la sesión CUA-TTY indicada de GERAMEG."""
+        """Cierra exclusivamente la sesión CUA-TTY indicada de TERMINAL_NODE."""
         return denied(authorized, valid_sid(session_id), "CUA_TTY_SESSION_INVALID") or call("abort", authorized, session_id=session_id)
 
     @mcp.tool(annotations=dict(CHANGE))
     def framebridge_cua_tty_key_send(session_id: str, key: str, authorized: bool) -> dict:
-        """Envía UP/DOWN/LEFT/RIGHT/ENTER/TAB/ESC/BACKSPACE/CTRL_C en GERAMEG."""
+        """Envía UP/DOWN/LEFT/RIGHT/ENTER/TAB/ESC/BACKSPACE/CTRL_C en TERMINAL_NODE."""
         valid = valid_sid(session_id) and type(key) is str and key in KEYS
         return denied(authorized, valid) or call("key_send", authorized, session_id=session_id, key=key)
 
     @mcp.tool(annotations=dict(CHANGE))
     def framebridge_cua_tty_text_type(session_id: str, text: str, authorized: bool) -> dict:
-        """Escribe 1–64 caracteres sin controles en la demo de GERAMEG."""
+        """Escribe 1–64 caracteres sin controles en la demo de TERMINAL_NODE."""
         valid = valid_sid(session_id) and type(text) is str and 1 <= len(text) <= 64 and not any(ord(ch) < 32 or ord(ch) == 127 for ch in text)
         if valid:
             try:

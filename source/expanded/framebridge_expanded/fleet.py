@@ -132,8 +132,8 @@ def original_paths() -> tuple[Path, Path]:
     for variable, suffix in choices:
         configured = os.environ.get(variable)
         candidates = [Path(configured)] if configured else [
-            root / "original/geranas" / suffix,
-            root / "sources/original-geranas" / suffix,
+            root / "original/hub" / suffix,
+            root / "sources/original-hub" / suffix,
         ]
         normalized = []
         for candidate in candidates:

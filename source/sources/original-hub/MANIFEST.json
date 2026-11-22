@@ -3,13 +3,13 @@
   "files": [
     {
       "path": ".local/share/framebridge/tool-adapter/bin/framebridge_tool_adapter.py",
-      "bytes": 10211,
-      "sha256": "2afb9bf8f789f42732a6aa6e50b5897174bfa1522ff032bc83533679c37551ec"
+      "bytes": 10218,
+      "sha256": "609657517fa0077b5ee425bb0a114e0bc65d0d790a1db13744a0186613d059d8"
     },
     {
       "path": "FrameBridge-Broker-RC1/dev/fbpair_dev_broker.py",
-      "bytes": 44615,
-      "sha256": "d520f142ace34a728787899d8cdaa02be4ab2ee98aec16e845603b1cf9d10330"
+      "bytes": 44647,
+      "sha256": "4f75f78d40228db8fa1b23768f8b3660bfd25669e8198ebb4d7afbcb500c1c75"
     },
     {
       "path": "FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/__init__.py",
@@ -4813,13 +4813,13 @@
     },
     {
       "path": "FrameBridge-Front-Door/bin/front_door_mcp.py",
-      "bytes": 29408,
-      "sha256": "165d7a9f9caadd5c4d385c2764ef124fc6568a0211a8f8dbc8c784ecf55eac88"
+      "bytes": 29714,
+      "sha256": "09a2d7d92d8e86e39292bfdffee6f1eb739f62ae8dbd7d89d239064c8d1b810b"
     },
     {
-      "path": "FrameBridge-Front-Door/bin/gerameg_cua_frontdoor.py",
-      "bytes": 9309,
-      "sha256": "9f228a3b7371f43c3434ff9f9bb7d700310fa90a6178d96a495852fc13d26666"
+      "path": "FrameBridge-Front-Door/bin/terminal_node_cua_frontdoor.py",
+      "bytes": 9417,
+      "sha256": "d0451a72e719f0597e4f1c5d33b6d1165ea2e5363cf45153ad11280dfa84337d"
     },
     {
       "path": "FrameBridge-MCP-Private/bin/framebridge-mcp-private-run",
@@ -4832,7 +4832,7 @@
       "sha256": "472eb9dd9dd625b4e6023c3b4a5736b3a2e5a1b6dbe9338e001887a64ec992a6"
     }
   ],
-  "historical_origin": "GERANAS-live-20261021",
+  "historical_origin": "HUB-live-20261021",
   "community_derivative": true,
   "community_version": "0.3.1~community.20261026.7"
 }

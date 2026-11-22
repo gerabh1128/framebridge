@@ -124,9 +124,9 @@ def main(argv=None):
     if list(sys.argv[1:] if argv is None else argv) != ["serve"]:
         raise SystemExit("Usage: python3 -m framebridge_expanded.adapter serve")
     prefix = Path(os.environ.get("FRAMEBRIDGE_EXPANDED_PREFIX", Path(__file__).resolve().parents[2]))
-    path = prefix / "original/asus/tool-adapter/bin/framebridge_tool_adapter.py"
+    path = prefix / "original/workstation/tool-adapter/bin/framebridge_tool_adapter.py"
     if not path.is_file():
-        path = prefix / "sources/original-asus/tool-adapter/bin/framebridge_tool_adapter.py"
+        path = prefix / "sources/original-workstation/tool-adapter/bin/framebridge_tool_adapter.py"
     spec = importlib.util.spec_from_file_location("_framebridge_original_adapter", path)
     original = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(original)

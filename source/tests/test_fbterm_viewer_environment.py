@@ -15,7 +15,7 @@ import types
 import unittest
 from unittest.mock import patch,Mock
 
-ENGINE_SOURCE=Path(__file__).resolve().parents[1]/'sources/original-asus/fbterm/bin/fbterm_engine.py'
+ENGINE_SOURCE=Path(__file__).resolve().parents[1]/'sources/original-workstation/fbterm/bin/fbterm_engine.py'
 spec=importlib.util.spec_from_file_location('viewer_engine_release',ENGINE_SOURCE)
 engine=importlib.util.module_from_spec(spec);spec.loader.exec_module(engine)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Build the original snapshot on GERAMEG; does not install or start software."""
+"""Build the original snapshot on TERMINAL_NODE; does not install or start software."""
 import calendar
 import hashlib
 import json
@@ -22,24 +22,24 @@ def sha(p):
 
 def main():
     assert (BASE / "portable/front_door_mcp.py").is_file(), "portable source missing"
-    assert (BASE / "sources/original-asus/SOURCE-MANIFEST.json").is_file(), "ASUS snapshot missing"
-    assert (BASE / "sources/original-geranas/MANIFEST.json").is_file(), "GERANAS snapshot missing"
+    assert (BASE / "sources/original-workstation/SOURCE-MANIFEST.json").is_file(), "WORKSTATION snapshot missing"
+    assert (BASE / "sources/original-hub/MANIFEST.json").is_file(), "HUB snapshot missing"
     if STAGE.exists():
         shutil.rmtree(STAGE)
     RELEASE.mkdir(exist_ok=True)
     PREFIX.mkdir(parents=True)
-    shutil.copytree(BASE / "sources/original-geranas", PREFIX / "original/geranas")
-    shutil.copytree(BASE / "sources/original-asus", PREFIX / "original/asus")
+    shutil.copytree(BASE / "sources/original-hub", PREFIX / "original/hub")
+    shutil.copytree(BASE / "sources/original-workstation", PREFIX / "original/workstation")
     shutil.copytree(BASE / "portable", PREFIX / "portable", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     (PREFIX / "bin").mkdir()
     shutil.copy2(BASE / "packaging/framebridge-original", PREFIX / "bin/framebridge-original")
     (PREFIX / "bin/framebridge-original").chmod(0o755)
     layout = {
-        "adapter": "original/asus/tool-adapter/bin/framebridge_tool_adapter.py",
-        "adapter_bin": "original/asus/tool-adapter/bin",
-        "fbterm_bin": "original/asus/fbterm/bin",
-        "native_host": "original/asus/framebridge-native/host/framebridge_host.py",
-        "native_host_dir": "original/asus/framebridge-native/host",
+        "adapter": "original/workstation/tool-adapter/bin/framebridge_tool_adapter.py",
+        "adapter_bin": "original/workstation/tool-adapter/bin",
+        "fbterm_bin": "original/workstation/fbterm/bin",
+        "native_host": "original/workstation/framebridge-native/host/framebridge_host.py",
+        "native_host_dir": "original/workstation/framebridge-native/host",
     }
     (PREFIX / "layout.json").write_text(json.dumps(layout, indent=2) + "\n")
     bindir = STAGE / "usr/bin"
@@ -63,7 +63,7 @@ def main():
         "Installed-Size: " + str((installed + 1023) // 1024) + "\n"
         "Depends: python3 (>= 3.13), python3 (<< 3.14), libc6 (>= 2.34), libgcc-s1, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm\n"
         "Description: FrameBridge Original with manual ChatGPT connection\n"
-        " Exact ASUS executor and native desktop programs with GERANAS MCP dependencies\n"
+        " Exact WORKSTATION executor and native desktop programs with HUB MCP dependencies\n"
         " and tunnel client. A separate profile and explicit manual startup avoid\n"
         " collision with existing FrameBridge installations. No phone pairing or\n"
         " Owner Device is required by this local executable path.\n")
@@ -76,7 +76,7 @@ def main():
                 for p in sorted(STAGE.rglob("*")) if p.is_file() and not p.is_symlink()]
     (RELEASE / "PACKAGE-MANIFEST.json").write_text(json.dumps({
         "package": "framebridge-original", "version": VERSION, "architecture": "amd64",
-        "source_host": "GERAMEG", "files": manifest}, indent=2) + "\n")
+        "source_host": "TERMINAL_NODE", "files": manifest}, indent=2) + "\n")
     for p in STAGE.rglob("*"):
         if not p.is_symlink():
             p.chmod(0o755 if p.is_dir() or p.stat().st_mode & 0o111 else 0o644)

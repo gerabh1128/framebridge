@@ -16,7 +16,7 @@ TEST_ROOT = Path(__file__).resolve().parent
 SOURCE_ROOT = TEST_ROOT.parent
 PACKAGE_ROOT = SOURCE_ROOT / 'expanded/framebridge_expanded'
 FIXTURES = TEST_ROOT / 'fixtures/r4-035'
-SPEC = importlib.util.spec_from_file_location('window_candidate', SOURCE_ROOT/'sources/original-asus/framebridge-native/host/framebridge_cua_linux.py')
+SPEC = importlib.util.spec_from_file_location('window_candidate', SOURCE_ROOT/'sources/original-workstation/framebridge-native/host/framebridge_cua_linux.py')
 cua = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(cua)
 
@@ -301,7 +301,7 @@ class WindowCaptureTests(unittest.TestCase):
 
     def test_all_other_existing_functions_and_top_level_nodes_unchanged(self):
         import hashlib, json
-        tree = ast.parse((SOURCE_ROOT/'sources/original-asus/framebridge-native/host/framebridge_cua_linux.py').read_text())
+        tree = ast.parse((SOURCE_ROOT/'sources/original-workstation/framebridge-native/host/framebridge_cua_linux.py').read_text())
         retained = [node for node in tree.body
                     if not (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
                             and node.name in {'_capture_visual_jpeg', '_visual_png_geometry',

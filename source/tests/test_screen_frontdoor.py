@@ -148,8 +148,8 @@ class ScreenTests(unittest.TestCase):
 
     def test_native_image_return_preserves_bytes_and_omits_internal_path(self):
         client, executor = self.client()
-        result = client.call("observe", "gerameg", True)
-        self.assertEqual(result[0]["node"], "GERAMEG")
+        result = client.call("observe", "terminal_node", True)
+        self.assertEqual(result[0]["node"], "TERMINAL_NODE")
         self.assertEqual(result[1].data, executor.data)
         self.assertEqual(result[1].format, "png")
         self.assertNotIn("path", result[0]["result"])
@@ -158,45 +158,45 @@ class ScreenTests(unittest.TestCase):
 
     def test_authorization_required_before_any_exec(self):
         client, executor = self.client()
-        self.assertEqual(client.call("observe", "GERAMEG", False)["error"], "AUTHORIZED_TRUE_REQUIRED")
+        self.assertEqual(client.call("observe", "TERMINAL_NODE", False)["error"], "AUTHORIZED_TRUE_REQUIRED")
         self.assertEqual(executor.requests, [])
 
     def test_invalid_node_cannot_reach_shell(self):
         client, executor = self.client()
-        self.assertEqual(client.call("observe", "GERAMEG;id", True)["error"], "SCREEN_NODE_INVALID")
+        self.assertEqual(client.call("observe", "TERMINAL_NODE;id", True)["error"], "SCREEN_NODE_INVALID")
         self.assertEqual(executor.requests, [])
 
     def test_visible_action_requires_capture_id(self):
         client, executor = self.client()
-        self.assertEqual(client.call("key", "GERAMEG", True, key="ENTER")["error"], "SCREEN_CAPTURE_ID_REQUIRED")
+        self.assertEqual(client.call("key", "TERMINAL_NODE", True, key="ENTER")["error"], "SCREEN_CAPTURE_ID_REQUIRED")
         self.assertEqual(executor.requests, [])
 
     def test_hidden_reference_observe_shows_full_screen_and_visibility_false(self):
         client, executor = self.client()
-        result = client.call("observe", "GERAMEG", True, session_id="hidden_virtual_session")
+        result = client.call("observe", "TERMINAL_NODE", True, session_id="hidden_virtual_session")
         self.assertFalse(result[0]["result"]["requested_session_visible"])
         self.assertIsInstance(result[1], Image)
 
     def test_hidden_action_error_survives_exit1_without_image(self):
         client, executor = self.client()
-        result = client.call("key", "GERAMEG", True, capture_id=CAPTURE_ID,
+        result = client.call("key", "TERMINAL_NODE", True, capture_id=CAPTURE_ID,
                              session_id="hidden_virtual_session", key="ENTER")
         self.assertEqual(result["error"], "SESSION_NOT_VISIBLE")
         self.assertEqual(len(executor.requests), 1)
 
     def test_backend_structured_error_survives_failure_flag_and_exit1(self):
         client, executor = self.client("error_exit1")
-        self.assertEqual(client.call("observe", "GERAMEG", True)["error"], "SESSION_NOT_VISIBLE")
+        self.assertEqual(client.call("observe", "TERMINAL_NODE", True)["error"], "SESSION_NOT_VISIBLE")
 
     def test_key_action_returns_new_real_image(self):
         client, executor = self.client()
-        result = client.call("key", "GERAMEG", True, capture_id=CAPTURE_ID, key="CTRL_L")
+        result = client.call("key", "TERMINAL_NODE", True, capture_id=CAPTURE_ID, key="CTRL_L")
         self.assertEqual(executor.requests[0]["op"], "key")
         self.assertEqual(result[1].data, executor.data)
 
     def test_uncertain_input_details_preserved_without_payload(self):
         client, executor = self.client("uncertain_input")
-        result = client.call("key", "GERAMEG", True, capture_id=CAPTURE_ID, key="ENTER")
+        result = client.call("key", "TERMINAL_NODE", True, capture_id=CAPTURE_ID, key="ENTER")
         self.assertEqual(result["error"], "INPUT_SENT_OBSERVE_FAILED")
         self.assertIs(result["performed"], True)
         self.assertIs(result["capture_consumed"], True)
@@ -223,14 +223,14 @@ class ScreenTests(unittest.TestCase):
 
     def test_utf8_text_limit_matches_backend(self):
         client, executor = self.client()
-        result = client.call("text", "GERAMEG", True, capture_id=CAPTURE_ID, text="界" * 1400)
+        result = client.call("text", "TERMINAL_NODE", True, capture_id=CAPTURE_ID, text="界" * 1400)
         self.assertEqual(result["error"], "SCREEN_TEXT_INVALID")
         self.assertEqual(executor.requests, [])
 
     def test_text_is_base64_transport_and_not_shell_interpolation(self):
         client, executor = self.client()
         text = "literal $(touch /tmp/no) `id` ' quote"
-        result = client.call("text", "GERAMEG", True, capture_id=CAPTURE_ID, text=text)
+        result = client.call("text", "TERMINAL_NODE", True, capture_id=CAPTURE_ID, text=text)
         self.assertEqual(executor.requests[0]["text"], text)
         self.assertIsInstance(result[1], Image)
 
@@ -251,15 +251,15 @@ class ScreenTests(unittest.TestCase):
         for variant, code in expected.items():
             with self.subTest(variant=variant):
                 client, _ = self.client(variant)
-                self.assertEqual(client.call("observe", "GERAMEG", True)["error"], code)
+                self.assertEqual(client.call("observe", "TERMINAL_NODE", True)["error"], code)
 
     def test_generic_node_is_passed_to_existing_executor(self):
         client, executor = self.client()
-        self.assertEqual(client.call("observe", "ASUS", True)[0]["node"], "ASUS")
+        self.assertEqual(client.call("observe", "WORKSTATION", True)[0]["node"], "WORKSTATION")
 
     def test_exact_x11_capture_source_is_accepted(self):
         client, executor = self.client("x11")
-        result = client.call("observe", "ASUS", True)
+        result = client.call("observe", "WORKSTATION", True)
         self.assertEqual(result[0]["result"]["source"], "x11-root-XGetImage")
         self.assertEqual(result[1].data, executor.data)
 
@@ -283,8 +283,8 @@ class ScreenTests(unittest.TestCase):
 
     def test_trusted_alias_or_uuid_resolver_is_injected(self):
         executor = Executor()
-        client = ScreenClient(executor, Image, lambda node: "GERAMEG")
-        self.assertEqual(client.call("observe", "node-alias", True)[0]["node"], "GERAMEG")
+        client = ScreenClient(executor, Image, lambda node: "TERMINAL_NODE")
+        self.assertEqual(client.call("observe", "node-alias", True)[0]["node"], "TERMINAL_NODE")
 
     def test_registration_annotations_and_callable_functions(self):
         mcp = MCP()
@@ -292,7 +292,7 @@ class ScreenTests(unittest.TestCase):
         self.assertEqual(set(mcp.tools), {"framebridge_screen_observe", "framebridge_screen_key", "framebridge_screen_text"})
         self.assertTrue(mcp.annotations["framebridge_screen_observe"]["readOnlyHint"])
         self.assertFalse(mcp.annotations["framebridge_screen_key"]["readOnlyHint"])
-        self.assertIsInstance(mcp.tools["framebridge_screen_observe"]("GERAMEG", True)[1], Image)
+        self.assertIsInstance(mcp.tools["framebridge_screen_observe"]("TERMINAL_NODE", True)[1], Image)
 
     def test_local_route_preserves_distinct_real_hostname_and_uuid(self):
         executor = Executor(hostname="fb-central-lab")

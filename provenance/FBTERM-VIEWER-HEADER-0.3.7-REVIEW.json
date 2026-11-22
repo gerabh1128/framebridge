@@ -1,10 +1,10 @@
 {
   "authorization_record": "FRAMEBRIDGE-FBTERM-LINUX-SINCRONIZACION-GIT-R1-20261109.md",
-  "baseline_source_key": "original-asus/fbterm/bin/fbterm_engine.py",
+  "baseline_source_key": "original-workstation/fbterm/bin/fbterm_engine.py",
   "historical_record_policy": "Historical source and package identities remain unchanged. Only the strict current-source hash for this reviewed file is advanced, with its previous bytes preserved explicitly.",
   "patch": "provenance/patches/fbterm-viewer-header-0.3.7.patch",
   "patch_sha256": "46fe28a10e91cd6a2dbff74a6fb339590dcb61d0d990554411e952731597081d",
-  "path": "source/sources/original-asus/fbterm/bin/fbterm_engine.py",
+  "path": "source/sources/original-workstation/fbterm/bin/fbterm_engine.py",
   "preserved_original": "provenance/originals/fbterm_engine-before-viewer-header-0.3.7.py",
   "preserved_original_sha256": "01ca3556b6e0d05ba95fa805fba70befbf765c8ae45fee75bce4131ab834a93a",
   "previous_sha256": "01ca3556b6e0d05ba95fa805fba70befbf765c8ae45fee75bce4131ab834a93a",

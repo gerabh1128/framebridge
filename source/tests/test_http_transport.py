@@ -37,13 +37,13 @@ class HttpMcpTransportTests(unittest.TestCase):
                         FRAMEBRIDGE_EXPANDED_STATE=str(home/'state'),
                         FRAMEBRIDGE_STATE_DIR=str(home/'state'),
                         FRAMEBRIDGE_TOOL_ROOT=str(home/'adapter'),
-                        FRAMEBRIDGE_BROKER_SOURCE=str(SOURCE/'sources/original-geranas/FrameBridge-Broker-RC1/src'),
-                        FRAMEBRIDGE_FLEET_SOURCE=str(SOURCE/'sources/original-geranas/FrameBridge-Fleet-Hub/app'))
+                        FRAMEBRIDGE_BROKER_SOURCE=str(SOURCE/'sources/original-hub/FrameBridge-Broker-RC1/src'),
+                        FRAMEBRIDGE_FLEET_SOURCE=str(SOURCE/'sources/original-hub/FrameBridge-Fleet-Hub/app'))
         # Match the child search path exported by runtime.environment(), with an
         # intentionally incompatible optional library taking precedence.
         self.env['PYTHONPATH'] = os.pathsep.join(map(str, [
             self.ambient, SOURCE/'expanded', SOURCE/'portable',
-            SOURCE/'sources/original-geranas/FrameBridge-Fleet-Hub/vendor']))
+            SOURCE/'sources/original-hub/FrameBridge-Fleet-Hub/vendor']))
 
     def test_default_websocket_detection_would_load_the_incompatible_library(self):
         code = "from mcp.server.fastmcp import FastMCP; import uvicorn; uvicorn.Config(FastMCP('negative-control').streamable_http_app()).load()"
@@ -149,8 +149,8 @@ class HttpMcpTransportTests(unittest.TestCase):
             self.assertFalse(schema['additionalProperties'])
             self.assertTrue(schema['properties']['node']['deprecated'])
         for request_id, selectors, expected in (
-            (3, {'target': 'LOCAL', 'node': 'ASUS'}, 'TARGET_SELECTOR_CONFLICT'),
-            (4, {'hostname': 'ASUS'}, 'hostname'),
+            (3, {'target': 'LOCAL', 'node': 'WORKSTATION'}, 'TARGET_SELECTOR_CONFLICT'),
+            (4, {'hostname': 'WORKSTATION'}, 'hostname'),
             (5, {'target': None}, 'target'),
         ):
             reply, _, _ = self.rpc({'jsonrpc': '2.0', 'id': request_id, 'method': 'tools/call',

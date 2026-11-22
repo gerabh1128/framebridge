@@ -1,5 +1,5 @@
---- a/source/sources/original-asus/fbterm/bin/fbterm_engine.py
-+++ b/source/sources/original-asus/fbterm/bin/fbterm_engine.py
+--- a/source/sources/original-workstation/fbterm/bin/fbterm_engine.py
++++ b/source/sources/original-workstation/fbterm/bin/fbterm_engine.py
 @@ -1,8 +1,13 @@
  #!/usr/bin/env python3
 +# Modified for FrameBridge 0.3.5 on 2026-10-31:

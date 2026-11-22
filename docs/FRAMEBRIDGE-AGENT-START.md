@@ -10,7 +10,7 @@ The currently tested connection is the manual ChatGPT workflow. A coding assista
 
 Give the assistant the computer you want to work on, the intended task, and the local path of the reviewed matching package. Use the [README's package matrix](../README.md#1-install-the-matching-package). If this is a pilot beside an existing installation, identify a new isolated `--state-dir` and the existing services that must remain running.
 
-Name both the computer receiving the assistant's tool call and the intended execution target. `LOCAL` means the current FrameBridge receiver, not a fixed computer called ASUS or the computer displaying the chat. Discover enrolled nodes and use their confirmed aliases or IDs. A legacy connector can have a different default target; changing endpoints does not preserve that default automatically.
+Name both the computer receiving the assistant's tool call and the intended execution target. `LOCAL` means the current FrameBridge receiver, not a fixed computer called WORKSTATION or the computer displaying the chat. Discover enrolled nodes and use their confirmed aliases or IDs. A legacy connector can have a different default target; changing endpoints does not preserve that default automatically.
 
 Select the computer with `target` in FBEXEC and CUA. The older `node` selector is an alias on the execution and screen tools that accept it. Pass one destination. For graphical input, observe with `framebridge_cua` and `capture_scope="WINDOW"`, then use the same target and the observed window ID and dimensions. The bound screen key and text tools require a visible TTY. Receipts identify the enrolled node by alias and UUID. `receiver_hostname` identifies the receiver, and `executed_hostname` gives the system name when reported by the executor. If the receipt reports `in_flight` or `outcome_unknown`, use `fb nodes execution` or `framebridge_exec_status` with the existing request or job ID before taking further action.
 
@@ -24,7 +24,7 @@ Help me install and verify FrameBridge on this Linux computer.
 Target computer: [the computer to which you already have authorized shell access]
 Reviewed package: [absolute local path to the matching FrameBridge .deb]
 Scope: [new installation, or the specifically authorized pilot/profile]
-Receiver and execution target: [identify both; do not assume LOCAL means ASUS]
+Receiver and execution target: [identify both; do not assume LOCAL means WORKSTATION]
 
 First establish where you are running. Inspect the distribution/version,
 architecture and system Python. Match them to the package's release profile.

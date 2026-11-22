@@ -72,8 +72,8 @@ class PackageUpgradeTests(unittest.TestCase):
             upgrade.identify(self.proc)
 
     def test_recognizes_qa_unit_without_selecting_unrelated_services(self):
-        (self.proc / 'cgroup').write_text('0::/user.slice/user@1000.service/app.slice/framebridge-qa-mint223-private2-c3418304.service\n')
-        self.assertEqual(self.identify()['unit'], 'framebridge-qa-mint223-private2-c3418304.service')
+        (self.proc / 'cgroup').write_text('0::/user.slice/user@1000.service/app.slice/framebridge-qa-mintlab-private2-c3418304.service\n')
+        self.assertEqual(self.identify()['unit'], 'framebridge-qa-mintlab-private2-c3418304.service')
 
     def test_unrelated_unit_is_not_restarted(self):
         (self.proc / 'cgroup').write_text('0::/user.slice/user@1000.service/app.slice/owner-important.service\n')

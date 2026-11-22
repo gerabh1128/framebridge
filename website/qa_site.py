@@ -38,7 +38,7 @@ def main():
     for p in pages:
         raw=p.read_text();q=Inspect();q.feed(raw);rel='/'+str(p.relative_to(DIST));http_paths.add(rel)
         if q.lang!='en' or not q.main:failures.append(str(p.relative_to(DIST))+': missing English or main landmark')
-        if '/home/' in raw or '/srv/geranas-services/' in raw or '/workspace/' in raw:failures.append(str(p.relative_to(DIST))+': personal host path')
+        if '/home/' in raw or '/srv/hub-services/' in raw or '/workspace/' in raw:failures.append(str(p.relative_to(DIST))+': personal host path')
         if "'unsafe-inline'" in raw:failures.append(str(p.relative_to(DIST))+': unsafe inline CSP')
         for value in q.links+q.assets:
             u=urlsplit(value)
@@ -117,7 +117,7 @@ def main():
             for suite in ['trixie','noble','mint22']:
                 if not any('Suites: '+suite in block for block in apt_blocks):
                     failures.append('Missing APT suite '+suite)
-    status={'host':'GERAMEG','website_source':str(BASE),'web_root':str(DIST),'language':'English','buildless':True,'html_pages_checked':len(pages),'loopback_http_paths_checked':http_count,'static_failures':failures,'pending_assets':sorted(set(pending)),'infra_routes_expected':sorted(infra),'external_links':sorted(external),'no_external_runtime_dependencies':True,'copy_controls_progressive':True,'ready_branch_rendered_with_synthetic_fixture':True,'install_blocks_syntax_checked_not_executed':True,'release_state':meta.get('state'),'package_sha256_present':all(p.get('sha256') for p in meta.get('profiles',[])),'signing_fingerprint_present':bool(meta.get('signing_fingerprint')),'video_present':(DIST/'assets/framebridge-preview-0.3.1-original-r4.mp4').is_file(),'visual_browser_QA_performed':False,'visual_browser_QA_limit':'No browser or user desktop was operated by this subtask. Root may inspect the staged site via the authorized GERAMEG surface.','production_network_or_services_changed':False,'site_ready_for_private_staging':not failures,'public_release_ready':not failures and not pending and meta.get('state')=='ready','homepage_sha256':hashlib.sha256((DIST/'index.html').read_bytes()).hexdigest()}
+    status={'host':'TERMINAL_NODE','website_source':str(BASE),'web_root':str(DIST),'language':'English','buildless':True,'html_pages_checked':len(pages),'loopback_http_paths_checked':http_count,'static_failures':failures,'pending_assets':sorted(set(pending)),'infra_routes_expected':sorted(infra),'external_links':sorted(external),'no_external_runtime_dependencies':True,'copy_controls_progressive':True,'ready_branch_rendered_with_synthetic_fixture':True,'install_blocks_syntax_checked_not_executed':True,'release_state':meta.get('state'),'package_sha256_present':all(p.get('sha256') for p in meta.get('profiles',[])),'signing_fingerprint_present':bool(meta.get('signing_fingerprint')),'video_present':(DIST/'assets/framebridge-preview-0.3.1-original-r4.mp4').is_file(),'visual_browser_QA_performed':False,'visual_browser_QA_limit':'No browser or user desktop was operated by this subtask. Root may inspect the staged site via the authorized TERMINAL_NODE surface.','production_network_or_services_changed':False,'site_ready_for_private_staging':not failures,'public_release_ready':not failures and not pending and meta.get('state')=='ready','homepage_sha256':hashlib.sha256((DIST/'index.html').read_bytes()).hexdigest()}
     visual=BASE/'qa/VISUAL-REVIEW.json'
     if visual.exists():
         status['visual_browser_QA_performed']=True

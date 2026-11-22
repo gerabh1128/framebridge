@@ -6,6 +6,7 @@ import re
 import tarfile
 
 
+PUBLIC_RELEASE_VERSION = r"[0-9]+\.[0-9]+\.[0-9]+(?:\+fbterm\.[1-9][0-9]*)?"
 PUBLIC_RELEASE_PROFILES = (
     "debian13-amd64-py313", "ubuntu24.04-amd64-py312", "mint22-amd64-py312",
 )
@@ -17,7 +18,7 @@ def release_source(manifest_path, version, profile_id, current_files, vendor_evi
     The manifest and archive are release inputs kept beside one another. Their
     signatures and the OS acceptance record are verified outside the builder.
     """
-    if profile_id not in PUBLIC_RELEASE_PROFILES or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+    if profile_id not in PUBLIC_RELEASE_PROFILES or not re.fullmatch(PUBLIC_RELEASE_VERSION, version):
         raise RuntimeError("Public release requires a stable version and an official release profile")
     manifest_path = Path(manifest_path)
     data = json.loads(manifest_path.read_text())
@@ -62,7 +63,7 @@ def release_source(manifest_path, version, profile_id, current_files, vendor_evi
     # Bind the ABI claims to the archived bytes, including the ABI not selected
     # by this particular package. A manifest field alone is not vendor evidence.
     for vendor_abi, expected_prefix in (
-        ("cp313", "source/sources/original-geranas/FrameBridge-Fleet-Hub/vendor"),
+        ("cp313", "source/sources/original-hub/FrameBridge-Fleet-Hub/vendor"),
         ("cp312", "source/target-vendors/cp312"),
     ):
         if vendors[vendor_abi].get("path") != expected_prefix:

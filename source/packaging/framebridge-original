@@ -58,15 +58,15 @@ def settings(args):
         "FRAMEBRIDGE_FLEET_HUB_PORT": str(args.hub_port),
         "FRAMEBRIDGE_HUB_MCP_URL": "http://127.0.0.1:" + str(args.hub_port) + "/mcp",
         "FRAMEBRIDGE_BROKER_CONTROL": "http://127.0.0.1:" + str(args.broker_port),
-        "FRAMEBRIDGE_ASUS_NODE_ID": "", "FRAMEBRIDGE_GERAMEG_NODE_ID": "",
+        "FRAMEBRIDGE_WORKSTATION_NODE_ID": "", "FRAMEBRIDGE_TERMINAL_NODE_NODE_ID": "",
         "FRAMEBRIDGE_CLOUD_DSM_SOCKET": str(runtime / "cloud-unconfigured.sock"),
         "FRAMEBRIDGE_NODE_REGISTRY": str(home / ".config/framebridge/nodes.json"),
         "FRAMEBRIDGE_ACCOUNT_BINDING": str(home / ".config/framebridge/account-binding.json"),
         "FRAMEBRIDGE_PAIRED_DISCOVERY": str(home / ".config/framebridge/paired-nodes.json"),
-        "FRAMEBRIDGE_ENABLE_GERAMEG_CUA_TTY": "0",
+        "FRAMEBRIDGE_ENABLE_TERMINAL_NODE_CUA_TTY": "0",
         "PYTHONPATH": os.pathsep.join(str(PREFIX / p) for p in [
-            "original/geranas/FrameBridge-Fleet-Hub/vendor",
-            "original/geranas/FrameBridge-Fleet-Hub/app", "portable"]),
+            "original/hub/FrameBridge-Fleet-Hub/vendor",
+            "original/hub/FrameBridge-Fleet-Hub/app", "portable"]),
     })
     env.pop("TMUX", None)
     env.pop("TMUX_PANE", None)
@@ -161,7 +161,7 @@ def start(args):
             probe.bind(("127.0.0.1", port))
     commands = [
         ("adapter", [sys.executable, str(PREFIX / LAYOUT["adapter"]), "serve"]),
-        ("fleet", [sys.executable, str(PREFIX / "original/geranas/FrameBridge-Fleet-Hub/app/fleet_hub_mcp_server.py")]),
+        ("fleet", [sys.executable, str(PREFIX / "original/hub/FrameBridge-Fleet-Hub/app/fleet_hub_mcp_server.py")]),
         ("mcp", [sys.executable, str(PREFIX / "portable/front_door_mcp.py")]),
     ]
     record = {"state_dir": str(state), "mcp_url": "http://127.0.0.1:" + str(args.port) + "/mcp",
@@ -214,7 +214,7 @@ def doctor(args):
               "core_commands": {x: bool(shutil.which(x)) for x in required},
               "cua_commands": {x: bool(shutil.which(x)) for x in gui},
               "display": os.environ.get("DISPLAY", ""),
-              "tunnel_sha256": hashlib.sha256((PREFIX / "original/geranas/FrameBridge-MCP-Private/bin/tunnel-client").read_bytes()).hexdigest()}
+              "tunnel_sha256": hashlib.sha256((PREFIX / "original/hub/FrameBridge-MCP-Private/bin/tunnel-client").read_bytes()).hexdigest()}
     print(json.dumps(report, indent=2))
     return 0 if sys.version_info[:2] == (3, 13) and imports.returncode == 0 and all(report["core_commands"].values()) else 1
 
@@ -245,7 +245,7 @@ def main():
                                "ALLOW_REMOTE_UI", "ADMIN_UI_LOG_BUFFER_EVENTS", "PROXY_CHECK_INTERVAL"}):
                 if key not in explicit_refs:
                     env.pop(key, None)
-        os.execve(str(PREFIX / "original/geranas/FrameBridge-MCP-Private/bin/tunnel-client"),
+        os.execve(str(PREFIX / "original/hub/FrameBridge-MCP-Private/bin/tunnel-client"),
                   ["tunnel-client"] + rest, env)
     result = globals()[args.command](args)
     return result or 0

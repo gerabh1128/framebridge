@@ -141,7 +141,7 @@ class ScreenTransferBudgetTests(unittest.TestCase):
         return ScreenClient(self.fixture, Image, **kwargs)
 
     def read(self, client):
-        return client.call('read_capture', 'GERAMEG', True, capture_id=CAPTURE_ID)
+        return client.call('read_capture', 'TERMINAL_NODE', True, capture_id=CAPTURE_ID)
 
     def test_expanded_complete_original_through_producer_rpc_and_transport(self):
         result = self.read(self.client(stdout_limit_bytes=EXPANDED_STDOUT_BYTES))
@@ -220,7 +220,7 @@ class ScreenTransferBudgetTests(unittest.TestCase):
                     with self.subTest(op=op):
                         self.fixture.calls.clear()
                         result = self.client(stdout_limit_bytes=BULK_STDOUT_BYTES).call(
-                            op, 'GERAMEG', True, **arguments)
+                            op, 'TERMINAL_NODE', True, **arguments)
                         self.assertEqual(result[1].data, self.fixture.data)
                         self.assertEqual(result[0]['result']['sha256'], self.fixture.manifest['sha256'])
                         self.assertNotIn('max_chunk_bytes', result[0]['result'])
@@ -266,7 +266,7 @@ class ScreenTransferBudgetTests(unittest.TestCase):
                             outer['mcp_script_sha256'] = '0' * 64
                         return outer
                     result = ScreenClient(execute, Image).call(
-                        op, 'GERAMEG', True, capture_id=CAPTURE_ID, **arguments)
+                        op, 'TERMINAL_NODE', True, capture_id=CAPTURE_ID, **arguments)
                     self.assertFalse(result['ok'])
                     self.assertTrue(result['observe_again'])
                     self.assertEqual(result['capture_id'], CAPTURE_ID)
@@ -279,7 +279,7 @@ class ScreenTransferBudgetTests(unittest.TestCase):
             with self.subTest(variant=variant):
                 fixture = Executor(variant)
                 result = ScreenClient(fixture, Image).call(
-                    'key', 'GERAMEG', True, capture_id=CAPTURE_ID, key='ENTER')
+                    'key', 'TERMINAL_NODE', True, capture_id=CAPTURE_ID, key='ENTER')
                 self.assertFalse(result['ok'])
                 self.assertTrue(result['observe_again'])
                 self.assertNotIn('performed', result)
@@ -301,7 +301,7 @@ class ScreenTransferBudgetTests(unittest.TestCase):
                     'mcp_job_id': kwargs['job_id'], 'mcp_script_sha256': kwargs['sha256'],
                     'stdout': output.getvalue(), 'stdout_truncated': False}
         result = ScreenClient(execute, Image).call(
-            'key', 'GERAMEG', True, capture_id=CAPTURE_ID, key='ENTER')
+            'key', 'TERMINAL_NODE', True, capture_id=CAPTURE_ID, key='ENTER')
         self.assertEqual(result['error'], 'SCREEN_REQUEST_FAILED')
         self.assertTrue(result['observe_again'])
         self.assertNotIn('performed', result)
@@ -318,7 +318,7 @@ class ScreenTransferBudgetTests(unittest.TestCase):
                     {'ok': False, 'error': {'code': 'UNKNOWN_REQUEST_FIELDS'}}))
             return result
         result = ScreenClient(execute, Image).call(
-            'key', 'GERAMEG', True, capture_id=CAPTURE_ID, key='ENTER')
+            'key', 'TERMINAL_NODE', True, capture_id=CAPTURE_ID, key='ENTER')
         self.assertEqual(result['error'], 'UNKNOWN_REQUEST_FIELDS')
         self.assertTrue(result['observe_again'])
         self.assertNotIn('performed', result)
@@ -330,7 +330,7 @@ class ScreenTransferBudgetTests(unittest.TestCase):
             with self.subTest(op=op):
                 fixture = Executor('error_exit1')
                 result = ScreenClient(fixture, Image).call(
-                    op, 'GERAMEG', True, capture_id=CAPTURE_ID, **arguments)
+                    op, 'TERMINAL_NODE', True, capture_id=CAPTURE_ID, **arguments)
                 self.assertEqual(result['error'], 'SESSION_NOT_VISIBLE')
                 self.assertNotIn('observe_again', result)
                 self.assertNotIn('performed', result)
@@ -368,7 +368,7 @@ class ScreenTransferBudgetTests(unittest.TestCase):
         self.fixture.clock, self.fixture.latency = clock, 1.2
         with patch('framebridge_expanded.real_screen.screen_frontdoor.time.monotonic', clock):
             result = self.client(transfer_timeout_s=3).call(
-                'key', 'GERAMEG', True, capture_id=CAPTURE_ID, key='ENTER')
+                'key', 'TERMINAL_NODE', True, capture_id=CAPTURE_ID, key='ENTER')
         self.assertEqual(result['error'], 'SCREEN_TRANSFER_TIMEOUT')
         self.assertTrue(result['performed'])
         self.assertTrue(result['capture_consumed'])
@@ -379,7 +379,7 @@ class ScreenTransferBudgetTests(unittest.TestCase):
         def failed(**kwargs):
             raise TimeoutError('test fixture timeout')
         result = ScreenClient(failed, Image).call(
-            'key', 'GERAMEG', True, capture_id=CAPTURE_ID, key='ENTER')
+            'key', 'TERMINAL_NODE', True, capture_id=CAPTURE_ID, key='ENTER')
         self.assertFalse(result['ok'])
         self.assertTrue(result['observe_again'])
         self.assertNotIn('performed', result)
@@ -415,9 +415,9 @@ class ScreenTransferBudgetTests(unittest.TestCase):
                     client = ScreenClient(execute, Image, stdout_limit_bytes=budget)
                     if over:
                         with self.assertRaisesRegex(ScreenError, 'SCREEN_STDOUT_INVALID'):
-                            client.remote('GERAMEG', {'op': 'status'})
+                            client.remote('TERMINAL_NODE', {'op': 'status'})
                     else:
-                        self.assertIn('padding', client.remote('GERAMEG', {'op': 'status'}))
+                        self.assertIn('padding', client.remote('TERMINAL_NODE', {'op': 'status'}))
 
     def test_typed_transport_exact_serialized_boundary(self):
         script = RPC_COMMAND + shlex.quote(base64.b64encode(rpc.encode({'op': 'status'})).decode()) + '\n'

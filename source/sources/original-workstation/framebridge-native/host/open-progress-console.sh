@@ -29,7 +29,7 @@ chmod 600 "$LOG" 2>/dev/null || true
 if [ ! -s "$LOG" ]; then
   cat > "$LOG" <<'HEADER'
 ============================================================
- FRAMEBRIDGE ASUS // DIG PROGRESS
+ FRAMEBRIDGE WORKSTATION // DIG PROGRESS
  MODO: SOLO LECTURA
 ============================================================
 HEADER

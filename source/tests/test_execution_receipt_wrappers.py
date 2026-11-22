@@ -13,9 +13,9 @@ from framebridge_expanded.real_screen.screen_frontdoor import ScreenClient
 from framebridge_expanded.tty_mcp import _remote_request, register_tools
 
 
-NODE_ID = "731320ca-b3a5-4ae7-9598-2746adbc2162"
-ALIAS = "gerameg-lab"
-HOST = "GERAMEG"
+NODE_ID = "11111111-1111-4111-8111-111111111111"
+ALIAS = "terminal_node-lab"
+HOST = "TERMINAL_NODE"
 CAPTURE = "a" * 32
 NOT_STARTED = ("not_started", "expired_before_dispatch", "expired_before_start")
 
@@ -26,7 +26,7 @@ def receipt(call, *, state="completed", request_id="broker-receipt"):
         "node": ALIAS, "node_id": NODE_ID, "registered_label": ALIAS,
         "hostname": HOST if state == "completed" else None,
         "executed_hostname": HOST if state == "completed" else None,
-        "receiver_hostname": "GERANAS", "request_id": request_id,
+        "receiver_hostname": "HUB", "request_id": request_id,
         "mcp_job_id": call["job_id"], "mcp_script_sha256": call["sha256"],
         "execution_state": state,
     }

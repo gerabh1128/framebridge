@@ -1085,7 +1085,7 @@ def worker(state):
                     key = _credential(state)
                     try:
                         spec = tunnel.TunnelSpec(config["tunnel_id"], config.get("control_plane_organization_id", ""), config.get("control_plane_url_path", ""))
-                        binary = runtime.PREFIX / "original/geranas/FrameBridge-MCP-Private/bin/tunnel-client"
+                        binary = runtime.PREFIX / "original/hub/FrameBridge-MCP-Private/bin/tunnel-client"
                         mcp = "http://127.0.0.1:" + str(config["ports"]["mcp"]) + "/mcp"
                         command = tunnel.build_command(binary, state, mcp, spec)
                         _worker_status(directory, "connecting")

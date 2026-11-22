@@ -11,3 +11,11 @@ CLASSIC_NODE_TARGETS is currently initialized to an empty dictionary. The compat
 The normal Expanded implementation uses account-relative state and generic transport. Review final staged source and approved promotional content for unrelated personal information. Do not publish runtime profiles, SSH material, passwords, tokens, cookies, logs containing hidden inputs or unrelated owner data. Source filenames preserving historical origin are not a claim that a matching machine is an available public node.
 
 No production services, profiles or owner credentials were accessed or changed by this text review. The final package, source archive and download delivery checks are separate release evidence. Subsequent implementation changes require a final artifact scan before public exposure.
+
+## Role-based release layout
+
+From 0.3.9+fbterm.4, the bundled workstation, hub and terminal-node snapshots use component roles in source and installed paths. Test fixtures use synthetic node identities and documentation addresses. The packaged command and fleet interfaces resolve targets through enrollment and local configuration.
+
+Paths in historical provenance records now use the component role labels. Their content hashes record the historical bytes. The active snapshot and corresponding-source manifests cover the current files and hashes.
+
+For a separate legacy CUA-TTY installation, configure `FRAMEBRIDGE_TERMINAL_NODE_HOST` for the terminal runtime and its local RPC wrapper. Both validate that host and retain the same-UID checks. The standard package selects targets through the fleet registry.

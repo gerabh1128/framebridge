@@ -16,7 +16,7 @@ import time
 import unittest
 
 WORK = Path(__file__).resolve().parents[1]
-VENDOR = WORK / "sources/original-geranas/FrameBridge-Fleet-Hub/vendor"
+VENDOR = WORK / "sources/original-hub/FrameBridge-Fleet-Hub/vendor"
 sys.path.insert(0, str(WORK / "expanded"))
 sys.path.insert(0, str(VENDOR))
 os.environ["PYTHONPATH"] = str(WORK / "expanded") + os.pathsep + str(VENDOR)

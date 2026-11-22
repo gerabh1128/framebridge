@@ -55,12 +55,12 @@ An email entered during setup is a local label. It is not proof of the browser a
 | EXEC-01 | Preserve original FBEXEC behavior and its job, exit-code, stdout, stderr and hash evidence. | Run real commands through the packaged route and verify their backend evidence. |
 | EXEC-02 | Use the original execution path without importing the experimental job-approval queue. | Source and runtime review identify the handler actually reached by each public tool. |
 | CUA-01 | Preserve original X11 CUA where the supported desktop or private display is available. | Run actual observation and interaction tests against the intended display. |
-| TTY-01 | Provide access to the original GERAMEG CUA-TTY backend, including the supported real-terminal mode. | Verify text input, Enter, actual shell output and terminal cleanup through the original RPC. |
+| TTY-01 | Provide access to the original TERMINAL_NODE CUA-TTY backend, including the supported real-terminal mode. | Verify text input, Enter, actual shell output and terminal cleanup through the original RPC. |
 | TTY-02 | Distinguish an isolated demo from control of a real persistent Bash terminal. | Tests and help explicitly identify the active mode; demo acknowledgements alone do not certify a real shell command. |
 | TTY-03 | Separate terminal state for independent instances. | Test distinct sockets and sessions; never copy live socket paths, session IDs or process IDs from another machine. |
 | AUTH-01 | Do not require a phone or Owner Device for the requested local execution or CUA workflow. | Exercise the workflow without phone enrollment or an Owner Device gate. |
 
-The original GERAMEG documentation first certified a demo and later certified a real terminal. The real-terminal A/B certificate is the relevant reference for TTY-01; the earlier demo result is not interchangeable with it.
+The original TERMINAL_NODE documentation first certified a demo and later certified a real terminal. The real-terminal A/B certificate is the relevant reference for TTY-01; the earlier demo result is not interchangeable with it.
 
 ## Fleet admission and authenticated transport
 
@@ -104,8 +104,8 @@ The successful Original R1/R2 tests are historical reference evidence. They must
 
 - FrameBridge C8 terminal-first onboarding R7, 2026-10-11: https://drive.google.com/file/d/1LuYF1vGw8FKaD4Izcpw4NnR0HRuws78s/view
 - Terminal-first onboarding guide R1: https://drive.google.com/file/d/11MEm5eOVke4aSeIBc-024e1zNLke_y_s/view
-- GERAMEG CUA-TTY demo-only live test, 2026-10-19: https://drive.google.com/file/d/1DixrNUYUhr6pM2wiXeILKmU2dmbE53_D/view
-- GERAMEG real-terminal FBEXEC/CUA-TTY A/B certificate R3, 2026-10-19: https://drive.google.com/file/d/1VUzhCLJpV8DNQSOlfWYus-nzKAsloGlm/view
+- TERMINAL_NODE CUA-TTY demo-only live test, 2026-10-19: https://drive.google.com/file/d/1DixrNUYUhr6pM2wiXeILKmU2dmbE53_D/view
+- TERMINAL_NODE real-terminal FBEXEC/CUA-TTY A/B certificate R3, 2026-10-19: https://drive.google.com/file/d/1VUzhCLJpV8DNQSOlfWYus-nzKAsloGlm/view
 
 These are historical implementation references. They do not override the current requested product or authorize copying runtime identities or secrets.
 

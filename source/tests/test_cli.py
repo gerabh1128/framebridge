@@ -195,7 +195,7 @@ class CliTests(unittest.TestCase):
     def connection_runtime(self, base):
         runtime = mock.Mock()
         runtime.PREFIX = Path(base) / "payload"
-        binary = runtime.PREFIX / "original/geranas/FrameBridge-MCP-Private/bin/tunnel-client"
+        binary = runtime.PREFIX / "original/hub/FrameBridge-MCP-Private/bin/tunnel-client"
         binary.parent.mkdir(parents=True)
         binary.write_bytes(b"synthetic test binary")
         runtime.status.return_value = {"running": False, "ready": False}

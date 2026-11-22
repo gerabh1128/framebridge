@@ -189,7 +189,7 @@ def handle_cua_request(req, job_id):
     payload = dict(cua)
     payload["op"] = "cua"
     payload["id"] = job_id
-    payload["target"] = "ASUS"
+    payload["target"] = "WORKSTATION"
     payload["authorized"] = "YES"
 
     response = native_cua_roundtrip(

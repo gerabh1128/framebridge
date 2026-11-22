@@ -1,7 +1,7 @@
 """Behavioral X11 text regressions; no display, libraries, or input devices.
 
 The fixture is an independent US physical-key model. It deliberately places
-the earlier LATAM slash before the US slash, matching the ASUS failure class.
+the earlier LATAM slash before the US slash, matching the WORKSTATION failure class.
 """
 import ast
 import ctypes as C

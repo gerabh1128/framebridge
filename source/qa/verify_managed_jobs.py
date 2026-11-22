@@ -20,7 +20,7 @@ import uuid
 
 prefix = Path(sys.argv[1]).resolve()
 os.environ["FRAMEBRIDGE_EXPANDED_PREFIX"] = str(prefix)
-sys.path[:0] = [str(prefix / "expanded"), str(prefix / "original/geranas/FrameBridge-Fleet-Hub/vendor")]
+sys.path[:0] = [str(prefix / "expanded"), str(prefix / "original/hub/FrameBridge-Fleet-Hub/vendor")]
 from framebridge_expanded import broker, config, node, runtime
 
 

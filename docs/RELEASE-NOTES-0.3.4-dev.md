@@ -17,11 +17,11 @@ This I/O candidate is based on `0.3.4~dev.20261029.1`. The separate `.2` node-in
 - Managed connection setup accepts administrator-owned `.config` and `.config/systemd` ancestors when they are directories without group/other write permission. The final `systemd/user` directory must still belong to the connecting user. Symbolic links, other-account ownership and unsafe permissions are rejected. Setup does not change existing directory ownership or permissions.
 - Managed-worker state is persisted on transitions instead of repeatedly syncing the same state while idle. Connection liveness heartbeats use the account's validated `/run/user/<uid>` runtime directory when available; profiles without it retain a bounded durable fallback. Status still requires a fresh heartbeat bound to the same worker identity. Existing permissions and credentials are unchanged. These changes do not claim that all application or system disk activity stops.
 
-## Native startup and the GERANAS deployment gap
+## Native startup and the HUB deployment gap
 
 Normal `fb connect` already installs the managed user service, protects the connection credential, enables startup without an interactive login and records connection intent. Installation of a package without connection setup cannot establish a new authenticated tunnel. APT preserves a manual profile's existing policy rather than silently enabling it.
 
-The affected GERANAS deployment had been left as a manually started central profile without the native managed connection setup. External recovery services did not complete that setup and did not share the CLI's lifecycle controls. This candidate fixes the service-account directory compatibility issue needed for native setup; it does not add another external startup mechanism or fabricate managed installation records.
+The affected HUB deployment had been left as a manually started central profile without the native managed connection setup. External recovery services did not complete that setup and did not share the CLI's lifecycle controls. This candidate fixes the service-account directory compatibility issue needed for native setup; it does not add another external startup mechanism or fabricate managed installation records.
 
 Source tests and package builds do not prove reconnection after a reboot. Acceptance must separately record a real changed boot ID, native service startup, connection availability and execution through the intended route. No reboot acceptance is claimed by these release notes.
 

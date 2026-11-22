@@ -5,7 +5,7 @@
       "declared_expression": "Apache-2.0 OR BSD-3-Clause",
       "documented_distribution_route": "Apache-2.0",
       "matches_official_wheel": true,
-      "object_path_in_package": "usr/lib/framebridge-expanded/original/geranas/FrameBridge-Fleet-Hub/vendor/cryptography/hazmat/bindings/_rust.abi3.so",
+      "object_path_in_package": "usr/lib/framebridge-expanded/original/hub/FrameBridge-Fleet-Hub/vendor/cryptography/hazmat/bindings/_rust.abi3.so",
       "object_sha256": "3d6423664bffe926fd91d1913d1c5ddda5c31ee7ff1cae06fc8b71c47c9501a1",
       "source_and_notice_association": "Matching official wheel; pinned official sdist; exact upstream notices; Cargo.lock/SBOM source closure where applicable. CFFI adds its pinned static-libffi workflow and libffi source."
     },
@@ -14,7 +14,7 @@
       "declared_expression": "MIT",
       "documented_distribution_route": "MIT",
       "matches_official_wheel": true,
-      "object_path_in_package": "usr/lib/framebridge-expanded/original/geranas/FrameBridge-Fleet-Hub/vendor/pydantic_core/_pydantic_core.cpython-313-x86_64-linux-gnu.so",
+      "object_path_in_package": "usr/lib/framebridge-expanded/original/hub/FrameBridge-Fleet-Hub/vendor/pydantic_core/_pydantic_core.cpython-313-x86_64-linux-gnu.so",
       "object_sha256": "c63bccc94fa837683c2bc9f006f3dbe87f0252893135e055e12b7bf8213228ad",
       "source_and_notice_association": "Matching official wheel; pinned official sdist; exact upstream notices; Cargo.lock/SBOM source closure where applicable. CFFI adds its pinned static-libffi workflow and libffi source."
     },
@@ -23,7 +23,7 @@
       "declared_expression": "MIT",
       "documented_distribution_route": "MIT",
       "matches_official_wheel": true,
-      "object_path_in_package": "usr/lib/framebridge-expanded/original/geranas/FrameBridge-Fleet-Hub/vendor/rpds/rpds.cpython-313-x86_64-linux-gnu.so",
+      "object_path_in_package": "usr/lib/framebridge-expanded/original/hub/FrameBridge-Fleet-Hub/vendor/rpds/rpds.cpython-313-x86_64-linux-gnu.so",
       "object_sha256": "bddb35d7ceaef748a4661a73774e1ff8d5ae76969b31e1cc7f757fb424bd8ed5",
       "source_and_notice_association": "Matching official wheel; pinned official sdist; exact upstream notices; Cargo.lock/SBOM source closure where applicable. CFFI adds its pinned static-libffi workflow and libffi source."
     },
@@ -32,7 +32,7 @@
       "declared_expression": "MIT-0",
       "documented_distribution_route": "MIT-0",
       "matches_official_wheel": true,
-      "object_path_in_package": "usr/lib/framebridge-expanded/original/geranas/FrameBridge-Fleet-Hub/vendor/_cffi_backend.cpython-313-x86_64-linux-gnu.so",
+      "object_path_in_package": "usr/lib/framebridge-expanded/original/hub/FrameBridge-Fleet-Hub/vendor/_cffi_backend.cpython-313-x86_64-linux-gnu.so",
       "object_sha256": "dac8151545022cc3561fbb7a8fffacf68fdb7273a9418552d6a18dda5e986a34",
       "source_and_notice_association": "Matching official wheel; pinned official sdist; exact upstream notices; Cargo.lock/SBOM source closure where applicable. CFFI adds its pinned static-libffi workflow and libffi source."
     }

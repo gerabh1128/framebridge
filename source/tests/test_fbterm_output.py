@@ -10,7 +10,7 @@ import tempfile
 import unittest
 
 
-BIN = Path(__file__).resolve().parents[1] / "sources/original-asus/fbterm/bin"
+BIN = Path(__file__).resolve().parents[1] / "sources/original-workstation/fbterm/bin"
 RENDERER = BIN / "fbterm-output"
 loader = importlib.machinery.SourceFileLoader("fbterm_output", str(RENDERER))
 spec = importlib.util.spec_from_loader(loader.name, loader)

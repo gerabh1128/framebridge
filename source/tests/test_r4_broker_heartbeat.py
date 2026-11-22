@@ -33,7 +33,7 @@ def load(name, path):
     return module
 
 
-crypto = load('test_real_node_identity', SOURCE_ROOT / 'sources/original-geranas/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/node_identity.py')
+crypto = load('test_real_node_identity', SOURCE_ROOT / 'sources/original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/node_identity.py')
 broker = load('test_broker_candidate', PACKAGE_ROOT / 'broker.py')
 
 
@@ -43,7 +43,7 @@ def canonical(value):
 
 clock = types.SimpleNamespace(now=2000000000.0)
 fake_time = types.SimpleNamespace(time=lambda: clock.now, monotonic=lambda: clock.now, sleep=lambda n: None)
-tree = ast.parse((SOURCE_ROOT / 'sources/original-geranas/FrameBridge-Broker-RC1/dev/fbpair_dev_broker.py').read_text())
+tree = ast.parse((SOURCE_ROOT / 'sources/original-hub/FrameBridge-Broker-RC1/dev/fbpair_dev_broker.py').read_text())
 store_ast = next(v for v in tree.body if isinstance(v, ast.ClassDef) and v.name == 'Store')
 namespace = {'Path': Path, 'threading': threading, 'collections': collections,
              'json': json, 'time': fake_time, 'os': __import__('os'),

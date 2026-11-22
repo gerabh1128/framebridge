@@ -1,1 +1,1 @@
-__version__ = "0.3.9+fbterm.3"
+__version__ = "0.3.9+fbterm.4"

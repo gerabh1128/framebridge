@@ -1,6 +1,6 @@
 # FrameBridge 0.3.9 source and artifact identities
 
-FrameBridge 0.3.9 was published on 11 November 2026 Eastern Time. The promotion completed at `2026-11-12T00:29:45Z`. Independent HTTPS verification from GERAMEG matched 52 public files against the signed stage and reviewed site files. Isolated APT checks over public HTTPS accepted 0.3.9 in all three suites. [Official download page](https://framebridge.betancourt.one/download/) · [Release catalog](https://framebridge.betancourt.one/assets/release.json)
+FrameBridge 0.3.9 was published on 11 November 2026 Eastern Time. The promotion completed at `2026-11-12T00:29:45Z`. Independent HTTPS verification from TERMINAL_NODE matched 52 public files against the signed stage and reviewed site files. Isolated APT checks over public HTTPS accepted 0.3.9 in all three suites. [Official download page](https://framebridge.betancourt.one/download/) · [Release catalog](https://framebridge.betancourt.one/assets/release.json)
 
 ## Frozen source
 
@@ -17,7 +17,7 @@ The commit and tree identify the source revision. The corresponding-source archi
 
 ## Build artifacts
 
-The three Debian packages were built on GERAMEG. The package profile determines the distribution, system Python and APT suite. Verify the matching detached signature or signed APT metadata with the independently trusted release key before installation.
+The three Debian packages were built on TERMINAL_NODE. The package profile determines the distribution, system Python and APT suite. Verify the matching detached signature or signed APT metadata with the independently trusted release key before installation.
 
 | Filename | APT suite | Bytes | SHA-256 |
 | --- | --- | ---: | --- |
@@ -34,10 +34,10 @@ The APT input manifest records the files used to assemble repository metadata. P
 | --- | --- |
 | Focused regression tests | 279 of 279 passed |
 | Full sandbox suite | 1,207 tests run, with 12 failures, 33 errors and two skips. The same failures and errors appeared on the sandbox baseline. |
-| Native GERAMEG source tests | 102 of 102 passed as an unprivileged user on Debian 13 with Python 3.13. The suite covered the agent guide, screen transfer, broker and node behavior, TLS and package upgrades. |
+| Native TERMINAL_NODE source tests | 102 of 102 passed as an unprivileged user on Debian 13 with Python 3.13. The suite covered the agent guide, screen transfer, broker and node behavior, TLS and package upgrades. |
 | Release signatures and isolated local APT | Passed for the staged release and all three suites |
 | Independent public HTTPS | All 52 files matched the reviewed bytes, totaling 218,369,200 bytes. Coverage included the catalog, complete package and source downloads, signatures and APT metadata. |
 | Public signed APT | Isolated HTTPS verification accepted candidate 0.3.9 and the matching package identities in `trixie`, `noble` and `mint22`. |
-| Live GERAMEG upgrade | The signed Debian package upgraded FrameBridge from 0.3.8 to 0.3.9. Transaction `82243c1cedd6bfe3` reached `COMPLETE`, the managed profile reached `READY`, the CLI reported 0.3.9 and a direct Fleet command completed. |
+| Live TERMINAL_NODE upgrade | The signed Debian package upgraded FrameBridge from 0.3.8 to 0.3.9. Transaction `82243c1cedd6bfe3` reached `COMPLETE`, the managed profile reached `READY`, the CLI reported 0.3.9 and a direct Fleet command completed. |
 
-The live upgrade evidence applies to GERAMEG. Installation and upgrade on each distribution, reboot and rollout to enrolled nodes have separate acceptance records. [Claims and evidence boundaries](CLAIMS-AND-LIMITS.md)
+The live upgrade evidence applies to TERMINAL_NODE. Installation and upgrade on each distribution, reboot and rollout to enrolled nodes have separate acceptance records. [Claims and evidence boundaries](CLAIMS-AND-LIMITS.md)

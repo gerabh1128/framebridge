@@ -1,5 +1,9 @@
 # FrameBridge release notes
 
+## 0.3.9+fbterm.4
+
+Bundled components use role-based paths for the workstation, fleet hub and terminal node. Tests use synthetic node identifiers and sample addresses. Fleet nodes are selected through their enrolled identities.
+
 ## Linux job updates
 
 **0.3.9+fbterm.3** incorporates three revisions on top of 0.3.9.

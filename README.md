@@ -10,7 +10,7 @@ APT users can select the signed source for their distribution from the [public A
 
 FrameBridge 0.3.9 lets compatible Linux peers negotiate larger blocks for original PNG captures. After a broker restart, nodes can resume polling when the broker acknowledges an authenticated result whose request is no longer recorded. The release also corrects local TLS control, CLI exit status and managed-profile checks during package upgrades. Read an uncertain execution receipt with `fb nodes execution` before deciding whether to submit another command. See the [0.3.9 release notes](RELEASE-NOTES.md#039).
 
-The `main` branch includes the **0.3.9+fbterm.3** Linux job updates. Each managed job has an ID and an execution receipt. Independent jobs can share a node, and callers can retrieve verified output from the node that ran the command. See the [job changes and validation scope](RELEASE-NOTES.md#linux-job-updates).
+The development source for **0.3.9+fbterm.4** uses role-based names for bundled components and synthetic data in tests. Each managed job has an ID and an execution receipt. Independent jobs can share a node, and callers can retrieve verified output from the node that ran the command. See the [job changes and validation scope](RELEASE-NOTES.md#linux-job-updates).
 
 ## Start here
 
@@ -89,7 +89,7 @@ fb help commands --json
 
 JSON output is versioned and never prompts. `INTERACTION_REQUIRED` gives an action for the owner's normal terminal. The agent workflow helps an existing shell-based assistant install and diagnose FrameBridge; it does not claim every AI client is a tested replacement for ChatGPT.
 
-For remote work, identify the receiver and execution target separately. `LOCAL` means the current FrameBridge receiver, not a fixed ASUS destination or the computer displaying the conversation. Read the enrolled-node inventory and use a confirmed alias or ID when selecting another computer. Legacy connectors can have different defaults; verify routing before replacing one with another.
+For remote work, identify the receiver and execution target separately. `LOCAL` means the current FrameBridge receiver, not a fixed WORKSTATION destination or the computer displaying the conversation. Read the enrolled-node inventory and use a confirmed alias or ID when selecting another computer. Legacy connectors can have different defaults; verify routing before replacing one with another.
 
 `fb` and `framebridge` are names for the same program. Read `fb help` for the English guide and `fb help compatibility` for legacy commands.
 

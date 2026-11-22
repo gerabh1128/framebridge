@@ -60,12 +60,12 @@ the new wheel identities with the new build evidence.
 
 ## Pilot on existing machines
 
-Order: disposable Debian and Ubuntu 24.04 VMs, GERAMEG (Debian 13), then ASUS
-(Mint 22.3). Exclude GERANAS from this initial pilot: it is the central router
+Order: disposable Debian and Ubuntu 24.04 VMs, TERMINAL_NODE (Debian 13), then WORKSTATION
+(Mint 22.3). Exclude HUB from this initial pilot: it is the central router
 and its 160 GB RAID contains a degraded member.
 
 The original services observed today run outside this published package.
-Publishing the 0.3.1 website did not install its .deb on these hosts. GERAMEG
+Publishing the 0.3.1 website did not install its .deb on these hosts. TERMINAL_NODE
 also has older Alpha packages. Check package ownership, file paths, maintainer
 scripts, dependency transactions, ports and state before installation.
 

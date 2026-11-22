@@ -212,7 +212,7 @@ def connect_chatgpt(state, *, foreground=False, replace=False):
     runtime = _module("runtime")
     port = config["ports"]["mcp"]
     expected_url = "http://127.0.0.1:" + str(port) + "/mcp"
-    binary = Path(runtime.PREFIX) / "original/geranas/FrameBridge-MCP-Private/bin/tunnel-client"
+    binary = Path(runtime.PREFIX) / "original/hub/FrameBridge-MCP-Private/bin/tunnel-client"
     if not binary.is_file():
         raise RuntimeError("The packaged tunnel client is missing.")
     manifest = Path(state) / "autostart/installation.json"

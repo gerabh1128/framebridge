@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import patch
 
 
-SOURCE = Path(__file__).resolve().parents[1] / "sources/original-asus/fbterm/bin"
+SOURCE = Path(__file__).resolve().parents[1] / "sources/original-workstation/fbterm/bin"
 spec = importlib.util.spec_from_file_location("fbterm_candidate", SOURCE / "fbterm_engine.py")
 engine = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(engine)

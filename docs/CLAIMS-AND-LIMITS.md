@@ -9,7 +9,7 @@
 | Distribution profiles | Debian 13 / CPython 3.13, Ubuntu 24.04 / CPython 3.12 and Mint 22.x / CPython 3.12, all amd64. Ubuntu 26.04, LMDE 7, other architectures and other distributions are outside this release's validated scope. |
 | Signed APT updates | Isolated APT checks against the public HTTPS repository verified the 0.3.9 candidate and package identity in `trixie`, `noble` and `mint22`. Installation, managed-service restart and reboot require separate evidence. [0.3.9 source-to-artifact record](RELEASE-SOURCE-0.3.9.md) |
 | Release identity | The frozen commit identifies the source. The signed corresponding-source archive, manifest, package signatures and release record identify the released bytes. [0.3.9 source-to-artifact record](RELEASE-SOURCE-0.3.9.md) |
-| Source tests and live upgrade | All 279 focused tests and 102 native Debian 13 tests passed. The live GERAMEG upgrade reached managed-profile readiness and completed a direct Fleet command. The full sandbox suite and its baseline comparison are recorded separately. Results apply to the tested source and systems. [0.3.9 source-to-artifact record](RELEASE-SOURCE-0.3.9.md) · [Run focused source tests](../CONTRIBUTING.md#run-focused-source-tests) |
+| Source tests and live upgrade | All 279 focused tests and 102 native Debian 13 tests passed. The live TERMINAL_NODE upgrade reached managed-profile readiness and completed a direct Fleet command. The full sandbox suite and its baseline comparison are recorded separately. Results apply to the tested source and systems. [0.3.9 source-to-artifact record](RELEASE-SOURCE-0.3.9.md) · [Run focused source tests](../CONTRIBUTING.md#run-focused-source-tests) |
 | Installed documentation | Read the guide matching the installed version. A newer repository README cannot update an older installed manual. Report contradictory release labels with the package version and file path. |
 
 ## Operation results
@@ -32,6 +32,6 @@ Earlier RC7 and Community Preview results remain historical records. They must n
 
 ## Retained control components
 
-The retained development broker defaults to its existing 127.0.0.1 peer only. Repeatable `--control-peer IP_LITERAL` arguments add explicit peers. Invalid entries fail before Store creation/binding; checks use the real client address, not proxy headers. Retained RPC UID, host, client/socket and administrator identity guards remain unchanged. Normal Expanded handling uses the generic terminal entrypoint; `FRAMEBRIDGE_ENABLE_GERAMEG_CUA_TTY=0` is not an effective guard.
+The retained development broker defaults to its existing 127.0.0.1 peer only. Repeatable `--control-peer IP_LITERAL` arguments add explicit peers. Invalid entries fail before Store creation/binding; checks use the real client address, not proxy headers. Retained RPC UID, host, client/socket and administrator identity guards remain unchanged. Normal Expanded handling uses the generic terminal entrypoint; `FRAMEBRIDGE_ENABLE_TERMINAL_NODE_CUA_TTY=0` is not an effective guard.
 
 The classic lab-target map is empty, while the compatibility route remains available for explicit integrator configuration. Do not describe retained code as entirely inactive. Executable changes require an identifiable source revision and validation of the changed behavior.

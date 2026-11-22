@@ -23,7 +23,7 @@ from unittest import mock
 import uuid
 
 WORK = Path(__file__).resolve().parents[1]
-VENDOR = WORK / "sources/original-geranas/FrameBridge-Fleet-Hub/vendor"
+VENDOR = WORK / "sources/original-hub/FrameBridge-Fleet-Hub/vendor"
 sys.path.insert(0, str(WORK / "expanded"))
 sys.path.insert(0, str(VENDOR))
 import anyio
@@ -85,7 +85,7 @@ def portable(*, execute=None, screen_execute=None, cua=None, threaded=True):
                      ToolAnnotations=ToolAnnotations, Image=Image, socket=socket,
                      ADAPTER_SOCKET=Path("/nonexistent/framebridge-test.sock"),
                      PRODUCT_VERSION="test", GUIDE_SCHEMA=1,
-                     _framebridge_exec_geranas_impl=execute, expanded_execute_node=execute,
+                     _framebridge_exec_hub_impl=execute, expanded_execute_node=execute,
                      local_target_identity=lambda: {"node": "central", "target": "central",
                                                     "requested_target": "LOCAL", "transport_target": "LOCAL",
                                                     "hostname": "fb-central-lab"},
@@ -123,24 +123,24 @@ class DispatchTests(unittest.IsolatedAsyncioTestCase):
         cua = mock.Mock(return_value={"ok": True})
         mcp, namespace = portable(execute=execute, cua=cua)
         local = mock.Mock(side_effect=AssertionError("remote request fell back to LOCAL"))
-        namespace["_framebridge_exec_geranas_impl"] = local
+        namespace["_framebridge_exec_hub_impl"] = local
         for operation, arguments, dispatch, argument_index in (
             ("framebridge_exec", {"script": "printf marker"}, execute, 0),
             ("framebridge_cua", {"action": "KEY", "key": "F8"}, cua, 4),
         ):
             base = {"authorized": True, **arguments}
-            for selector in ({"target": "ASUS"}, {"node": "ASUS"}, {"target": "ASUS", "node": "ASUS"}):
+            for selector in ({"target": "WORKSTATION"}, {"node": "WORKSTATION"}, {"target": "WORKSTATION", "node": "WORKSTATION"}):
                 reply = await mcp.call_tool(operation, {**base, **selector})
                 self.assertTrue(structured(reply)["ok"])
-                self.assertEqual(dispatch.call_args.args[argument_index], "ASUS")
+                self.assertEqual(dispatch.call_args.args[argument_index], "WORKSTATION")
             dispatch.reset_mock()
-            for target in ("LOCAL", "GERANAS"):
-                reply = await mcp.call_tool(operation, {**base, "target": target, "node": "ASUS"})
+            for target in ("LOCAL", "HUB"):
+                reply = await mcp.call_tool(operation, {**base, "target": target, "node": "WORKSTATION"})
                 self.assertEqual(structured(reply)["error"], "TARGET_SELECTOR_CONFLICT")
             for selector in ({"target": ""}, {"node": ""}):
                 reply = await mcp.call_tool(operation, {**base, **selector})
                 self.assertEqual(structured(reply)["error"], "TARGET_SELECTOR_INVALID")
-            for selector in ({"hostname": "ASUS"}, {"target": None}, {"node": None}):
+            for selector in ({"hostname": "WORKSTATION"}, {"target": None}, {"node": None}):
                 with self.assertRaises(ToolError):
                     await mcp.call_tool(operation, {**base, **selector})
             dispatch.assert_not_called()
@@ -152,10 +152,10 @@ class DispatchTests(unittest.IsolatedAsyncioTestCase):
                           sha256, include_stdout: executor(target=alias, script=script,
                           authorized=authorized, timeout_s=timeout_s, job_id=job_id,
                           sha256=sha256, include_stdout=include_stdout))
-        for selector in ({"target": "ASUS"}, {"node": "ASUS"}):
+        for selector in ({"target": "WORKSTATION"}, {"node": "WORKSTATION"}):
             result = await mcp.call_tool("framebridge_screen_observe", {"authorized": True, **selector})
             metadata = json.loads(next(item.text for item in result if item.type == "text"))
-            self.assertEqual(metadata["target"], "ASUS")
+            self.assertEqual(metadata["target"], "WORKSTATION")
         for name, arguments in (
             ("framebridge_screen_observe", {}),
             ("framebridge_screen_key", {"capture_id": "0" * 32, "key": "F8"}),
@@ -163,7 +163,7 @@ class DispatchTests(unittest.IsolatedAsyncioTestCase):
             ("framebridge_screen_show", {"capture_id": "0" * 32}),
         ):
             result = await mcp.call_tool(name, {"authorized": True, "target": "LOCAL",
-                                               "node": "ASUS", **arguments})
+                                               "node": "WORKSTATION", **arguments})
             if hasattr(result, "structuredContent"):
                 result = result.structuredContent
             self.assertEqual(structured(result)["error"], "TARGET_SELECTOR_CONFLICT")
@@ -363,13 +363,13 @@ class AutomaticJobTests(unittest.TestCase):
         from concurrent.futures import ThreadPoolExecutor
         tree = ast.parse(PORTABLE.read_text())
         function = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
-                        and node.name == "_framebridge_exec_geranas_impl")
+                        and node.name == "_framebridge_exec_hub_impl")
         namespace = dict(hashlib=hashlib, time=time, uuid=uuid,
                          JOB_RE=re.compile(r"^[A-Za-z0-9._-]{1,80}$"),
                          adapter_request=lambda payload: {"ok": True, "job_id": payload["job_id"]},
                          sanitize_text=lambda text: text)
         exec(compile(ast.Module(body=[function], type_ignores=[]), str(PORTABLE), "exec"), namespace)
-        execute = namespace["_framebridge_exec_geranas_impl"]
+        execute = namespace["_framebridge_exec_hub_impl"]
         with mock.patch.object(time, "strftime", return_value="20261028-000000"):
             with ThreadPoolExecutor(max_workers=8) as pool:
                 results = list(pool.map(lambda _: execute("same-command", True), range(16)))

@@ -65,8 +65,8 @@ class GuideTests(unittest.TestCase):
         with self.assertRaises(ValueError):guide.render_text('missing')
     def test_guides_have_no_fixed_owner_paths_or_account(self):
         text=json.dumps(guide.export_guide())
-        for marker in ['/home/gerabh','/home/gera/','gerabh1128@','GERAMEG','ASUS','GERANAS']:
-            self.assertNotIn(marker,text)
+        self.assertNotRegex(text, r'/(?:home|var/services/homes)/')
+        self.assertNotIn('example-operator@', text)
     def test_human_agent_and_transcript_boundary_are_explicit(self):
         text=guide.render_text('all')
         self.assertIn('one human administrator',text)
@@ -109,7 +109,7 @@ class MCPGuideSurfaceTests(unittest.TestCase):
     def test_historical_lab_tools_are_not_publicly_decorated(self):
         tree=ast.parse(FRONT.read_text())
         byname={n.name:n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}
-        for name in ['framebridge_exec_geranas','framebridge_cloud_dsm']:
+        for name in ['framebridge_exec_hub','framebridge_cloud_dsm']:
             self.assertFalse(byname[name].decorator_list)
         self.assertTrue(byname['framebridge_exec'].decorator_list)
         self.assertTrue(byname['framebridge_help'].decorator_list)

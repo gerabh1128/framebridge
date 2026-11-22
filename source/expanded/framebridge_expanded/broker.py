@@ -644,9 +644,9 @@ def original_modules():
     bootstrap_original()
     root = Path(os.environ.get("FRAMEBRIDGE_BROKER_SOURCE")
                 or str(Path(os.environ.get("FRAMEBRIDGE_EXPANDED_PREFIX", "/usr/lib/framebridge-expanded"))
-                       / "original/geranas/FrameBridge-Broker-RC1"))
+                       / "original/hub/FrameBridge-Broker-RC1"))
     if not root.exists():
-        root = Path(__file__).resolve().parents[2] / "sources/original-geranas/FrameBridge-Broker-RC1"
+        root = Path(__file__).resolve().parents[2] / "sources/original-hub/FrameBridge-Broker-RC1"
     src = root if (root / "framebridge_linux_chatgpt").is_dir() else root / "src"
     if not src.is_dir():
         raise BrokerError("ORIGINAL_BROKER_SOURCE_UNAVAILABLE")

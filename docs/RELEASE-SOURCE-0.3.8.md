@@ -11,7 +11,7 @@ FrameBridge 0.3.8 was promoted on 11 November 2026. Independent HTTPS verificati
 | Complete tracked Git tree | `8a0521dfab921a1395f53f7f96696d3e72c15860` |
 | APT input manifest SHA-256 | `654c68d0e47f96edf32fd54e91ab7340f72fd8a2d09c166a8deffdf962c9b7c2` |
 | Release catalog SHA-256 | `e4e49605874fb08ed4f22aee4c7f18076eac454a859d5550069b946697dd9c7a` |
-| GERANAS promotion receipt SHA-256 | f37a7b0eee736a7e293728e6fed48a03c79a1eb23eca6a35bfa86066f33c7b6c |
+| HUB promotion receipt SHA-256 | f37a7b0eee736a7e293728e6fed48a03c79a1eb23eca6a35bfa86066f33c7b6c |
 | Public APT acceptance receipt SHA-256 | 85616893b942705ec734cfd7b475ff908db5f4a734c41b06542b687bdffe1950 |
 | Release-key fingerprint | `2B1F01BC806C0B33CB6CEDDE52859CEBC91B8808` |
 
@@ -19,7 +19,7 @@ The commit and tree identify the source revision. The corresponding-source archi
 
 ## Build artifacts
 
-The three native Debian packages were built on GERAMEG. The package profile determines the distribution, system Python and APT suite. Compare the exact filename, byte size and SHA-256 with the verified official files. Verify the relevant detached signature or signed APT metadata with the independently trusted release key before installation.
+The three native Debian packages were built on TERMINAL_NODE. The package profile determines the distribution, system Python and APT suite. Compare the exact filename, byte size and SHA-256 with the verified official files. Verify the relevant detached signature or signed APT metadata with the independently trusted release key before installation.
 
 | Filename | APT suite | Bytes | SHA-256 |
 | --- | --- | ---: | --- |
@@ -36,9 +36,9 @@ The APT input manifest records the files used to assemble repository metadata. P
 | --- | --- |
 | Focused regression tests | 260 of 260 passed |
 | Full suite in the sandbox | 1,138 passed. The same 45 environment-related failures and errors were reproduced on the baseline. |
-| Isolated GERAMEG QA | 133 of 133 passed |
+| Isolated TERMINAL_NODE QA | 133 of 133 passed |
 | Release signatures and isolated local APT | Passed for the staged release and all three APT suites |
 | Public HTTPS downloads | Complete package and source downloads match their SHA-256 and detached signatures |
 | Public signed APT | Candidate 0.3.8 and exact package hashes verified in trixie, noble and mint22 |
 
-Source tests cover deadline enforcement, receipt reconciliation and authenticated routing. GERAMEG QA applies to the isolated validation environment. Installation and upgrade on each named distribution and rollout to enrolled nodes have separate acceptance records. [Claims and evidence boundaries](CLAIMS-AND-LIMITS.md)
+Source tests cover deadline enforcement, receipt reconciliation and authenticated routing. TERMINAL_NODE QA applies to the isolated validation environment. Installation and upgrade on each named distribution and rollout to enrolled nodes have separate acceptance records. [Claims and evidence boundaries](CLAIMS-AND-LIMITS.md)

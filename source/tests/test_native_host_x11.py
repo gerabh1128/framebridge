@@ -198,7 +198,7 @@ class NativeHostX11Tests(unittest.TestCase):
     def test_actual_frozen_type_consumes_completed_process_contract(self):
         candidates = [Path(__file__).with_name("frozen_type_fixture.py")]
         for parent in [ROOT, *ROOT.parents]:
-            candidates.append(parent / "sources/original-asus/framebridge-native/host/framebridge_cua_linux.py")
+            candidates.append(parent / "sources/original-workstation/framebridge-native/host/framebridge_cua_linux.py")
         source = next((path for path in candidates if path.is_file()), None)
         if source is None:
             self.skipTest("captured original _type source is not available in this checkout")

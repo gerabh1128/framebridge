@@ -15,13 +15,13 @@ from unittest import mock
 
 SOURCE = Path(__file__).resolve().parents[1]
 FRONT_DOORS = (
-    SOURCE / 'portable/gerameg_cua_frontdoor.py',
-    SOURCE / 'sources/original-geranas/FrameBridge-Front-Door/bin/gerameg_cua_frontdoor.py',
+    SOURCE / 'portable/terminal_node_cua_frontdoor.py',
+    SOURCE / 'sources/original-hub/FrameBridge-Front-Door/bin/terminal_node_cua_frontdoor.py',
 )
-RPC = SOURCE / 'sources/original-gerameg/cua_tty_rpc.py'
-HOST = SOURCE / 'sources/original-asus/framebridge-native/host/framebridge_host.py'
+RPC = SOURCE / 'sources/original-terminal-node/cua_tty_rpc.py'
+HOST = SOURCE / 'sources/original-workstation/framebridge-native/host/framebridge_host.py'
 LAUNCHER = SOURCE / 'packaging/framebridge-original'
-PROGRESS_CONSOLE = SOURCE / 'sources/original-asus/framebridge-native/host/open-progress-console.sh'
+PROGRESS_CONSOLE = SOURCE / 'sources/original-workstation/framebridge-native/host/open-progress-console.sh'
 
 
 def load_module(path, name):
@@ -100,7 +100,7 @@ class PublicReleasePrivacyTests(unittest.TestCase):
         # Execute only our synthetic stub, not the captured CUA client or server.
         with tempfile.TemporaryDirectory(prefix='framebridge-public-check-') as temporary:
             remote_home = Path(temporary) / 'different user home'
-            stub = remote_home / '.local/lib/framebridge-gerameg-original/cua_tty_rpc.py'
+            stub = remote_home / '.local/lib/framebridge-terminal-node-original/cua_tty_rpc.py'
             stub.parent.mkdir(parents=True)
             stub.write_text('import json, os, sys\nprint(json.dumps({"home": os.environ["HOME"], "args": sys.argv[1:]}))\n')
             marker = Path(temporary) / 'must-not-exist'
@@ -130,7 +130,8 @@ class PublicReleasePrivacyTests(unittest.TestCase):
     def test_captured_rpc_uses_accounts_home_and_retains_identity_guard(self):
         with tempfile.TemporaryDirectory(prefix='framebridge-owner-home-') as temporary:
             home = Path(temporary)
-            with mock.patch.object(Path, 'home', return_value=home):
+            with mock.patch.object(Path, 'home', return_value=home), \
+                 mock.patch.dict(os.environ, {'FRAMEBRIDGE_TERMINAL_NODE_HOST': 'fixture-terminal'}):
                 module = load_module(RPC, 'public_captured_rpc')
                 self.assertEqual(module.HOME, home)
                 with mock.patch.object(module.os, 'getuid', return_value=module.UID), \
@@ -142,6 +143,9 @@ class PublicReleasePrivacyTests(unittest.TestCase):
                             module.guard_runtime()
                     with mock.patch.object(Path, 'home', return_value=home / 'other'):
                         with self.assertRaisesRegex(module.RpcError, 'HOME_MISMATCH'):
+                            module.guard_runtime()
+                    with mock.patch.object(module, 'HOSTNAME', ''):
+                        with self.assertRaisesRegex(module.RpcError, 'HOSTNAME_MISMATCH'):
                             module.guard_runtime()
 
     def test_no_implicit_lab_node_is_reachable_through_classic_routes(self):

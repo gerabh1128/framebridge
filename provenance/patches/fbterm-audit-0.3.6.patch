@@ -1,7 +1,7 @@
-diff --git a/source/sources/original-asus/fbterm/bin/fbterm_engine.py b/source/sources/original-asus/fbterm/bin/fbterm_engine.py
+diff --git a/source/sources/original-workstation/fbterm/bin/fbterm_engine.py b/source/sources/original-workstation/fbterm/bin/fbterm_engine.py
 index e57d6774298c8596d477d7405f6ff97d86c67f37..9a1f64202eef621e02e371d4d4a8bda8d231bbc5
---- a/source/sources/original-asus/fbterm/bin/fbterm_engine.py
-+++ b/source/sources/original-asus/fbterm/bin/fbterm_engine.py
+--- a/source/sources/original-workstation/fbterm/bin/fbterm_engine.py
++++ b/source/sources/original-workstation/fbterm/bin/fbterm_engine.py
 @@ -348,15 +348,19 @@
              incomplete_jobs = []
  

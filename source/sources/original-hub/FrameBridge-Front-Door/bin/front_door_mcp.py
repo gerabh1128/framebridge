@@ -19,8 +19,8 @@ ADAPTER_SOCKET = HOME / ".local/share/framebridge/tool-adapter/adapter.sock"
 JOBS_ROOT = HOME / ".local/share/framebridge/fbterm/jobs"
 HUB_URL = os.environ.get("FRAMEBRIDGE_HUB_MCP_URL", "http://127.0.0.1:8877/mcp")
 BROKER_CONTROL = os.environ.get("FRAMEBRIDGE_BROKER_CONTROL", "http://127.0.0.1:28765")
-ASUS_NODE_ID = os.environ.get("FRAMEBRIDGE_ASUS_NODE_ID", "4b4157f9-3c98-4d24-bff4-840825d50951")
-GERAMEG_NODE_ID = os.environ.get("FRAMEBRIDGE_GERAMEG_NODE_ID", "76885f27-da2e-4cca-bbde-6ec981e91e68")
+WORKSTATION_NODE_ID = os.environ.get("FRAMEBRIDGE_WORKSTATION_NODE_ID", "4b4157f9-3c98-4d24-bff4-840825d50951")
+TERMINAL_NODE_NODE_ID = os.environ.get("FRAMEBRIDGE_TERMINAL_NODE_NODE_ID", "76885f27-da2e-4cca-bbde-6ec981e91e68")
 HOST = os.environ.get("FRAMEBRIDGE_FRONT_DOOR_HOST", "127.0.0.1")
 PORT = int(os.environ.get("FRAMEBRIDGE_FRONT_DOOR_PORT", "8865"))
 JOB_RE = re.compile(r"^[A-Za-z0-9._-]{1,80}$")
@@ -29,10 +29,10 @@ KEY_BEGIN = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----")
 KEY_END = re.compile(r"-----END [A-Z0-9 ]*PRIVATE KEY-----")
 
 mcp = FastMCP(
-    "FrameBridge GERANAS Front Door",
+    "FrameBridge HUB Front Door",
     instructions=(
-        "Front Door privado de FrameBridge en GERANAS. "
-        "framebridge_exec enruta por target: ASUS y GERAMEG mediante broker_outbound, GERANAS via FBTERM local, autorizado explicitamente; sin target mantiene ASUS. "
+        "Front Door privado de FrameBridge en HUB. "
+        "framebridge_exec enruta por target: WORKSTATION y TERMINAL_NODE mediante broker_outbound, HUB via FBTERM local, autorizado explicitamente; sin target mantiene WORKSTATION. "
         "Las seis herramientas Fleet son READ-only y se enrutan al Hub local."
     ),
     host=HOST,
@@ -100,7 +100,7 @@ def framebridge_status() -> dict:
     mode=oct(ADAPTER_SOCKET.stat().st_mode & 0o777) if ok else None
     return {
         "ok":ok,
-        "host":"geranas",
+        "host":"hub",
         "adapter_socket":str(ADAPTER_SOCKET),
         "socket_mode":mode,
         "mcp_transport":"streamable-http",
@@ -130,7 +130,7 @@ def broker_post(path: str, payload: dict, timeout_s: float=10.0) -> dict:
     return out if isinstance(out,dict) else {"ok":False,"error":"BROKER_RESPONSE_INVALID"}
 
 
-def asus_exec_request(
+def workstation_exec_request(
     script: str,
     authorized: bool,
     timeout_s: int = 120,
@@ -154,14 +154,14 @@ def asus_exec_request(
     if not 1<=timeout_s<=600:
         return {"ok":False,"error":"INVALID_TIMEOUT"}
     if not job_id:
-        job_id="asus-mcp-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
+        job_id="workstation-mcp-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
     if not JOB_RE.fullmatch(job_id):
         return {"ok":False,"error":"INVALID_JOB_ID"}
 
     queued=broker_post(
         "/fbpair/v1/control/admin-exec",
         {
-            "node_id":ASUS_NODE_ID,
+            "node_id":WORKSTATION_NODE_ID,
             "payload":{
                 "authorized":True,
                 "job_id":job_id,
@@ -173,10 +173,10 @@ def asus_exec_request(
         timeout_s=10.0,
     )
     if queued.get("ok") is not True:
-        return {"ok":False,"error":"ASUS_EXEC_QUEUE_FAILED","broker":queued}
+        return {"ok":False,"error":"WORKSTATION_EXEC_QUEUE_FAILED","broker":queued}
     request_id=str(queued.get("request_id") or "")
     if not request_id:
-        return {"ok":False,"error":"ASUS_EXEC_REQUEST_ID_MISSING"}
+        return {"ok":False,"error":"WORKSTATION_EXEC_REQUEST_ID_MISSING"}
 
     deadline=time.monotonic()+timeout_s+75
     while time.monotonic()<deadline:
@@ -192,30 +192,30 @@ def asus_exec_request(
         if state=="complete":
             outer=status.get("result") or {}
             if not isinstance(outer,dict):
-                return {"ok":False,"error":"ASUS_EXEC_RESULT_INVALID","request_id":request_id}
+                return {"ok":False,"error":"WORKSTATION_EXEC_RESULT_INVALID","request_id":request_id}
             if outer.get("ok") is not True:
                 return {
                     "ok":False,
-                    "error":"ASUS_EXEC_NODE_FAILED",
+                    "error":"WORKSTATION_EXEC_NODE_FAILED",
                     "request_id":request_id,
                     "node_result":outer,
                 }
             value=outer.get("result") or {}
             if not isinstance(value,dict):
-                return {"ok":False,"error":"ASUS_EXEC_ADAPTER_RESULT_INVALID","request_id":request_id}
+                return {"ok":False,"error":"WORKSTATION_EXEC_ADAPTER_RESULT_INVALID","request_id":request_id}
             value=dict(value)
             value["mcp_job_id"]=job_id
             value["mcp_script_sha256"]=digest
             value["broker_request_id"]=request_id
-            value["target"]="ASUS"
+            value["target"]="WORKSTATION"
             return value
         if state in {"expired","failed","denied"}:
-            return {"ok":False,"error":"ASUS_EXEC_"+state.upper(),"request_id":request_id}
+            return {"ok":False,"error":"WORKSTATION_EXEC_"+state.upper(),"request_id":request_id}
         time.sleep(0.25)
-    return {"ok":False,"error":"ASUS_EXEC_TIMEOUT","request_id":request_id}
+    return {"ok":False,"error":"WORKSTATION_EXEC_TIMEOUT","request_id":request_id}
 
 
-def gerameg_exec_request(
+def terminal_node_exec_request(
     script: str,
     authorized: bool,
     timeout_s: int = 120,
@@ -239,14 +239,14 @@ def gerameg_exec_request(
     if not 1<=timeout_s<=600:
         return {"ok":False,"error":"INVALID_TIMEOUT"}
     if not job_id:
-        job_id="gerameg-mcp-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
+        job_id="terminal_node-mcp-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
     if not JOB_RE.fullmatch(job_id):
         return {"ok":False,"error":"INVALID_JOB_ID"}
 
     queued=broker_post(
         "/fbpair/v1/control/admin-exec",
         {
-            "node_id":GERAMEG_NODE_ID,
+            "node_id":TERMINAL_NODE_NODE_ID,
             "payload":{
                 "authorized":True,
                 "job_id":job_id,
@@ -258,10 +258,10 @@ def gerameg_exec_request(
         timeout_s=10.0,
     )
     if queued.get("ok") is not True:
-        return {"ok":False,"error":"GERAMEG_EXEC_QUEUE_FAILED","broker":queued}
+        return {"ok":False,"error":"TERMINAL_NODE_EXEC_QUEUE_FAILED","broker":queued}
     request_id=str(queued.get("request_id") or "")
     if not request_id:
-        return {"ok":False,"error":"GERAMEG_EXEC_REQUEST_ID_MISSING"}
+        return {"ok":False,"error":"TERMINAL_NODE_EXEC_REQUEST_ID_MISSING"}
 
     deadline=time.monotonic()+timeout_s+75
     while time.monotonic()<deadline:
@@ -277,32 +277,32 @@ def gerameg_exec_request(
         if state=="complete":
             outer=status.get("result") or {}
             if not isinstance(outer,dict):
-                return {"ok":False,"error":"GERAMEG_EXEC_RESULT_INVALID","request_id":request_id}
+                return {"ok":False,"error":"TERMINAL_NODE_EXEC_RESULT_INVALID","request_id":request_id}
             if outer.get("ok") is not True:
                 return {
                     "ok":False,
-                    "error":"GERAMEG_EXEC_NODE_FAILED",
+                    "error":"TERMINAL_NODE_EXEC_NODE_FAILED",
                     "request_id":request_id,
                     "node_result":outer,
                 }
             value=outer.get("result") or {}
             if not isinstance(value,dict):
-                return {"ok":False,"error":"GERAMEG_EXEC_ADAPTER_RESULT_INVALID","request_id":request_id}
+                return {"ok":False,"error":"TERMINAL_NODE_EXEC_ADAPTER_RESULT_INVALID","request_id":request_id}
             value=dict(value)
             value["mcp_job_id"]=job_id
             value["mcp_script_sha256"]=digest
             value["broker_request_id"]=request_id
-            value["target"]="GERAMEG"
+            value["target"]="TERMINAL_NODE"
             return value
         if state in {"expired","failed","denied"}:
-            return {"ok":False,"error":"GERAMEG_EXEC_"+state.upper(),"request_id":request_id}
+            return {"ok":False,"error":"TERMINAL_NODE_EXEC_"+state.upper(),"request_id":request_id}
         time.sleep(0.25)
-    return {"ok":False,"error":"GERAMEG_EXEC_TIMEOUT","request_id":request_id}
+    return {"ok":False,"error":"TERMINAL_NODE_EXEC_TIMEOUT","request_id":request_id}
 
 
 
 @mcp.tool()
-def framebridge_exec_geranas(
+def framebridge_exec_hub(
     script: str,
     authorized: bool,
     timeout_s: int = 120,
@@ -310,8 +310,8 @@ def framebridge_exec_geranas(
     sha256: str = "",
     include_stdout: bool = False,
 ) -> dict:
-    """Administrative/lab exec on GERANAS local FBTERM."""
-    return _framebridge_exec_geranas_impl(
+    """Administrative/lab exec on HUB local FBTERM."""
+    return _framebridge_exec_hub_impl(
         script=script,
         authorized=authorized,
         timeout_s=timeout_s,
@@ -321,7 +321,7 @@ def framebridge_exec_geranas(
     )
 
 
-def _framebridge_exec_geranas_impl(
+def _framebridge_exec_hub_impl(
     script: str,
     authorized: bool,
     timeout_s: int = 120,
@@ -371,7 +371,7 @@ def _framebridge_exec_geranas_impl(
 
 
 def _cloud_dsm_rpc(payload: dict) -> dict:
-    """Private GERANAS local socket; root-only approval never exposed through MCP."""
+    """Private HUB local socket; root-only approval never exposed through MCP."""
     import socket as _socket
     import json as _json
     sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
@@ -428,9 +428,9 @@ def framebridge_exec(
     job_id: str = "",
     sha256: str = "",
     include_stdout: bool = False,
-    target: str = "ASUS",
+    target: str = "WORKSTATION",
 ) -> dict:
-    """Generic administrative/lab exec. target=ASUS or GERAMEG uses broker; target=GERANAS uses local FBTERM. Legacy calls without target remain ASUS. CLOUD uses only typed JSON actions, never shell commands."""
+    """Generic administrative/lab exec. target=WORKSTATION or TERMINAL_NODE uses broker; target=HUB uses local FBTERM. Legacy calls without target remain WORKSTATION. CLOUD uses only typed JSON actions, never shell commands."""
     if target == "CLOUD":
         import json as _json
         try:
@@ -444,8 +444,8 @@ def framebridge_exec(
         return _cloud_dsm_rpc({"action":payload.get("action"),
                                "params":payload.get("params",{}),
                                "authorized":bool(authorized)})
-    if target == "GERANAS":
-        result = _framebridge_exec_geranas_impl(
+    if target == "HUB":
+        result = _framebridge_exec_hub_impl(
             script=script,
             authorized=authorized,
             timeout_s=timeout_s,
@@ -455,11 +455,11 @@ def framebridge_exec(
         )
         if isinstance(result, dict):
             result = dict(result)
-            result["target"] = "GERANAS"
+            result["target"] = "HUB"
         return result
-    if target not in ("ASUS", "GERAMEG"):
-        return {"ok": False, "error": "UNSUPPORTED_TARGET", "allowed_targets": ["ASUS", "GERANAS", "GERAMEG", "CLOUD"]}
-    exec_request = asus_exec_request if target == "ASUS" else gerameg_exec_request
+    if target not in ("WORKSTATION", "TERMINAL_NODE"):
+        return {"ok": False, "error": "UNSUPPORTED_TARGET", "allowed_targets": ["WORKSTATION", "HUB", "TERMINAL_NODE", "CLOUD"]}
+    exec_request = workstation_exec_request if target == "WORKSTATION" else terminal_node_exec_request
     result=exec_request(
         script=script,
         authorized=authorized,
@@ -510,7 +510,7 @@ def _cua_frame_fields(frame_output: str) -> dict:
     return result
 
 
-def asus_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -> dict:
+def workstation_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -> dict:
     if authorized is not True:
         return {"ok":False,"error":"AUTHORIZED_TRUE_REQUIRED"}
     if not isinstance(cua,dict):
@@ -527,14 +527,14 @@ def asus_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -
     if not job_id:
         seed=json.dumps({"action":action,"time":time.time_ns()},sort_keys=True).encode()
         digest=hashlib.sha256(seed).hexdigest()
-        job_id="cua-geranas-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
+        job_id="cua-hub-"+time.strftime("%Y%m%d-%H%M%S")+"-"+digest[:8]
     if not JOB_RE.fullmatch(job_id):
         return {"ok":False,"error":"INVALID_JOB_ID"}
 
     queued=broker_post(
         "/fbpair/v1/control/admin-cua",
         {
-            "node_id":ASUS_NODE_ID,
+            "node_id":WORKSTATION_NODE_ID,
             "payload":{
                 "authorized":True,
                 "job_id":job_id,
@@ -545,7 +545,7 @@ def asus_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -
         timeout_s=10.0,
     )
     if queued.get("ok") is not True:
-        return {"ok":False,"error":"ASUS_CUA_QUEUE_FAILED","broker":queued}
+        return {"ok":False,"error":"WORKSTATION_CUA_QUEUE_FAILED","broker":queued}
     rid=str(queued.get("request_id") or "")
     deadline=time.monotonic()+timeout_s+75
     while time.monotonic()<deadline:
@@ -557,23 +557,23 @@ def asus_cua_request(cua: dict, authorized: bool, timeout_s: int, job_id: str) -
         if state=="complete":
             outer=status.get("result") or {}
             if not isinstance(outer,dict):
-                return {"ok":False,"error":"ASUS_CUA_RESULT_INVALID","request_id":rid}
+                return {"ok":False,"error":"WORKSTATION_CUA_RESULT_INVALID","request_id":rid}
             if outer.get("ok") is not True:
-                return {"ok":False,"error":"ASUS_CUA_NODE_FAILED","request_id":rid,"node_result":outer}
+                return {"ok":False,"error":"WORKSTATION_CUA_NODE_FAILED","request_id":rid,"node_result":outer}
             value=outer.get("result") or {}
             if not isinstance(value,dict):
-                return {"ok":False,"error":"ASUS_CUA_ADAPTER_RESULT_INVALID","request_id":rid}
+                return {"ok":False,"error":"WORKSTATION_CUA_ADAPTER_RESULT_INVALID","request_id":rid}
             value=dict(value)
             frame_output=str(value.pop("frame_output",""))
             if frame_output:
                 value.update(_cua_frame_fields(frame_output))
             value["broker_request_id"]=rid
-            value["target"]="ASUS"
+            value["target"]="WORKSTATION"
             return value
         if state in {"expired","failed","denied"}:
-            return {"ok":False,"error":"ASUS_CUA_"+state.upper(),"request_id":rid}
+            return {"ok":False,"error":"WORKSTATION_CUA_"+state.upper(),"request_id":rid}
         time.sleep(.2)
-    return {"ok":False,"error":"ASUS_CUA_TIMEOUT","request_id":rid}
+    return {"ok":False,"error":"WORKSTATION_CUA_TIMEOUT","request_id":rid}
 
 
 @mcp.tool()
@@ -607,7 +607,7 @@ def framebridge_cua(
     timeout_s: int = 60,
     job_id: str = "",
 ):
-    """CUA R8 on ASUS through GERANAS. Requires explicit per-use chat authorization."""
+    """CUA R8 on WORKSTATION through HUB. Requires explicit per-use chat authorization."""
     if authorized is not True:
         return {"ok":False,"error":"AUTHORIZED_TRUE_REQUIRED"}
     action=str(action).upper().strip()
@@ -659,7 +659,7 @@ def framebridge_cua(
             "button":str(button).lower(),"steps":int(steps),"duration_ms":int(duration_ms),
         })
 
-    result=asus_cua_request(payload,True,timeout_s,job_id)
+    result=workstation_cua_request(payload,True,timeout_s,job_id)
     if bool(observe_after) and action!="OBSERVE" and bool(result.get("ok")):
         post=dict(payload)
         post.clear()
@@ -667,7 +667,7 @@ def framebridge_cua(
         if expected_window_id:
             post["expected_window_id"]=str(expected_window_id)
         post_id=(str(job_id or "cua")[:72]+"-post")[:80]
-        post_result=asus_cua_request(post,True,timeout_s,post_id)
+        post_result=workstation_cua_request(post,True,timeout_s,post_id)
         result["post_ok"]=bool(post_result.get("ok"))
         result["post_resultado_final"]=post_result.get("resultado_final")
         for key_name in (
@@ -742,8 +742,8 @@ async def framebridge_fleet_node_network_inspect(node: str) -> dict:
 async def framebridge_fleet_node_service_status(node: str, service: str) -> dict:
     return await hub_call("framebridge_fleet_node_service_status",{"node":node,"service":service})
 
-from gerameg_cua_frontdoor import register_tools as register_gerameg_cua_tools
-register_gerameg_cua_tools(mcp, gerameg_exec_request)
+from terminal_node_cua_frontdoor import register_tools as register_terminal_node_cua_tools
+register_terminal_node_cua_tools(mcp, terminal_node_exec_request)
 
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")

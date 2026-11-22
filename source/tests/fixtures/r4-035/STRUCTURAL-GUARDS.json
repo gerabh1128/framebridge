@@ -24,8 +24,8 @@
   "schema": 1,
   "screen_capture_without_chunk_transfer_ast": "066940e490cf617c7306fe6d0253dda3c49d4422c2992bf5154221e0b5f2f3bd",
   "unchanged_helpers": {
-    "autostart.py": "d99392b33531d28d699ec5a6e9e942ce3696ebf29464e8e7c3d74178b2553f09",
+    "autostart.py": "6416954bcf206e63d1c8ed4ec96086ba85cdebf2fd1676cbf6d50769c9dccfc1",
     "display_context.py": "464525537a1af948159a64ff27df65a1a1bf4f6f61c7d7d121f28524ff96b01a"
   },
-  "window_retained_sha256": "b44c78d42d7b0e41d2f75224113e2e23ddd98c708cb623002c2e6794e3f7e03c"
+  "window_retained_sha256": "36429ca41490538ebacb42ef3f8429a371a3b3daa32628ad6f5ff6fa645f8df2"
 }

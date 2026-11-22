@@ -57,7 +57,7 @@ class BrokerNodeTests(unittest.TestCase):
         return state, public["node_id"]
 
     def test_http_remote_and_unauthenticated_control_are_rejected(self):
-        for value in ("http://10.0.0.53:1234", "http://example.com", "https://u:p@example.com", "https://example.com/#x"):
+        for value in ("http://192.0.2.53:1234", "http://example.com", "https://u:p@example.com", "https://example.com/#x"):
             with self.assertRaises(broker.BrokerError):
                 broker.validate_endpoint(value)
         with self.assertRaises(broker.BrokerError):

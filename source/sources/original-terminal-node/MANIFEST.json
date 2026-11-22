@@ -2,22 +2,22 @@
   "origin": "Original text-console source capture; community derivative",
   "files": [
     {
-      "source": "gerameg_cua_runtime.py",
-      "path": "gerameg_cua_runtime.py",
-      "bytes": 5049,
-      "sha256": "381a7dc740227e27085e66d5f7e5d398a09f86eff66d6aefce9025e896634887"
+      "source": "terminal_node_cua_runtime.py",
+      "path": "terminal_node_cua_runtime.py",
+      "bytes": 5123,
+      "sha256": "c1e9d53d7f1756336de3ffa28bff55d2462b90e701f8de0c9bdc3657165e9e16"
     },
     {
       "source": "real_tty_manager.py",
       "path": "real_tty_manager.py",
-      "bytes": 9647,
-      "sha256": "3c8fe23cf1499172d4064f04f373656f6fd6109a1c1bc01657d669aabd4121d8"
+      "bytes": 9708,
+      "sha256": "f0031c8f943e5b9479306146e39049064628c340aaa2042670cf7932ff4efca6"
     },
     {
       "source": "cua_tty_rpc.py",
       "path": "cua_tty_rpc.py",
-      "bytes": 9957,
-      "sha256": "e64b0b9283c8143b5fc4db2c6020c288927f0a26a9c4fd42cfc8aca8bfc36175"
+      "bytes": 10033,
+      "sha256": "02eb0963a8b307badcaca2bc1a96d8295ef2dcc79b237f71522f025e3a9ac376"
     },
     {
       "source": "framebridge_cua_tty/__init__.py",

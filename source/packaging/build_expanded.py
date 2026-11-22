@@ -346,7 +346,8 @@ def main(argv=None):
         shutil.rmtree(STAGE)
     PREFIX.mkdir(parents=True)
     RELEASE.mkdir(parents=True, exist_ok=True)
-    for name, dest in [("original-asus", "asus"), ("original-geranas", "geranas"), ("original-gerameg", "gerameg")]:
+    for dest in ("workstation", "hub", "terminal-node"):
+        name = "original-" + dest
         source = BASE / "sources" / name
         if not source.is_dir():
             raise RuntimeError("Required public source snapshot missing: " + name)
@@ -367,11 +368,11 @@ def main(argv=None):
     rules.mkdir(parents=True)
     shutil.copy2(BASE / "packaging/70-framebridge-screen.rules", rules / "70-framebridge-screen.rules")
     layout = {
-        "adapter": "original/asus/tool-adapter/bin/framebridge_tool_adapter.py",
-        "adapter_bin": "original/asus/tool-adapter/bin",
-        "fbterm_bin": "original/asus/fbterm/bin",
-        "native_host": "original/asus/framebridge-native/host/framebridge_host.py",
-        "native_host_dir": "original/asus/framebridge-native/host"
+        "adapter": "original/workstation/tool-adapter/bin/framebridge_tool_adapter.py",
+        "adapter_bin": "original/workstation/tool-adapter/bin",
+        "fbterm_bin": "original/workstation/fbterm/bin",
+        "native_host": "original/workstation/framebridge-native/host/framebridge_host.py",
+        "native_host_dir": "original/workstation/framebridge-native/host"
     }
     (PREFIX / "layout.json").write_text(json.dumps(layout, indent=2) + "\n")
     bindir = STAGE / "usr/bin"

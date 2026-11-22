@@ -12,7 +12,7 @@ import tarfile
 import sys
 
 from build_profiles import CANDIDATE_VERSION, SOURCE_VENDOR, target_profile, validate_vendor, vendor_versions
-from release_metadata import PUBLIC_RELEASE_PROFILES
+from release_metadata import PUBLIC_RELEASE_PROFILES, PUBLIC_RELEASE_VERSION
 
 BASE = Path(__file__).resolve().parents[1]
 ROOT = BASE.parent
@@ -128,7 +128,7 @@ def main(argv=None):
     parser.add_argument("--vendor-cp312", type=Path, help="Reviewed cp312 vendor input to include")
     parser.add_argument("--vendor-cp314", type=Path, help="Reviewed cp314 vendor input to include")
     args = parser.parse_args(argv)
-    if args.public_release and not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", CANDIDATE_VERSION):
+    if args.public_release and not re.fullmatch(PUBLIC_RELEASE_VERSION, CANDIDATE_VERSION):
         parser.error("--public-release requires a stable project version")
     if args.public_release and (args.vendor_cp312 is None or args.vendor_cp314 is not None):
         parser.error("--public-release requires --vendor-cp312 and excludes experimental cp314 input")

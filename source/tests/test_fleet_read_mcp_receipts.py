@@ -10,9 +10,9 @@ from framebridge_expanded import broker, fleet
 from framebridge_expanded.fleet_read_mcp import register_fleet_read_tools
 
 
-NODE_ID = "731320ca-b3a5-4ae7-9598-2746adbc2162"
-ALIAS = "gerameg-lab"
-HOST = "GERAMEG"
+NODE_ID = "11111111-1111-4111-8111-111111111111"
+ALIAS = "terminal_node-lab"
+HOST = "TERMINAL_NODE"
 REMOTE = {"node_id": NODE_ID, "alias": ALIAS, "registered_label": ALIAS,
           "hostname": None, "transport": "broker_outbound",
           "capability_profile": "original-readonly", "operational_transport_ready": True}

@@ -125,7 +125,7 @@ class NativeFramingTests(unittest.TestCase):
                    "PYTHONDONTWRITEBYTECODE": "1", "LC_ALL": "C.UTF-8",
                    "FRAMEBRIDGE_EXPANDED_PREFIX": str(root), dc.BINDING: "{}"}
             message = json.dumps({"op": "cua", "action": "OBSERVE", "authorized": "YES",
-                                  "target": "ASUS", "id": "r2-native-test"}).encode()
+                                  "target": "WORKSTATION", "id": "r2-native-test"}).encode()
             proc = subprocess.run([sys.executable, str(root / "packaging/framebridge-native-expanded")],
                                   input=struct.pack("<I", len(message)) + message,
                                   env=env, capture_output=True, timeout=15)

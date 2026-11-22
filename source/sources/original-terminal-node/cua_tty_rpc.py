@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RPC local CUA-TTY de GERAMEG, invocado por el FBEXEC original firmado."""
+"""RPC local CUA-TTY de TERMINAL_NODE, invocado por el FBEXEC original firmado."""
 from __future__ import annotations
 import base64
 import hashlib
@@ -14,7 +14,7 @@ import sys
 import uuid
 
 UID = 1000
-HOSTNAME = "GERAMEG"
+HOSTNAME = os.environ.get("FRAMEBRIDGE_TERMINAL_NODE_HOST", "").upper()
 HOME = Path.home()
 SOCKET_PATH = Path("/run/user/1000/framebridge-alpha01-cua/agent.sock")
 CLIENT_PATH = Path("/opt/framebridge-alpha-01/vendor/framebridge_cua_tty/client.py")
@@ -111,7 +111,7 @@ def validate_request(req):
 
 def guard_runtime():
     require(os.getuid() == UID and os.geteuid() == UID, "UID_MISMATCH")
-    require(socket.gethostname().upper() == HOSTNAME, "HOSTNAME_MISMATCH")
+    require(HOSTNAME and socket.gethostname().upper() == HOSTNAME, "HOSTNAME_MISMATCH")
     require(Path.home().resolve() == HOME.resolve(), "HOME_MISMATCH")
 
 
@@ -119,7 +119,7 @@ def load_client():
     require(CLIENT_PATH.is_file() and not CLIENT_PATH.is_symlink(), "CLIENT_PATH_INVALID")
     source = CLIENT_PATH.read_bytes()
     require(hashlib.sha256(source).hexdigest() == CLIENT_SHA256, "CLIENT_SHA256_MISMATCH")
-    spec = importlib.util.spec_from_file_location("_gerameg_cua_client_pinned", CLIENT_PATH)
+    spec = importlib.util.spec_from_file_location("_terminal_node_cua_client_pinned", CLIENT_PATH)
     require(spec is not None and spec.loader is not None, "CLIENT_IMPORT_INVALID")
     module = importlib.util.module_from_spec(spec)
     exec(compile(source, str(CLIENT_PATH), "exec"), module.__dict__)

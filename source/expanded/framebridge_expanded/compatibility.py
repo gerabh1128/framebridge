@@ -21,7 +21,7 @@ PROFILES = {
 SYSTEM_PYTHONS = frozenset({"/usr/bin/python3", "/usr/bin/python3.12",
                             "/usr/bin/python3.13", "/usr/bin/python3.14"})
 INSTALLED_PREFIX = Path("/usr/lib/framebridge-expanded")
-VENDOR_RELATIVE = Path("original/geranas/FrameBridge-Fleet-Hub/vendor")
+VENDOR_RELATIVE = Path("original/hub/FrameBridge-Fleet-Hub/vendor")
 
 
 def profile_for(os_release):

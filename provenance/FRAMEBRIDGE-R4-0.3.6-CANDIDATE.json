@@ -70,8 +70,8 @@
       "before_sha256": "e3c2798d886919b67321b79b3233d6989b7f618c83190e390794ddb9a9053128",
       "bytes_after": 16908,
       "bytes_before": 16550,
-      "installed_path": "/usr/lib/framebridge-expanded/original/asus/fbterm/bin/fbterm_engine.py",
-      "repository_path": "source/sources/original-asus/fbterm/bin/fbterm_engine.py"
+      "installed_path": "/usr/lib/framebridge-expanded/original/workstation/fbterm/bin/fbterm_engine.py",
+      "repository_path": "source/sources/original-workstation/fbterm/bin/fbterm_engine.py"
     },
     {
       "after_git_blob": "f3a7e1f5180c9e3e776ea30f9ee87f1690a91f43",
@@ -80,8 +80,8 @@
       "before_sha256": "aed73125f88b4408bad83ef4aae220fd79bd8f57e41ff15ebc9930453bdc69a1",
       "bytes_after": 49600,
       "bytes_before": 45731,
-      "installed_path": "/usr/lib/framebridge-expanded/original/asus/framebridge-native/host/framebridge_cua_linux.py",
-      "repository_path": "source/sources/original-asus/framebridge-native/host/framebridge_cua_linux.py"
+      "installed_path": "/usr/lib/framebridge-expanded/original/workstation/framebridge-native/host/framebridge_cua_linux.py",
+      "repository_path": "source/sources/original-workstation/framebridge-native/host/framebridge_cua_linux.py"
     }
   ],
   "historical_binding_fields_preserved": [
@@ -104,7 +104,7 @@
       "date": "2026-11-02",
       "patch": "provenance/patches/fbterm-audit-0.3.6.patch",
       "patch_sha256": "6319e6234533c7a3eaa34cf68c404f278f6a228402df00491eb08aa07423efd7",
-      "path": "original-asus/fbterm/bin/fbterm_engine.py",
+      "path": "original-workstation/fbterm/bin/fbterm_engine.py",
       "previous_sha256": "e3c2798d886919b67321b79b3233d6989b7f618c83190e390794ddb9a9053128",
       "provenance": "provenance/FRAMEBRIDGE-R4-0.3.6-CANDIDATE.json",
       "reason": "Preserve the complete job audit while avoiding repeated directory-stat calls.",
@@ -115,7 +115,7 @@
       "date": "2026-11-02",
       "patch": "provenance/patches/cua-window-0.3.6.patch",
       "patch_sha256": "5ef5b66341177d4e3f419bc52449d79ba796bc7b8a65095d9a2de06102e3c1d1",
-      "path": "original-asus/framebridge-native/host/framebridge_cua_linux.py",
+      "path": "original-workstation/framebridge-native/host/framebridge_cua_linux.py",
       "previous_sha256": "aed73125f88b4408bad83ef4aae220fd79bd8f57e41ff15ebc9930453bdc69a1",
       "provenance": "provenance/FRAMEBRIDGE-R4-0.3.6-CANDIDATE.json",
       "reason": "Capture the verified visible X11 window intersection with stable geometry and identity.",

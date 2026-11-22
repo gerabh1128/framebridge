@@ -1,5 +1,5 @@
---- a/source/sources/original-asus/fbterm/bin/fbterm_engine.py
-+++ b/source/sources/original-asus/fbterm/bin/fbterm_engine.py
+--- a/source/sources/original-workstation/fbterm/bin/fbterm_engine.py
++++ b/source/sources/original-workstation/fbterm/bin/fbterm_engine.py
 @@ -98,6 +98,27 @@
              # guessed display, another user's bus, or a fabricated visible state.
              return None

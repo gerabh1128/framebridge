@@ -80,7 +80,7 @@ def asset(spec):
     project_url(spec.get("signature_url", ""), "/downloads/")
 
 def validate(meta, ready):
-    require(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", meta.get("version", "")), "Release version must be numeric")
+    require(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:\+fbterm\.[1-9][0-9]*)?", meta.get("version", "")), "Invalid public release version")
     require(meta.get("state") in ("preparing", "ready"), "Unknown release state")
     require(meta.get("site_url") == "https://framebridge.betancourt.one", "Canonical site origin required")
     require(meta.get("package_name") == "framebridge-original-expanded", "Unexpected binary package")

@@ -1,6 +1,6 @@
 """Portable access to the captured real FrameBridge tmux CUA-TTY engine.
 
-The captured Manager/LocalServer are loaded from original/gerameg, never from
+The captured Manager/LocalServer are loaded from original/terminal-node, never from
 an installed ALPHA. _tty_backend.py preserves RealTerminalMixin with a recorded
 portability diff. The public RPC uses same-UID sockets plus authorized=True.
 """
@@ -40,8 +40,8 @@ _STARTED_CHILDREN = {}
 def _source_root():
     here = Path(__file__).resolve().parents[2]
     prefix = Path(os.environ.get("FRAMEBRIDGE_EXPANDED_PREFIX", str(here)))
-    for p in (prefix / "original/gerameg", prefix / "sources/original-gerameg",
-              here / "original/gerameg", here / "sources/original-gerameg"):
+    for p in (prefix / "original/terminal-node", prefix / "sources/original-terminal-node",
+              here / "original/terminal-node", here / "sources/original-terminal-node"):
         if (p / "framebridge_cua_tty/core.py").is_file():
             return p
     raise RuntimeError("TTY_ORIGINAL_SOURCE_NOT_FOUND")

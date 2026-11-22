@@ -13,8 +13,8 @@ An attempted input batch remains conservatively marked as possible input after a
 - Fix source commit: b283999f5aef615b2acee7754e438cdd01cc75bd.
 - Approved helper SHA-256: d0c8a1f56a6a8e3d16a7d676bcc0a858318cbe590ea825f76bceb6a1d7045470.
 - Approved native host SHA-256: 9a2f2af559793aa93c0623d307f6383494fb0b4863db2c425f73ed67ed7ae65f.
-- The fix worktree passed all 800 tests; remote receipt gerameg-mcp-20261028-090452-f2ada16c, stdout SHA-256 b073bf80ad84bb1aeb6105fd8d8796106c231f20c0ce060ffc66d320d4e62e42.
-- ASUS read-only preflight for a 169-character command-shaped ASCII probe passed with group 0, no held modifiers, Num Lock mask 16 and slash keycode 61; event emission was disabled. Receipt asus-mcp-20261028-085936-a8426ef7, stdout SHA-256 235d7cc42b8313fccdf49c604530c47e6b14c4505ba4f3d324d0b0e98fc1aca1.
+- The fix worktree passed all 800 tests; remote receipt terminal_node-mcp-20261028-090452-f2ada16c, stdout SHA-256 b073bf80ad84bb1aeb6105fd8d8796106c231f20c0ce060ffc66d320d4e62e42.
+- WORKSTATION read-only preflight for a 169-character command-shaped ASCII probe passed with group 0, no held modifiers, Num Lock mask 16 and slash keycode 61; event emission was disabled. Receipt workstation-mcp-20261028-085936-a8426ef7, stdout SHA-256 235d7cc42b8313fccdf49c604530c47e6b14c4505ba4f3d324d0b0e98fc1aca1.
 - The root GUI controller then tested the reviewed standalone development helper in its own foreground cat receiver: 169 characters exactly matched, 169 permission batches, 5.704268 seconds, with keyboard map/group/held/Num Lock state unchanged. Production EXEC receipt 090055-db27c436d046 and receiver receipt 090127-6ceba9d8e540.
 - That live result validates the development helper, not the installed MCP pipeline. This candidate still requires a private installed pilot and exact receiver comparison through the final package before any broader activation.
 

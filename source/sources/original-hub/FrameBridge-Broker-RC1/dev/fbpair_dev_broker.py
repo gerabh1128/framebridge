@@ -52,8 +52,8 @@ READ_CAPS={
     "filesystem.stat","filesystem.list","filesystem.hash","filesystem.read_text",
 }
 
-ADMIN_EXEC_NODE_LABEL="ASUS"
-ADMIN_EXEC_GERAMEG_NODE_ID="76885f27-da2e-4cca-bbde-6ec981e91e68"
+ADMIN_EXEC_NODE_LABEL="WORKSTATION"
+ADMIN_EXEC_TERMINAL_NODE_NODE_ID="76885f27-da2e-4cca-bbde-6ec981e91e68"
 ADMIN_EXEC_MAX_SCRIPT_BYTES=262144
 ADMIN_EXEC_JOB_RE=re.compile(r"^[A-Za-z0-9._-]{1,80}$")
 
@@ -398,7 +398,7 @@ class Store:
         label=str(node.get("node_label") or "")
         if not (
             label==ADMIN_EXEC_NODE_LABEL
-            or (str(node_id)==ADMIN_EXEC_GERAMEG_NODE_ID and label=="GERAMEG")
+            or (str(node_id)==ADMIN_EXEC_TERMINAL_NODE_NODE_ID and label=="TERMINAL_NODE")
         ):
             return None,"admin_exec_node_not_allowed"
         if not isinstance(payload,dict):
@@ -451,7 +451,7 @@ class Store:
         node=self._paired_node(str(node_id))
         if node is None:
             return None,"node_not_paired"
-        if str(node.get("node_label") or "")!="ASUS":
+        if str(node.get("node_label") or "")!="WORKSTATION":
             return None,"admin_cua_node_not_allowed"
         if not isinstance(payload,dict):
             return None,"payload_not_object"

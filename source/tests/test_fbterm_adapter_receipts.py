@@ -12,7 +12,7 @@ from framebridge_expanded import broker, fleet, runtime
 
 
 ADAPTER = Path(__file__).resolve().parents[1] / (
-    "sources/original-asus/tool-adapter/bin/framebridge_tool_adapter.py"
+    "sources/original-workstation/tool-adapter/bin/framebridge_tool_adapter.py"
 )
 SPEC = importlib.util.spec_from_file_location("test_original_fbterm_adapter", ADAPTER)
 adapter = importlib.util.module_from_spec(SPEC)

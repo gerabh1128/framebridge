@@ -11,9 +11,9 @@ from pathlib import Path
 import re
 
 
-CANDIDATE_VERSION = "0.3.9+fbterm.3"
-VENDOR_RELATIVE = Path("original/geranas/FrameBridge-Fleet-Hub/vendor")
-SOURCE_VENDOR = Path("sources/original-geranas/FrameBridge-Fleet-Hub/vendor")
+CANDIDATE_VERSION = "0.3.9+fbterm.4"
+VENDOR_RELATIVE = Path("original/hub/FrameBridge-Fleet-Hub/vendor")
+SOURCE_VENDOR = Path("sources/original-hub/FrameBridge-Fleet-Hub/vendor")
 GLIBC_BASELINE = (2, 34)
 PROFILES = {
     "debian13-amd64-py313": {"os_id": "debian", "os_version": "13", "python_minor": "3.13"},

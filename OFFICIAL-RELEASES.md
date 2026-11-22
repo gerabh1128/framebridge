@@ -4,7 +4,7 @@ FrameBridge is free software under the applicable licenses. Everyone retains the
 
 ## What official means
 
-An official FrameBridge release is built from an identified source revision accepted by the project maintainers. It has a version, source archive, installer, checksums and release signatures. The Debian APT repository publishes signed repository metadata. Official distribution starts at https://framebridge.betancourt.one/. The existing GERANAS Gitea repository is https://framebridge.betancourt.one/git/gerardo/framebridge. Each release record identifies the exact source revision, corresponding-source archive, three distribution package profiles, checksums and signatures. The signed APT repository uses independent trixie, noble and mint22 suites for the tested Debian 13, Ubuntu 24.04 and Linux Mint 22.x amd64 profiles. Release artifact signatures identify official downloads; individually signed Git tags are not required by this policy.
+An official FrameBridge release is built from an identified source revision accepted by the project maintainers. It has a version, source archive, installer, checksums and release signatures. The Debian APT repository publishes signed repository metadata. Official distribution starts at https://framebridge.betancourt.one/. The project's Gitea repository is https://framebridge.betancourt.one/git/gerardo/framebridge. Each release record identifies the exact source revision, corresponding-source archive, three distribution package profiles, checksums and signatures. The signed APT repository uses independent trixie, noble and mint22 suites for the tested Debian 13, Ubuntu 24.04 and Linux Mint 22.x amd64 profiles. Release artifact signatures identify official downloads; individually signed Git tags are not required by this policy.
 
 Maintainers control write access, reviewed branches, release tags and signing operations. Public visitors and agents do not receive release-signing or direct protected-branch write access. External contributors propose changes through review.
 
@@ -24,7 +24,7 @@ This is operational guidance for reliable use, not a restriction on a recipient'
 
 ## Development source
 
-The Linux job changes through `0.3.9+fbterm.3` are available on `main`. Use the official download catalog to identify the version offered by APT. [Linux job updates](RELEASE-NOTES.md#linux-job-updates)
+The development source includes the Linux job changes and the role-based component paths for `0.3.9+fbterm.4`. Use the official download catalog to identify the version offered by APT. [Linux job updates](RELEASE-NOTES.md#linux-job-updates)
 
 ## Release records
 

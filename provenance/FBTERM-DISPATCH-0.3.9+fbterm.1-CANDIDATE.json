@@ -11,28 +11,28 @@
   },
   "changes": [
     {
-      "path": "source/sources/original-asus/fbterm/bin/fbterm-output",
+      "path": "source/sources/original-workstation/fbterm/bin/fbterm-output",
       "base_sha256": null,
       "candidate_sha256": "6545cf1bf034a702936ccf776c7f6eb241273faf46713090f1bcd017176cf3a7"
     },
     {
-      "path": "source/sources/original-asus/fbterm/bin/fbterm-run",
+      "path": "source/sources/original-workstation/fbterm/bin/fbterm-run",
       "base_sha256": "bbfc19c878746518e482adbe61cd6f8ae8560dca75a1e3db9921e1cb40b42e71",
       "candidate_sha256": "c9d42c5448cf53337bf82732875af310e4cb78febfe0eb6b475ef2381fe97acc"
     },
     {
-      "path": "source/sources/original-asus/fbterm/bin/fbterm-shell",
+      "path": "source/sources/original-workstation/fbterm/bin/fbterm-shell",
       "base_sha256": "eb6de30bfd6430165f7ebc982021f3565b2e80c4b82480b4e01e64e15e65957a",
       "candidate_sha256": "0a6df860feecd6b1462caf306881e022eb934b36e9c408ccf4aedd3e0c6fbe48"
     },
     {
-      "path": "source/sources/original-asus/fbterm/bin/fbterm_engine.py",
+      "path": "source/sources/original-workstation/fbterm/bin/fbterm_engine.py",
       "base_sha256": "dc810baddeaf526323fd7ca9bde12735a7e3eb0918e06606e9ef7fdc5fa894fe",
       "candidate_sha256": "970914757292ca17380136eca1596df58caa9627ddd68b18b3293071c7df0827",
       "preserved_original": "provenance/originals/fbterm_engine-before-hardening-0.3.9.py"
     },
     {
-      "path": "source/sources/original-asus/tool-adapter/bin/framebridge_tool_adapter.py",
+      "path": "source/sources/original-workstation/tool-adapter/bin/framebridge_tool_adapter.py",
       "base_sha256": "dca9bf3dfbae7881aa6824ca79a2922fb4ec7ab1b61b5696b39cb64630c4d86b",
       "candidate_sha256": "c580bbb4eae919bd7add8ce4654d75d9a2623a0a6f8754b21ff011973c51b663"
     }

@@ -4,9 +4,9 @@ The original visual design and renderer are retained. The main workflow is
 administration of a home Linux network by one human administrator. Compatible
 desktop access is an auxiliary tool.
 
-The canonical source repository is the existing GERANAS Gitea project
+The canonical source repository is the existing HUB Gitea project
 https://framebridge.betancourt.one/git/gerardo/framebridge. CLOUD provides the
-existing HTTPS reverse proxy; GERANAS serves the website, downloads and APT
+existing HTTPS reverse proxy; HUB serves the website, downloads and APT
 repository. Do not substitute a static Git mirror or another hosting backend.
 
 Copy release.example.json to release.json for a preparation preview. The example
@@ -29,7 +29,7 @@ identities before a ready build:
   2e867d4b6a22f81ecbefa293a88799b9e3c93f02aa7d1090c7f0a0dbfe44dc9f
 
 The homepage features the approved 40-second English film with lowercase
-framebridge wordmarks, real ASUS console capture, an illustrative request,
+framebridge wordmarks, real WORKSTATION console capture, an illustrative request,
 animated diagrams, synthetic narration and the original music. The vertical
 1080x1920 player keeps its 9:16 ratio and a bounded width on the homepage. The
 homepage versions its stylesheet URL so returning visitors load the matching

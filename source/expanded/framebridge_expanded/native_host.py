@@ -151,9 +151,9 @@ def _load(name, path):
 
 def main():
     prefix = Path(os.environ.get("FRAMEBRIDGE_EXPANDED_PREFIX", Path(__file__).resolve().parents[2]))
-    host = prefix / "original/asus/framebridge-native/host/framebridge_host.py"
+    host = prefix / "original/workstation/framebridge-native/host/framebridge_host.py"
     if not host.is_file():
-        host = prefix / "sources/original-asus/framebridge-native/host/framebridge_host.py"
+        host = prefix / "sources/original-workstation/framebridge-native/host/framebridge_host.py"
     if not host.is_file():
         raise SystemExit("CAPTURED_NATIVE_HOST_NOT_FOUND")
     sys.path.insert(0, str(host.parent))

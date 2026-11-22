@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import hashlib
 import os
 from pathlib import Path
+import pwd
 import re
 import subprocess
 import time
@@ -37,7 +38,8 @@ class RealTerminalMixin:
 
     def _tmux(self, *args, data=None, optional=False):
         env={k:v for k,v in os.environ.items() if k not in ('TMUX','TMUX_PANE')}
-        env.update({'HOME':str(Path.home()),'USER':'gerabh','LOGNAME':'gerabh',
+        account = pwd.getpwuid(os.getuid()).pw_name
+        env.update({'HOME':str(Path.home()),'USER':account,'LOGNAME':account,
                     'LANG':'C.UTF-8','TERM':'xterm-256color','HISTFILE':'/dev/null'})
         try:
             p=subprocess.run(['/usr/bin/tmux','-S',TMUX_SOCKET,'-f','/dev/null',*args],

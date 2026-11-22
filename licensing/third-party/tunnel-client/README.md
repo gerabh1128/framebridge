@@ -1,6 +1,6 @@
 # OpenAI tunnel-client and its incorporated Go modules
 
-The retained executable source/sources/original-geranas/FrameBridge-MCP-Private/bin/tunnel-client is third-party OpenAI Secure MCP Tunnel software, licensed Apache-2.0. It is not original FrameBridge code. Its SHA-256 is 472eb9dd9dd625b4e6023c3b4a5736b3a2e5a1b6dbe9338e001887a64ec992a6.
+The retained executable source/sources/original-hub/FrameBridge-MCP-Private/bin/tunnel-client is third-party OpenAI Secure MCP Tunnel software, licensed Apache-2.0. It is not original FrameBridge code. Its SHA-256 is 472eb9dd9dd625b4e6023c3b4a5736b3a2e5a1b6dbe9338e001887a64ec992a6.
 
 The Go build information identifies github.com/openai/tunnel-client/cmd/client, Go 1.27.0, module version (devel), and 47 dependency modules. It does not embed an upstream VCS revision. No claim is made that its exact own-source commit or independent reproducible build has been established.
 

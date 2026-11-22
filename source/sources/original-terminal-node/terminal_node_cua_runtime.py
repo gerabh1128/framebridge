@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""GERAMEG CUA-TTY with the explicitly selected local-user input policy.
+"""TERMINAL_NODE CUA-TTY with the explicitly selected local-user input policy.
 
 Reuse the installed LocalServer and Manager without changing their source,
 socket protocol, existing demos and PTY handling, or input/session limits for demos.
@@ -7,7 +7,7 @@ socket protocol, existing demos and PTY handling, or input/session limits for de
 Remote callers must still enter through authenticated FrameBridge. This
 process authenticates LOCAL peers by the original LocalServer's SO_PEERCRED
 check. It cannot distinguish an authenticated FBEXEC process from another
-process running as gerabh (UID 1000). Both have the same local authority.
+process running under the same Unix account (UID 1000).
 
 The legacy owner_assertion RPC field remains mandatory for wire compatibility
 but must be an empty object. It is not a grant, signature, or approval flag.
@@ -24,7 +24,7 @@ import stat
 
 
 EXPECTED_UID = 1000
-EXPECTED_HOST = "GERAMEG"
+EXPECTED_HOST = os.environ.get("FRAMEBRIDGE_TERMINAL_NODE_HOST", "").upper()
 DEFAULT_SOCKET = "/run/user/1000/framebridge-alpha01-cua/agent.sock"
 _SESSION_ID = re.compile(r"[a-f0-9]{32}\Z")
 _PAYLOAD_HASH = re.compile(r"[a-f0-9]{64}\Z")
@@ -35,7 +35,8 @@ _CONTEXT_FIELDS = frozenset(
 
 def require_local_identity() -> None:
     if (
-        os.getuid() != EXPECTED_UID
+        not EXPECTED_HOST
+        or os.getuid() != EXPECTED_UID
         or os.geteuid() != EXPECTED_UID
         or os.uname().nodename.upper() != EXPECTED_HOST
     ):
@@ -77,7 +78,7 @@ def _stop(_signum: int, _frame: object) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="GERAMEG CUA-TTY local UID policy")
+    parser = argparse.ArgumentParser(description="TERMINAL_NODE CUA-TTY local UID policy")
     parser.add_argument("--socket", default=DEFAULT_SOCKET)
     args = parser.parse_args(argv)
     require_local_identity()

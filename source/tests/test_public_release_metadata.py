@@ -23,7 +23,7 @@ class PublicReleaseSourceTests(unittest.TestCase):
         self.file.write_text("# reviewed release source\n")
         self.archive = self.root / "FrameBridge-0.3.4-source.tar.gz"
         self.vendor_paths = {
-            "cp313": "source/sources/original-geranas/FrameBridge-Fleet-Hub/vendor",
+            "cp313": "source/sources/original-hub/FrameBridge-Fleet-Hub/vendor",
             "cp312": "source/target-vendors/cp312",
         }
         vendor_data = b"# reviewed vendor input\n"

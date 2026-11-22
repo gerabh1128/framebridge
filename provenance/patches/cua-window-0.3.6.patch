@@ -1,7 +1,7 @@
-diff --git a/source/sources/original-asus/framebridge-native/host/framebridge_cua_linux.py b/source/sources/original-asus/framebridge-native/host/framebridge_cua_linux.py
+diff --git a/source/sources/original-workstation/framebridge-native/host/framebridge_cua_linux.py b/source/sources/original-workstation/framebridge-native/host/framebridge_cua_linux.py
 index 358f18f2cca2df210a1e48bf800df968a6b43262..f3a7e1f5180c9e3e776ea30f9ee87f1690a91f43
---- a/source/sources/original-asus/framebridge-native/host/framebridge_cua_linux.py
-+++ b/source/sources/original-asus/framebridge-native/host/framebridge_cua_linux.py
+--- a/source/sources/original-workstation/framebridge-native/host/framebridge_cua_linux.py
++++ b/source/sources/original-workstation/framebridge-native/host/framebridge_cua_linux.py
 @@ -1389,6 +1389,7 @@
      space = _coord_space(msg)
  
