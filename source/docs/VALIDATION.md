@@ -8,7 +8,7 @@ Status: release acceptance is determined by the external report and evidence.
 
 RC6 (0.3.0~expanded.20261023.6) is a separate frozen artifact. Its final source suite passed 314 tests and two builds produced identical package bytes. RC6 was installed on the isolated Debian CENTRAL and NODE VM filesystems. The real test account and manual tunnel verified status, local and remote EXEC, and authentic physical X11/framebuffer captures without new capture-created FBTERM jobs.
 
-Those results do not certify RC7. RC6 still had an open ChatGPT image presentation/reuse gate, and the lab framebuffer read ACL was temporary. Three additional direct diagnostic checks passed; two terminal-key negative cases were skipped because the required auxiliary Bash window was not in front. Official CLOUD MT publication was not verified by that diagnostic phase.
+Those results do not certify RC7. RC6 still had an open ChatGPT image presentation/reuse gate, and the lab framebuffer read ACL was temporary. Three additional direct diagnostic checks passed; two terminal-key negative cases were skipped because the required auxiliary Bash window was not in front. Publication in the official technical archive was not verified by that diagnostic phase.
 
 ## RC7 implementation scope
 

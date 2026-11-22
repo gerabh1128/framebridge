@@ -423,7 +423,8 @@ def main(argv=None):
     relationships = package_relationships(profile)
     (control / "control").write_text(
         "Package: " + PACKAGE + "\nVersion: " + VERSION + "\nSection: utils\nPriority: optional\nArchitecture: amd64\n"
-        "Maintainer: FrameBridge <gerardobh1128@gmail.com>\n"
+        "Maintainer: FrameBridge <framebridge@localhost>\n"
+        "Bugs: https://github.com/gerabh1128/framebridge/issues\n"
         "Homepage: https://framebridge.betancourt.one/\n"
         "Installed-Size: " + str((installed + 1023) // 1024) + "\n"
         "Depends: " + relationships["Depends"] + "\n"

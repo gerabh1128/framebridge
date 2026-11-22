@@ -14,7 +14,7 @@ import time
 import uuid
 from framebridge_cua_tty.core import TerminalDenied
 
-TMUX_SOCKET = '/run/user/1000/framebridge-alpha01-cua/real-tmux.sock'
+TMUX_SOCKET = f'/run/user/{os.getuid()}/framebridge-alpha01-cua/real-tmux.sock'
 KEY_NAMES = {'UP':'Up','DOWN':'Down','LEFT':'Left','RIGHT':'Right',
  'ENTER':'Enter','RETURN':'Enter','TAB':'Tab','SHIFT_TAB':'BTab','ESC':'Escape',
  'BACKSPACE':'BSpace','DELETE':'DC','INSERT':'IC','HOME':'Home','END':'End',
@@ -118,7 +118,7 @@ class RealTerminalMixin:
                 'real_sessions':sessions,'real_terminal_enabled':True,
                 'real_programs':['bash'],'input_policy':'local-uid-1000',
                 'owner_device_connected':False,'owner_signature_required':False,
-                'input_enabled':'same-uid-1000','real_idle_timeout_s':None})
+                'input_enabled': f'same-uid-{os.getuid()}','real_idle_timeout_s':None})
             return value
 
     def observe(self, sid):

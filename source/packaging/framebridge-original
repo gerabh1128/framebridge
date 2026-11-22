@@ -59,7 +59,7 @@ def settings(args):
         "FRAMEBRIDGE_HUB_MCP_URL": "http://127.0.0.1:" + str(args.hub_port) + "/mcp",
         "FRAMEBRIDGE_BROKER_CONTROL": "http://127.0.0.1:" + str(args.broker_port),
         "FRAMEBRIDGE_WORKSTATION_NODE_ID": "", "FRAMEBRIDGE_TERMINAL_NODE_NODE_ID": "",
-        "FRAMEBRIDGE_CLOUD_DSM_SOCKET": str(runtime / "cloud-unconfigured.sock"),
+        "FRAMEBRIDGE_CLOUD_DSM_SOCKET": str(runtime / "dsm-unconfigured.sock"),
         "FRAMEBRIDGE_NODE_REGISTRY": str(home / ".config/framebridge/nodes.json"),
         "FRAMEBRIDGE_ACCOUNT_BINDING": str(home / ".config/framebridge/account-binding.json"),
         "FRAMEBRIDGE_PAIRED_DISCOVERY": str(home / ".config/framebridge/paired-nodes.json"),

@@ -100,15 +100,9 @@ Node operation must use the configured local user's identity and runtime directo
 
 The successful Original R1/R2 tests are historical reference evidence. They must not be reported as fresh Expanded package tests.
 
-## Historical source documents
+## Historical acceptance records
 
-- FrameBridge C8 terminal-first onboarding R7, 2026-10-11: https://drive.google.com/file/d/1LuYF1vGw8FKaD4Izcpw4NnR0HRuws78s/view
-- Terminal-first onboarding guide R1: https://drive.google.com/file/d/11MEm5eOVke4aSeIBc-024e1zNLke_y_s/view
-- TERMINAL_NODE CUA-TTY demo-only live test, 2026-10-19: https://drive.google.com/file/d/1DixrNUYUhr6pM2wiXeILKmU2dmbE53_D/view
-- TERMINAL_NODE real-terminal FBEXEC/CUA-TTY A/B certificate R3, 2026-10-19: https://drive.google.com/file/d/1VUzhCLJpV8DNQSOlfWYus-nzKAsloGlm/view
-
-These are historical implementation references. They do not override the current requested product or authorize copying runtime identities or secrets.
-
+The project preserves its original terminal-first onboarding and CUA-TTY acceptance evidence in the technical archive. The [validation record](VALIDATION.md) describes the scope of the published checks.
 
 ## RC7 saved-image and lifecycle acceptance
 

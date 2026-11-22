@@ -4,7 +4,7 @@
   "source_file_count": 983,
   "source_hashes": {
     "original-workstation/SOURCE-MANIFEST.json": "750881b2eb355241911fe3af973f36e243f4a76ffbd114dd5c0214ec431e2450",
-    "original-hub/MANIFEST.json": "7bda2af7b5b846630941da6cfe55013aead52c5ce0238f0bf5f3511f98ff7256",
+    "original-hub/MANIFEST.json": "3a49fcd821b329fa0f4b4b099bc483482439da847425329839c3e00068f87b50",
     "original-hub/FrameBridge-Broker-RC1/dev/fbpair_dev_broker.py": "4f75f78d40228db8fa1b23768f8b3660bfd25669e8198ebb4d7afbcb500c1c75",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/classic_tty.py": "f195566a43eaefd329080c12f4095cdbfa49f8548cbd6afeb5fd83c70ae832f6",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/network_security.py": "3ee930c6ff4d7ffdbe7157b1f5c960e2f0a55e4f163b2142a4cb939b8593fd19",
@@ -32,7 +32,7 @@
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/vendor/qrcodegen.py": "9f4ed1dd201dcb92b1bc0d6e14f46c754bcff0ce48580c5d7e8ace8f6926c8ef",
     "original-hub/FrameBridge-MCP-Private/bin/framebridge-mcp-private-run": "61fc24212d60599589b451e6babe6aad81c8f5f0401e4b168409df6bc3d72f68",
     "original-hub/FrameBridge-MCP-Private/bin/tunnel-client": "472eb9dd9dd625b4e6023c3b4a5736b3a2e5a1b6dbe9338e001887a64ec992a6",
-    "original-hub/FrameBridge-Front-Door/bin/front_door_mcp.py": "09a2d7d92d8e86e39292bfdffee6f1eb739f62ae8dbd7d89d239064c8d1b810b",
+    "original-hub/FrameBridge-Front-Door/bin/front_door_mcp.py": "799158b5550c3c070ced075e4b4b2feeeb01fac0e58bf4d214f275f6c3d1b7c8",
     "original-hub/FrameBridge-Front-Door/bin/terminal_node_cua_frontdoor.py": "d0451a72e719f0597e4f1c5d33b6d1165ea2e5363cf45153ad11280dfa84337d",
     "original-hub/FrameBridge-Fleet-Hub/app/fleet_hub_mcp_server.py": "280a5cb2fc9394a941e4b94c9c4d4a77ce5de8426fc4c1ac98a9abd05f6717a0",
     "original-hub/FrameBridge-Fleet-Hub/app/framebridge_node_gateway.py": "7d26f28cf3bd19046337d644d13dcea424c27fc2ada01d1e16b8b0043dfb1428",

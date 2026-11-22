@@ -4813,8 +4813,8 @@
     },
     {
       "path": "FrameBridge-Front-Door/bin/front_door_mcp.py",
-      "bytes": 29714,
-      "sha256": "09a2d7d92d8e86e39292bfdffee6f1eb739f62ae8dbd7d89d239064c8d1b810b"
+      "bytes": 29808,
+      "sha256": "799158b5550c3c070ced075e4b4b2feeeb01fac0e58bf4d214f275f6c3d1b7c8"
     },
     {
       "path": "FrameBridge-Front-Door/bin/terminal_node_cua_frontdoor.py",

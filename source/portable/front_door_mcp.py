@@ -467,13 +467,14 @@ def _cloud_dsm_rpc(payload: dict) -> dict:
     """Optional private local socket; root-only approval never exposed through MCP."""
     import socket as _socket
     import json as _json
+    target = os.environ.get("FRAMEBRIDGE_DSM_TARGET") or "DSM"
     sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
     sock.settimeout(38)
     try:
         sock.connect(os.environ.get("FRAMEBRIDGE_CLOUD_DSM_SOCKET", str(HOME / ".local/share/framebridge/dsm/cloud.sock")))
         body = (_json.dumps(payload, separators=(",",":"),ensure_ascii=True) + "\n").encode("utf8")
         if len(body)>12000:
-            return {"ok":False,"error":"CLOUD_REQUEST_TOO_LARGE","target":"CLOUD"}
+            return {"ok":False,"error":"CLOUD_REQUEST_TOO_LARGE","target":target}
         sock.sendall(body)
         result = b""
         while len(result)<32768 and b"\n" not in result:
@@ -481,21 +482,21 @@ def _cloud_dsm_rpc(payload: dict) -> dict:
             if not part:break
             result+=part
         if b"\n" not in result:
-            return {"ok":False,"error":"CLOUD_RESPONSE_INCOMPLETE","target":"CLOUD"}
+            return {"ok":False,"error":"CLOUD_RESPONSE_INCOMPLETE","target":target}
         output = _json.loads(result.split(b"\n",1)[0])
         if not isinstance(output,dict):
-            return {"ok":False,"error":"CLOUD_RESPONSE_INVALID","target":"CLOUD"}
-        output["target"]="CLOUD"
+            return {"ok":False,"error":"CLOUD_RESPONSE_INVALID","target":target}
+        output["target"]=target
         return output
     except (OSError,ValueError,UnicodeError) as e:
         return {"ok":False,"error":"CLOUD_DSM_UNAVAILABLE",
-                "error_type":type(e).__name__,"target":"CLOUD"}
+                "error_type":type(e).__name__,"target":target}
     finally:
         sock.close()
 
 
 def framebridge_cloud_dsm(action: str, authorized: bool = False, params_json: str = "{}") -> dict:
-    """CLOUD XPEnology agentless DSM: persistent agentless DSM with temporary owner 2FA; typed reads and Owner-MFA gated writes.
+    """Agentless DSM through a configured local socket, with typed reads and owner-approved writes.
     action: status,system_info,file_station_info,shares,list_folder,users,
             create_folder,rename_folder,pending.
     params_json: JSON object (no passwords/OTP). Writes require local owner OTP approval.

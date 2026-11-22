@@ -78,5 +78,7 @@ Perform final HTTPS, Gitea clone and isolated APT verification through the
 actual public domain before reporting publication complete.
 
 The website follows the project's GPL-3.0-only license. Third-party materials
-retain their own licenses and notices. Support is voluntary; the contact and
-PayPal account supplied by the project owner is gerardobh1128@gmail.com.
+retain their own licenses and notices. Support is voluntary.
+Set `FRAMEBRIDGE_PAYPAL_DONATION_URL` in the deployment environment to a hosted
+PayPal donation link supplied by the project owner. Use its hosted button ID
+and keep payment account addresses out of the public source and site.

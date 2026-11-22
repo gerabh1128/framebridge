@@ -85,7 +85,7 @@
 +        sock.connect(os.environ.get("FRAMEBRIDGE_CLOUD_DSM_SOCKET", str(HOME / ".local/share/framebridge/dsm/cloud.sock")))
          body = (_json.dumps(payload, separators=(",",":"),ensure_ascii=True) + "\n").encode("utf8")
          if len(body)>12000:
-             return {"ok":False,"error":"CLOUD_REQUEST_TOO_LARGE","target":"CLOUD"}
+             return {"ok":False,"error":"CLOUD_REQUEST_TOO_LARGE","target":target}
 @@ -428,9 +432,15 @@
      job_id: str = "",
      sha256: str = "",
@@ -93,23 +93,23 @@
 -    target: str = "WORKSTATION",
 +    target: str = "LOCAL",
  ) -> dict:
--    """Generic administrative/lab exec. target=WORKSTATION or TERMINAL_NODE uses broker; target=HUB uses local FBTERM. Legacy calls without target remain WORKSTATION. CLOUD uses only typed JSON actions, never shell commands."""
-+    """Original execution on this receiver by default. WORKSTATION/TERMINAL_NODE require explicit broker configuration; HUB remains a historical local alias. CLOUD accepts typed JSON only."""
+-    """Generic administrative/lab exec. target=WORKSTATION or TERMINAL_NODE uses broker; target=HUB uses local FBTERM. Legacy calls without target remain WORKSTATION. DSM accepts only typed JSON actions."""
++    """Original execution on this receiver by default. WORKSTATION/TERMINAL_NODE require explicit broker configuration; HUB remains a historical local alias. DSM accepts typed JSON only."""
 +    if target == "LOCAL":
 +        result = _framebridge_exec_hub_impl(script, authorized, timeout_s, job_id, sha256, include_stdout)
 +        if isinstance(result, dict):
 +            result = dict(result)
 +            result["target"] = "LOCAL"
 +        return result
-     if target == "CLOUD":
+     if target == (os.environ.get("FRAMEBRIDGE_DSM_TARGET") or "DSM"):
          import json as _json
          try:
 @@ -458,7 +468,7 @@
              result["target"] = "HUB"
          return result
      if target not in ("WORKSTATION", "TERMINAL_NODE"):
--        return {"ok": False, "error": "UNSUPPORTED_TARGET", "allowed_targets": ["WORKSTATION", "HUB", "TERMINAL_NODE", "CLOUD"]}
-+        return {"ok": False, "error": "UNSUPPORTED_TARGET", "allowed_targets": ["LOCAL", "WORKSTATION", "HUB", "TERMINAL_NODE", "CLOUD"]}
+-        return {"ok": False, "error": "UNSUPPORTED_TARGET", "allowed_targets": ["WORKSTATION", "HUB", "TERMINAL_NODE", os.environ.get("FRAMEBRIDGE_DSM_TARGET") or "DSM"]}
++        return {"ok": False, "error": "UNSUPPORTED_TARGET", "allowed_targets": ["LOCAL", "WORKSTATION", "HUB", "TERMINAL_NODE", os.environ.get("FRAMEBRIDGE_DSM_TARGET") or "DSM"]}
      exec_request = workstation_exec_request if target == "WORKSTATION" else terminal_node_exec_request
      result=exec_request(
          script=script,

@@ -13,10 +13,10 @@ import stat
 import sys
 import uuid
 
-UID = 1000
+UID = os.getuid()
 HOSTNAME = os.environ.get("FRAMEBRIDGE_TERMINAL_NODE_HOST", "").upper()
 HOME = Path.home()
-SOCKET_PATH = Path("/run/user/1000/framebridge-alpha01-cua/agent.sock")
+SOCKET_PATH = Path(f"/run/user/{UID}/framebridge-alpha01-cua/agent.sock")
 CLIENT_PATH = Path("/opt/framebridge-alpha-01/vendor/framebridge_cua_tty/client.py")
 CLIENT_SHA256 = "6a1fc004f2d50944661fcce67002b04534721bc3118eaf44e3f0694e19d15fe7"
 RESULTS_DIR = HOME / ".local/share/framebridge/cua-tty-results"
@@ -110,7 +110,7 @@ def validate_request(req):
 
 
 def guard_runtime():
-    require(os.getuid() == UID and os.geteuid() == UID, "UID_MISMATCH")
+    require(UID > 0 and os.getuid() == UID and os.geteuid() == UID, "UID_MISMATCH")
     require(HOSTNAME and socket.gethostname().upper() == HOSTNAME, "HOSTNAME_MISMATCH")
     require(Path.home().resolve() == HOME.resolve(), "HOME_MISMATCH")
 

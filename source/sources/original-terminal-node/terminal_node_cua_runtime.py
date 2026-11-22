@@ -7,7 +7,7 @@ socket protocol, existing demos and PTY handling, or input/session limits for de
 Remote callers must still enter through authenticated FrameBridge. This
 process authenticates LOCAL peers by the original LocalServer's SO_PEERCRED
 check. It cannot distinguish an authenticated FBEXEC process from another
-process running under the same Unix account (UID 1000).
+process running under the same Unix account.
 
 The legacy owner_assertion RPC field remains mandatory for wire compatibility
 but must be an empty object. It is not a grant, signature, or approval flag.
@@ -23,9 +23,9 @@ import signal
 import stat
 
 
-EXPECTED_UID = 1000
+EXPECTED_UID = os.getuid()
 EXPECTED_HOST = os.environ.get("FRAMEBRIDGE_TERMINAL_NODE_HOST", "").upper()
-DEFAULT_SOCKET = "/run/user/1000/framebridge-alpha01-cua/agent.sock"
+DEFAULT_SOCKET = f"/run/user/{EXPECTED_UID}/framebridge-alpha01-cua/agent.sock"
 _SESSION_ID = re.compile(r"[a-f0-9]{32}\Z")
 _PAYLOAD_HASH = re.compile(r"[a-f0-9]{64}\Z")
 _CONTEXT_FIELDS = frozenset(
@@ -35,7 +35,8 @@ _CONTEXT_FIELDS = frozenset(
 
 def require_local_identity() -> None:
     if (
-        not EXPECTED_HOST
+        EXPECTED_UID <= 0
+        or not EXPECTED_HOST
         or os.getuid() != EXPECTED_UID
         or os.geteuid() != EXPECTED_UID
         or os.uname().nodename.upper() != EXPECTED_HOST
@@ -112,8 +113,8 @@ def main(argv: list[str] | None = None) -> None:
             # A callable verifier is not evidence of an Owner device. Report
             # the selected authority honestly while retaining session status.
             value["owner_device_connected"] = False
-            value["input_enabled"] = "same-uid-1000"
-            value["input_policy"] = "local-uid-1000"
+            value["input_enabled"] = f"same-uid-{EXPECTED_UID}"
+            value["input_policy"] = f"local-uid-{EXPECTED_UID}"
             value["owner_signature_required"] = False
             return value
 
@@ -122,7 +123,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     signal.signal(signal.SIGTERM, _stop)
     with LocalServer(args.socket, manager=manager) as server:
-        print("CUA_TTY_READY POLICY=LOCAL_UID_1000 OWNER_SIGNATURE_REQUIRED=NO", flush=True)
+        print(f"CUA_TTY_READY POLICY=LOCAL_UID_{EXPECTED_UID} OWNER_SIGNATURE_REQUIRED=NO", flush=True)
         try:
             server.serve_forever(poll_interval=0.2)
         except KeyboardInterrupt:

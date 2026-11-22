@@ -132,8 +132,11 @@ class PublicReleasePrivacyTests(unittest.TestCase):
             home = Path(temporary)
             with mock.patch.object(Path, 'home', return_value=home), \
                  mock.patch.dict(os.environ, {'FRAMEBRIDGE_TERMINAL_NODE_HOST': 'fixture-terminal'}):
-                module = load_module(RPC, 'public_captured_rpc')
+                with mock.patch.object(os, 'getuid', return_value=31921):
+                    module = load_module(RPC, 'public_captured_rpc')
                 self.assertEqual(module.HOME, home)
+                self.assertEqual(module.UID, 31921)
+                self.assertEqual(module.SOCKET_PATH, Path('/run/user/31921/framebridge-alpha01-cua/agent.sock'))
                 with mock.patch.object(module.os, 'getuid', return_value=module.UID), \
                      mock.patch.object(module.os, 'geteuid', return_value=module.UID), \
                      mock.patch.object(module.socket, 'gethostname', return_value=module.HOSTNAME):
