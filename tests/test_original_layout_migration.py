@@ -96,11 +96,11 @@ class OriginalLayoutMigration(unittest.TestCase):
 
     def test_reject_existing_legacy_target(self):
         self.old_links("legacy-role")
-        (self.prefix / "original/asus/fbterm/bin").mkdir(parents=True)
+        (self.prefix / "original/legacy-role/fbterm/bin").mkdir(parents=True)
         with self.assertRaisesRegex(RuntimeError, "Unexpected link"):
             self.prepare()
         self.assertEqual(os.readlink(self.home / LINKS[0][0]),
-                         str(self.prefix / "original/asus/fbterm/bin"))
+                         str(self.prefix / "original/legacy-role/fbterm/bin"))
 
     def test_partially_migrated_profile(self):
         self.old_links("legacy-role")
