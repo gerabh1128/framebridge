@@ -62,7 +62,8 @@ def main():
             if item.get('src')!='/assets/site.js':failures.append('Unexpected script source')
     support=(DIST/'support/index.html').read_text()
     for name in ('index.html','download/index.html'):
-        if '/support/#donations' not in (DIST/name).read_text():
+        page=(DIST/name).read_text()
+        if 'class="button support-button" href="/support/#donations"' not in page:
             failures.append(name+': missing prominent donation link')
     if '<form' in support or 'id="donations"' not in support:
         failures.append('Support must use the dedicated donation section and an off-site payment link')
@@ -131,7 +132,7 @@ def main():
         status['visual_browser_QA_performed']=True
         status['visual_browser_QA_limit']=json.loads(visual.read_text())['limitations']
         status['visual_browser_QA_report']=str(visual)
-    status.update(support_page='/support/',support_funding_channel_configured='https://www.paypal.com/donate/' in (DIST/'support/index.html').read_text(),support_payment_form_present='<form' in (DIST/'support/index.html').read_text(),license_identifier=meta.get('license'),dependency_source_archives=len(meta.get('dependency_sources',[])))
+    status.update(support_page='/support/',support_funding_channel_configured='Donate with PayPal' in support,support_payment_form_present='<form' in support,license_identifier=meta.get('license'),dependency_source_archives=len(meta.get('dependency_sources',[])))
     video=DIST/'assets/framebridge-preview-0.3.1-original-r4.mp4'
     if video.exists():
         status['video_sha256']=hashlib.sha256(video.read_bytes()).hexdigest()

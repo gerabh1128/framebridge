@@ -44,3 +44,20 @@
     margin-bottom: 12px;
     color: var(--muted);
 }
+.site-header nav a[href="/support/"] {
+    color: var(--mint);
+    font-weight: 600;
+}
+@media (max-width: 760px) {
+    .hero h1 {
+        max-width: 15ch;
+        font-size: clamp(36px, 10vw, 55px);
+    }
+    .hero .lead {
+        margin-bottom: 20px;
+    }
+    .hero .support-callout {
+        margin: 18px 0;
+        padding: 12px 14px;
+    }
+}
