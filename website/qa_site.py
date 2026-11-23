@@ -60,6 +60,14 @@ def main():
                 if u.fragment not in other.ids:failures.append('Missing target fragment '+value)
         for item in q.scripts:
             if item.get('src')!='/assets/site.js':failures.append('Unexpected script source')
+    support=(DIST/'support/index.html').read_text()
+    for name in ('index.html','download/index.html'):
+        if '/support/#donations' not in (DIST/name).read_text():
+            failures.append(name+': missing prominent donation link')
+    if '<form' in support or 'id="donations"' not in support:
+        failures.append('Support must use the dedicated donation section and an off-site payment link')
+    if ('Donate with PayPal' in support) != bool(os.environ.get('FRAMEBRIDGE_PAYPAL_DONATION_URL')):
+        failures.append('Support payment action does not match the configured channel')
     css=(DIST/'assets/site.css').read_text()
     assert css.count('{')==css.count('}'),'CSS brace mismatch'
     class Quiet(SimpleHTTPRequestHandler):

@@ -143,7 +143,7 @@ def apt_commands(meta, profile):
   sudo apt install framebridge-original-expanded
 )"""
 
-def download(meta):
+def download(meta, *, support=""):
     ready = meta["state"] == "ready"
     body = '<main id="content"><div class="page-header"><div class="wrap"><p class="section-label">Download / Verify / Install</p><h1>Choose your Linux package.</h1><p class="lead">One network administration tool. Three distribution profiles. Updates through signed APT repositories.</p></div></div><div class="wrap page-content"><article class="prose">'
     body += '<p>FrameBridge helps one administrator manage their own home Linux network: inventory, services, storage, diagnostics, commands and persistent terminals. Desktop access is an auxiliary tool.</p>'
@@ -159,7 +159,7 @@ def download(meta):
         else:
             body += '<p class="micro">Version ' + E(meta["version"]) + ' · package and signature pending.</p>'
         body += '</section>'
-    body += '</div><article class="prose">'
+    body += '</div>' + support + '<article class="prose">'
     if ready:
         body += '<h2>Release verification and source</h2><p>Expected signing-key fingerprint:</p><p class="hash">' + FINGERPRINT + '</p><p><a href="' + E(meta["checksums_url"]) + '">SHA256SUMS</a> · <a href="' + E(meta["checksums_signature_url"]) + '">Checksum signature</a> · <a href="' + E(meta["signing_key_url"]) + '">Public key</a></p><p><a href="' + E(meta["source"]["url"]) + '">Corresponding FrameBridge source</a> · <a href="' + E(meta["source"]["signature_url"]) + '">Source signature</a></p><p class="hash">SHA-256: ' + E(meta["source"]["sha256"]) + '</p><ul>'
         for dep in meta["dependency_sources"]:
