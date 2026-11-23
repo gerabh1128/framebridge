@@ -4,7 +4,7 @@ import copy
 import hashlib
 import json
 import re
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 E = lambda value: html.escape(str(value), quote=True)
 FINGERPRINT = "2B1F01BC806C0B33CB6CEDDE52859CEBC91B8808"
@@ -69,6 +69,28 @@ def project_url(value, prefix=None):
     require(re.fullmatch(r"/[A-Za-z0-9/._+~:-]*",url.path), "Unsafe artifact URL characters")
     if prefix:
         require(url.path.startswith(prefix), "Unexpected artifact route")
+    return value
+
+def paypal_donation_url(value):
+    """Accept the public URL copied from PayPal's donation tools."""
+    message = "Use the public PayPal donation URL without a payment account email."
+    require(len(value) <= 2048 and not re.search(r"[\x00-\x20\x7f]", value), message)
+    url = urlsplit(value)
+    require(url.scheme == "https" and url.netloc in ("paypal.com", "www.paypal.com")
+            and url.path in ("/donate", "/donate/") and not url.fragment, message)
+    items = parse_qsl(url.query, keep_blank_values=True, strict_parsing=True)
+    params = dict(items)
+    require(len(params) == len(items), message)
+    if set(params) == {"hosted_button_id"}:
+        require(re.fullmatch(r"[A-Za-z0-9]{1,64}", params["hosted_button_id"]), message)
+    else:
+        require(set(params) == {"business", "currency_code", "item_name", "no_recurring"}, message)
+        description = params["item_name"]
+        require(re.fullmatch(r"[A-Z0-9]{13}", params["business"])
+                and re.fullmatch(r"[A-Z]{3}", params["currency_code"])
+                and params["no_recurring"] in ("0", "1")
+                and 1 <= len(description) <= 127 and description.isprintable()
+                and "@" not in description and "\ufffd" not in description, message)
     return value
 
 def asset(spec):
@@ -143,10 +165,12 @@ def apt_commands(meta, profile):
   sudo apt install framebridge-original-expanded
 )"""
 
-def download(meta):
+def download(meta, *, support=""):
     ready = meta["state"] == "ready"
     body = '<main id="content"><div class="page-header"><div class="wrap"><p class="section-label">Download / Verify / Install</p><h1>Choose your Linux package.</h1><p class="lead">One network administration tool. Three distribution profiles. Updates through signed APT repositories.</p></div></div><div class="wrap page-content"><article class="prose">'
     body += '<p>FrameBridge helps one administrator manage their own home Linux network: inventory, services, storage, diagnostics, commands and persistent terminals. Desktop access is an auxiliary tool.</p>'
+    if support:
+        body += '</article>' + support + '<article class="prose">'
     body += '<h2>Match the target computer</h2>' + code("cat /etc/os-release\ndpkg --print-architecture\npython3 --version")
     body += '<p>The supported profiles below use amd64 and the distribution system Python. Select one matching suite for each computer.</p>'
     if not ready:

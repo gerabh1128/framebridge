@@ -295,7 +295,7 @@ class PrivateLogTests(unittest.TestCase):
             self.assertIn("[REDACTED]", clean)
 
     def test_proxy_url_userinfo_is_redacted(self):
-        for value in ["proxy http://user:FAKE_PASSWORD@proxy.example:80/path", "https://name:p%40ss@host.example/next"]:
+        for value in ["proxy http://user:" + "FAKE_PASSWORD@proxy.example:80/path", "https://name:p%40ss@host.example/next"]:
             clean = monitor.redact(value, "different_runtime_fixture")
             for fragment in ["user:", "FAKE_PASSWORD", "name:", "p%40ss"]:
                 self.assertNotIn(fragment, clean)

@@ -12,9 +12,11 @@ from pathlib import Path
 import shutil
 import shlex
 import subprocess
+import tempfile
 
 from build_profiles import CANDIDATE_VERSION, PROFILES, SOURCE_VENDOR, VENDOR_RELATIVE, target_profile, validate_vendor, vendor_versions
 from release_metadata import release_source
+from release_privacy import ReleasePrivacy
 
 BASE = Path(__file__).resolve().parents[1]
 ROOT = BASE.parent
@@ -301,8 +303,10 @@ def main(argv=None):
     parser.add_argument("--vendor-dir", type=Path, help="Reviewed target-ABI Fleet Hub vendor tree; never installed globally")
     parser.add_argument("--public-release", action="store_true", help="Bind an official release profile to its assembled corresponding-source archive")
     parser.add_argument("--source-manifest", type=Path, help="Matching SOURCE-ARCHIVE-MANIFEST.json kept beside its source archive")
+    parser.add_argument("--privacy-policy", type=Path, help="Local JSON array of private identifiers to reject")
     parser.add_argument("--check-vendor", action="store_true", help="Validate inputs without staging or building a package")
     args = parser.parse_args(argv)
+    privacy = ReleasePrivacy(args.privacy_policy)
     if not re.fullmatch(r"[0-9][0-9A-Za-z.+:~\-]*", args.version) or args.version == "0.3.1":
         parser.error("A distinct valid Debian candidate version is required")
     subprocess.run(["dpkg", "--validate-version", args.version], check=True)
@@ -461,11 +465,16 @@ def main(argv=None):
         os.utime(path, (EPOCH, EPOCH), follow_symlinks=False)
     manifest = [{"path": str(p.relative_to(STAGE)), "sha256": sha(p), "bytes": p.stat().st_size}
                 for p in sorted(STAGE.rglob("*")) if p.is_file() and not p.is_symlink()]
-    (RELEASE / "RELEASE-PROFILE.json").write_text(json.dumps(profile, indent=2, sort_keys=True) + "\n")
-    (RELEASE / "PACKAGE-MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n")
     output = RELEASE / ("framebridge-expanded_" + VERSION + "_amd64.deb")
     env = dict(os.environ, SOURCE_DATE_EPOCH=str(EPOCH))
-    subprocess.run(["dpkg-deb", "--root-owner-group", "-Zxz", "-z6", "--build", str(STAGE), str(output)], check=True, env=env)
+    with tempfile.TemporaryDirectory(prefix=".package-build-", dir=RELEASE) as temporary:
+        staged = Path(temporary) / output.name
+        subprocess.run(["dpkg-deb", "--root-owner-group", "-Zxz", "-z6", "--build", str(STAGE), str(staged)], check=True, env=env)
+        if PUBLIC_RELEASE or args.privacy_policy is not None:
+            privacy.deb(staged)
+        staged.replace(output)
+    (RELEASE / "RELEASE-PROFILE.json").write_text(json.dumps(profile, indent=2, sort_keys=True) + "\n")
+    (RELEASE / "PACKAGE-MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n")
     shutil.copy2(output, RELEASE / PUBLIC_FILENAME)
     print(json.dumps({"package": str(output), "bytes": output.stat().st_size, "sha256": sha(output), "payload_entries": len(manifest), "profile_id": args.target, "validation_status": "release_build" if PUBLIC_RELEASE else "candidate", "public_filename": PUBLIC_FILENAME, "status": "PUBLIC_RELEASE_BUILD_ASSEMBLED" if PUBLIC_RELEASE else "COMPATIBILITY_CANDIDATE_BUILD"}))
 

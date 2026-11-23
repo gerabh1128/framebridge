@@ -20,7 +20,7 @@
       "signature_url": "/downloads/FrameBridge-0.3.1-tunnel-client-dependency-sources.tar.gz.asc"
     }
   ],
-  "version": "0.3.9+fbterm.4",
+  "version": "0.3.9+fbterm.5",
   "state": "preparing",
   "release_date": "2026-11-11",
   "distribution": "Debian 13 \u00b7 Ubuntu 24.04 \u00b7 Linux Mint 22.x",

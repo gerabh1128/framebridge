@@ -31,7 +31,7 @@ class ParserTests(unittest.TestCase):
                 self.assertEqual(tunnel.parse_tunnel_input(command).tunnel_id, ID)
 
     def test_rejections_never_echo_hidden_input(self):
-        secret = "sk-test-DO_NOT_DISCLOSE-0123456789"
+        secret = "sk-" + "test-DO_NOT_DISCLOSE-0123456789"
         bad = [
             "sudo tunnel-client run --control-plane.tunnel-id " + ID,
             "env OPENAI_API_KEY=" + secret + " tunnel-client run --control-plane.tunnel-id " + ID,
