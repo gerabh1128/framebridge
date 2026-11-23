@@ -173,7 +173,7 @@ def download(meta, *, support=""):
     body += '<p>The supported profiles below use amd64 and the distribution system Python. Select one matching suite for each computer.</p>'
     if not ready:
         body += '<div class="release-notice" role="status"><strong>Release preparation.</strong> Version ' + E(meta["version"]) + ' is being prepared. Download links and installation commands appear after the exact artifacts and signatures are verified.</div>'
-    body += '</article><div class="profiles">'
+    body += '</article>' + support + '<div class="profiles">'
     for profile in meta["profiles"]:
         body += '<section class="profile-card" id="' + E(profile["profile_id"]) + '"><p class="section-label">amd64 · Python ' + E(profile["python"]) + '</p><h2>' + E(profile["label"]) + '</h2><p>APT suite: <code>' + E(profile["suite"]) + '</code></p>'
         if ready:
@@ -181,7 +181,7 @@ def download(meta, *, support=""):
         else:
             body += '<p class="micro">Version ' + E(meta["version"]) + ' · package and signature pending.</p>'
         body += '</section>'
-    body += '</div>' + support + '<article class="prose">'
+    body += '</div><article class="prose">'
     if ready:
         body += '<h2>Release verification and source</h2><p>Expected signing-key fingerprint:</p><p class="hash">' + FINGERPRINT + '</p><p><a href="' + E(meta["checksums_url"]) + '">SHA256SUMS</a> · <a href="' + E(meta["checksums_signature_url"]) + '">Checksum signature</a> · <a href="' + E(meta["signing_key_url"]) + '">Public key</a></p><p><a href="' + E(meta["source"]["url"]) + '">Corresponding FrameBridge source</a> · <a href="' + E(meta["source"]["signature_url"]) + '">Source signature</a></p><p class="hash">SHA-256: ' + E(meta["source"]["sha256"]) + '</p><ul>'
         for dep in meta["dependency_sources"]:

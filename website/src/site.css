@@ -61,3 +61,6 @@
         padding: 12px 14px;
     }
 }
+.hero .support-callout {
+    max-width: 40ch;
+}
