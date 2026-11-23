@@ -169,11 +169,13 @@ def download(meta, *, support=""):
     ready = meta["state"] == "ready"
     body = '<main id="content"><div class="page-header"><div class="wrap"><p class="section-label">Download / Verify / Install</p><h1>Choose your Linux package.</h1><p class="lead">One network administration tool. Three distribution profiles. Updates through signed APT repositories.</p></div></div><div class="wrap page-content"><article class="prose">'
     body += '<p>FrameBridge helps one administrator manage their own home Linux network: inventory, services, storage, diagnostics, commands and persistent terminals. Desktop access is an auxiliary tool.</p>'
+    if support:
+        body += '</article>' + support + '<article class="prose">'
     body += '<h2>Match the target computer</h2>' + code("cat /etc/os-release\ndpkg --print-architecture\npython3 --version")
     body += '<p>The supported profiles below use amd64 and the distribution system Python. Select one matching suite for each computer.</p>'
     if not ready:
         body += '<div class="release-notice" role="status"><strong>Release preparation.</strong> Version ' + E(meta["version"]) + ' is being prepared. Download links and installation commands appear after the exact artifacts and signatures are verified.</div>'
-    body += '</article>' + support + '<div class="profiles">'
+    body += '</article><div class="profiles">'
     for profile in meta["profiles"]:
         body += '<section class="profile-card" id="' + E(profile["profile_id"]) + '"><p class="section-label">amd64 · Python ' + E(profile["python"]) + '</p><h2>' + E(profile["label"]) + '</h2><p>APT suite: <code>' + E(profile["suite"]) + '</code></p>'
         if ready:
