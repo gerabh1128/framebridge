@@ -1,6 +1,6 @@
 # FrameBridge release notes
 
-## 0.3.9+fbterm.6 (candidate for review — not yet signed or published)
+## 0.3.9+fbterm.6
 
 Fixes the upgrade regression affecting some existing Linux profiles when the
 packaged Original runtime switches from a retired role-specific directory to
