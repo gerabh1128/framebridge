@@ -1,5 +1,13 @@
 # FrameBridge release notes
 
+## 0.3.9+fbterm.5
+
+The public-release builders inspect the assembled source and both sections of
+each DEB before writing the finished files. The release review can also check the
+rendered website and use private, locally maintained identifiers. Findings
+identify the affected section without printing the value that triggered them.
+See [the publication checks](docs/PRIVACY-REVIEW.md#publication-checks).
+
 ## 0.3.9+fbterm.4
 
 Bundled components use role-based paths for the workstation, fleet hub and terminal node. Tests use synthetic node identifiers and sample addresses. Fleet nodes are selected through their enrolled identities.

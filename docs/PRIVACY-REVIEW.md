@@ -19,3 +19,34 @@ From 0.3.9+fbterm.4, the bundled workstation, hub and terminal-node snapshots us
 Paths in historical provenance records now use the component role labels. Their content hashes record the historical bytes. The active snapshot and corresponding-source manifests cover the current files and hashes.
 
 For a separate legacy CUA-TTY installation, configure `FRAMEBRIDGE_TERMINAL_NODE_HOST` for the terminal runtime and its local RPC wrapper. Both validate that host and retain the same-UID checks. The standard package selects targets through the fleet registry.
+
+## Publication checks
+
+From 0.3.9+fbterm.5, public-release builders check the assembled source archive and
+both Debian package sections before the completed artifacts are placed in the
+release directory. The checks cover common private-key and credential shapes,
+private file paths, direct Drive links and personal email in package control
+metadata or rendered website files. Third-party attribution stays intact.
+
+Use `--privacy-policy` on the builders to include the private identifiers for a
+specific deployment. Keep the policy in a private directory outside the checkout.
+It is a JSON array of identifying strings such as host aliases, full local paths,
+node IDs and private addresses. Include identifiers only and keep credential
+values out of the policy. Test fixtures should use synthetic values.
+
+Run the check again on the exact files selected for publication. Include a Git
+archive of the reviewed commit to cover repository files outside the source
+distribution. Pass the website output directory when including a website update.
+
+```sh
+git archive --format=tar HEAD > /staged/reviewed-source.tar
+python3 source/packaging/release_privacy.py --policy /private/release-identifiers.json \
+    /staged/reviewed-source.tar /staged/FrameBridge-source.tar.gz /staged/SOURCE-ARCHIVE-MANIFEST.json \
+    /staged/debian.deb /staged/ubuntu.deb /staged/mint.deb /staged/website
+```
+
+A finding identifies the affected artifact section and entry number without
+printing its matched value. Keep the report and exact file hashes with the
+release review. Review media and sharing permissions separately, and recheck
+the public release after promotion. Historical tags, packages and external
+copies have their own retention and remediation decisions.
