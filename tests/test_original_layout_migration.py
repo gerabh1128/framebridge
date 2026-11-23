@@ -51,7 +51,7 @@ class OriginalLayoutMigration(unittest.TestCase):
         self.module.settings = lambda args: (self.state, self.home,
                                               {"XDG_RUNTIME_DIR": str(self.runtime)})
 
-    def old_links(self, role="asus"):
+    def old_links(self, role="legacy-role"):
         for rel, suffix in LINKS:
             dest = self.home / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -69,7 +69,7 @@ class OriginalLayoutMigration(unittest.TestCase):
                              (self.prefix / "original/workstation" / suffix).resolve())
 
     def test_upgrade_all_stale_links_and_idempotence(self):
-        self.old_links("asus")
+        self.old_links("legacy-role")
         self.prepare()
         self.assert_new_links()
         manifests = list(self.state.glob("layout-migration-*.json"))
@@ -85,7 +85,7 @@ class OriginalLayoutMigration(unittest.TestCase):
         self.assertEqual(list(self.state.glob("layout-migration-*.json")), [])
 
     def test_reject_custom_dangling_symlink(self):
-        self.old_links("asus")
+        self.old_links("legacy-role")
         dest = self.home / LINKS[0][0]
         dest.unlink()
         custom = Path(self.temporary.name) / "unrelated" / "fbterm"
@@ -95,7 +95,7 @@ class OriginalLayoutMigration(unittest.TestCase):
         self.assertEqual(os.readlink(dest), str(custom))
 
     def test_reject_existing_legacy_target(self):
-        self.old_links("asus")
+        self.old_links("legacy-role")
         (self.prefix / "original/asus/fbterm/bin").mkdir(parents=True)
         with self.assertRaisesRegex(RuntimeError, "Unexpected link"):
             self.prepare()
@@ -103,7 +103,7 @@ class OriginalLayoutMigration(unittest.TestCase):
                          str(self.prefix / "original/asus/fbterm/bin"))
 
     def test_partially_migrated_profile(self):
-        self.old_links("asus")
+        self.old_links("legacy-role")
         dest = self.home / LINKS[0][0]
         dest.unlink()
         dest.symlink_to(self.prefix / "original/workstation/fbterm/bin",
