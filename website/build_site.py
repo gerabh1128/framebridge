@@ -15,8 +15,8 @@ READY=META.get('state')=='ready'
 CAT=runpy.run_path(str(BASE/'release_catalog.py'))
 CAT['validate'](META,READY)
 support_url = os.environ.get('FRAMEBRIDGE_PAYPAL_DONATION_URL', '')
-if support_url and not re.fullmatch(r'https://(?:www\.)?paypal\.com/donate/?\?hosted_button_id=[A-Za-z0-9]+', support_url):
-    raise ValueError('Use a hosted PayPal donation link without a personal account address.')
+if support_url:
+    CAT['paypal_donation_url'](support_url)
 VIDEO=CAT['VIDEO'];POSTER=CAT['POSTER']
 PREVIEW='framebridge-preview-0.3.4-en.mp4'
 PREVIEW_POSTER='framebridge-preview-0.3.4-en.jpg'

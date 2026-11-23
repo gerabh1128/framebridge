@@ -79,6 +79,9 @@ actual public domain before reporting publication complete.
 
 The website follows the project's GPL-3.0-only license. Third-party materials
 retain their own licenses and notices. Support is voluntary.
-Set `FRAMEBRIDGE_PAYPAL_DONATION_URL` in the deployment environment to a hosted
-PayPal donation link supplied by the project owner. Use its hosted button ID
-and keep payment account addresses out of the public source and site.
+Set `FRAMEBRIDGE_PAYPAL_DONATION_URL` in the deployment environment to the
+public Donate URL created in PayPal. The builder accepts a hosted button ID or
+PayPal's shareable link with an opaque recipient ID. Check the recipient and
+donation settings in a signed-out browser before deployment. Keep the project
+payment URL in deployment configuration and account email addresses out of
+the public site.
