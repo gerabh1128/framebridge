@@ -2,15 +2,15 @@ Origin: FrameBridge
 Label: FrameBridge
 Suite: mint22
 Codename: mint22
-Date: Thu, 12 Nov 2026 00:11:19 +0000
-Valid-Until: Sat, 12 Dec 2026 00:11:19 +0000
+Date: Sun, 22 Nov 2026 23:27:42 +0000
+Valid-Until: Tue, 22 Dec 2026 23:27:42 +0000
 Architectures: amd64
 Components: main
 Description: FrameBridge for Linux Mint 22.x
 Acquire-By-Hash: yes
 SHA256:
- edbd735a0fd07ffaa9baadd4d351b04051bcbdaf19586d84260d27fb0356a7aa             1699 main/binary-amd64/Packages
- ec5be458d4d00d5da686d2e7fc3e93ade6712b7904e2238bf41552222e4ad27a             1044 main/binary-amd64/Packages.gz
+ 9636e94756706415aec289817e57233ed79e5b0db5975d2e75c6cbf103a58c41             1770 main/binary-amd64/Packages
+ 8a86728795a4014911fa1e0d4ff22827a6eae3c9202af5931e48ace9e027f60c             1072 main/binary-amd64/Packages.gz
 SHA512:
- 758cf4f364b704134c1ceb88993ac339ab528ef977feab76c40a1875c31bd7b9f76515fe5342da83548d066f61647f51f23449c37f42ad18337ff7409ebc1814             1699 main/binary-amd64/Packages
- 7c8ec004a41b578035fac316b6894364de744818db6b990396e7bba3be9011de0c63442fa6cb853f280fb248e385181f7ae50efe182d139d1da86da380d3395f             1044 main/binary-amd64/Packages.gz
+ cff6bde721d5ce0f27651d0a24dcfad1d9a6108a9111305a187d3a1d1559c027c0ac12d5189144aac679b7f7c8ddc577b922955578c4ab3fe10b62b3271aabf2             1770 main/binary-amd64/Packages
+ e37279d41c9e4e224164b2fc9812742be697c38da2bb8a75c8da2fee0bed0373ad643885f0a02aae527bc4b6cdfe8cc1e4656a030ef17bda6ca9158405e53a75             1072 main/binary-amd64/Packages.gz

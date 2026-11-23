@@ -2,15 +2,15 @@ Origin: FrameBridge
 Label: FrameBridge
 Suite: noble
 Codename: noble
-Date: Thu, 12 Nov 2026 00:11:19 +0000
-Valid-Until: Sat, 12 Dec 2026 00:11:19 +0000
+Date: Sun, 22 Nov 2026 23:27:42 +0000
+Valid-Until: Tue, 22 Dec 2026 23:27:42 +0000
 Architectures: amd64
 Components: main
 Description: FrameBridge for Ubuntu 24.04
 Acquire-By-Hash: yes
 SHA256:
- 80375ee0e137d516f8b5e527386ad401f5bacb190a8600bed0ea9ac85dddb8ac             1704 main/binary-amd64/Packages
- eb4862fba89d928795f54896aedd6010dcab0c0ec55eade8d93a948c34162155             1046 main/binary-amd64/Packages.gz
+ 3d84f3060a95d729a6c7e2f77959c12c5fee5615404abf55f1e2db7112dfeae2             1775 main/binary-amd64/Packages
+ 54720e9032493a8d649a0e2b37e89ce3a89d5e253ac281174ad47c755a6c863f             1076 main/binary-amd64/Packages.gz
 SHA512:
- c75233cf8ed4de68201853150c9f00ab8b4bd92f842ba0cc4ac49ca195b5b7a1f12d9ae8ed052d5825f3399c54dd0378bcf909fe4da2db864578f087de52d520             1704 main/binary-amd64/Packages
- 3a30a7b45e1227d9414f1808c71b29cad1d8a40db043917c5dd5a5bd505ef3527f3b57038b4138aa9eec13e7b462f361ad9aa73bd08170bb8795499faf147f75             1046 main/binary-amd64/Packages.gz
+ 11063a8c95f85c029eef834e36eb53a011cd5740839414d11a0ae5d55b5b9cd6efe33c66bbd607388060d74e913eacf1d7be4b9b5530c1f379b385a8ade5e4d4             1775 main/binary-amd64/Packages
+ 497a9b943d182583d74dd9ef2fad3715f5ec172572db86c82b5c185f9d9cf4fa0e8edf037df55ef03fe5f52cea79d4dee155dbca917213c967a999efd352cb40             1076 main/binary-amd64/Packages.gz

@@ -2,15 +2,15 @@ Origin: FrameBridge
 Label: FrameBridge
 Suite: trixie
 Codename: trixie
-Date: Thu, 12 Nov 2026 00:11:19 +0000
-Valid-Until: Sat, 12 Dec 2026 00:11:19 +0000
+Date: Sun, 22 Nov 2026 23:27:42 +0000
+Valid-Until: Tue, 22 Dec 2026 23:27:42 +0000
 Architectures: amd64
 Components: main
 Description: FrameBridge for Debian 13
 Acquire-By-Hash: yes
 SHA256:
- e17f455b92372ddbe702eda196ca0aab40a761bac60c5ba78a370497ede98960             1701 main/binary-amd64/Packages
- d62faa21941f2256bfb908d59a3339e266fce110c49d0d002936379b9e5833ea             1038 main/binary-amd64/Packages.gz
+ 349d6e1662dda16ce1e70d57d8f9768ba754ab21c58bd7997aa8b5e8d48b1bc2             1772 main/binary-amd64/Packages
+ 2da14bb312dddae49dbc4017cdfad8084d0b0eefe7c52aada680af77985b7310             1069 main/binary-amd64/Packages.gz
 SHA512:
- 8b6a3a72dbdb66e376606d49762ad3440ca9d7d03cdded706c4338865cd004a86219275411719265ea516a0e393e5a0923a0e50732f8f2fa54dd13089d6bfaf0             1701 main/binary-amd64/Packages
- 7ecffe7f6311d7213e683a0e3acca9f331c51cd032df6b073ea365626a290ba166776cfdd74597706adb50bb2bbe08819c15370e4fd957f6df4adb9fe7982d02             1038 main/binary-amd64/Packages.gz
+ 889a00155714775321a7b1152c7b8d5bcdeb69f88c609a15bcf8733304358cce9e083f91c52cac3309187fc4cb05d9a3b1c2b4bc7f1017e8036eb4490b8db2b2             1772 main/binary-amd64/Packages
+ de53215bf6845771314a1164cadc15e38b829b84a9c3a827c2b5740fe3f1c92e34cd5d8be445278dbb587840836ff9d890a514536968070a6446be14873f98de             1069 main/binary-amd64/Packages.gz
