@@ -28,14 +28,20 @@ CONTENT_RULES = (
         rb"|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}"
         rb"|sk-(?:(?:proj|svcacct)-)?[A-Za-z0-9_-]{30,}|AKIA[A-Z0-9]{16})\b"
     )),
-    ("credential-in-url", re.compile(
-        rb"\b(?:https?|sftp|postgres(?:ql)?)://[A-Za-z0-9._%+-]{1,100}:"
-        rb"[A-Za-z0-9._%+=-]{8,100}@[A-Za-z0-9.-]+"
-    )),
     ("drive-document-link", re.compile(
         rb"https?://(?:drive|docs)\.google\.com/[^\s\"'<>]+", re.IGNORECASE
     )),
 )
+URL_CREDENTIAL = re.compile(
+    rb"\b(?:https?|sftp|postgres(?:ql)?)://[A-Za-z0-9._%+-]{1,100}:"
+    rb"[A-Za-z0-9._%+=-]{8,100}@[A-Za-z0-9.-]+"
+)
+# Exact reviewed HTTPX documentation examples preserved in both ABI vendors.
+HTTPX_DOC_FILE_SHA256 = "757f7d551d4348e1e9828f40abb3f360ee0529dc6a2a3c32369f20adff1d1cdd"
+HTTPX_DOC_EXAMPLES = {
+    "0ebf92f8dd2bb8573a05b4f843b9c501f7192a76051bb9da419d8294329674ce",
+    "3d6e008451b0edcc8d3524508217185561c5a2851b4379ecaeb228460d0f6f10",
+}
 PERSONAL_EMAIL = re.compile(
     rb"\b[A-Za-z0-9._%+-]+@(?:gmail\.com|outlook\.com|hotmail\.com|icloud\.com|yahoo\.com)\b",
     re.IGNORECASE,
@@ -75,8 +81,16 @@ class ReleasePrivacy:
                 raise PrivacyError(f"{location}: compressed file exceeds review limit")
         else:
             inflated = b""
+        reviewed_httpx = (name.endswith(("/vendor/httpx/_urls.py", "/target-vendors/cp312/httpx/_urls.py"))
+                          and hashlib.sha256(data).hexdigest() == HTTPX_DOC_FILE_SHA256)
+        payloads = (encoded, data, inflated)
+        for payload in payloads:
+            for match in URL_CREDENTIAL.finditer(payload):
+                if not (payload is data and reviewed_httpx
+                        and hashlib.sha256(match[0]).hexdigest() in HTTPX_DOC_EXAMPLES):
+                    raise PrivacyError(f"{location}: credential-in-url")
         for label, pattern in rules:
-            if pattern.search(encoded) or pattern.search(data) or pattern.search(inflated):
+            if any(pattern.search(payload) for payload in payloads):
                 raise PrivacyError(f"{location}: {label}")
 
     def tar_stream(self, stream, kind, *, personal_email=False):
@@ -90,8 +104,9 @@ class ReleasePrivacy:
                     data = member.linkname.encode("utf-8", errors="surrogateescape")
                 location = f"{kind} member {count}"
                 self.check(member.name, data, location, personal_email=personal_email)
-                metadata = json.dumps([member.uname, member.gname, member.linkname, member.pax_headers])
-                self.check("", metadata.encode("utf-8"), location, personal_email=personal_email)
+                metadata = (member.uname, member.gname, member.linkname, *member.pax_headers, *member.pax_headers.values())
+                self.check("", "\n".join(metadata).encode("utf-8", errors="surrogateescape"),
+                           location, personal_email=personal_email)
         if not count:
             raise PrivacyError(f"{kind}: empty archive")
         return count

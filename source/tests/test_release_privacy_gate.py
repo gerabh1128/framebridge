@@ -57,11 +57,25 @@ class ReleasePrivacyGateTests(unittest.TestCase):
             (b"https://drive." + b"google.com/file/d/SYNTHETIC_EXAMPLE/view", "drive-document-link"),
             (b"gh" + b"p_" + b"A" * 36, "credential-token"),
             (b"-----BEGIN OPENSSH " + b"PRIVATE KEY-----\n" + b"A" * 32, "private-key-material"),
+            (b"https://fixture:" + b"fixture-credential" + b"@proxy.example", "credential-in-url"),
         ):
             with self.subTest(reason=reason), self.assertRaisesRegex(PrivacyError, reason):
                 self.scanner.source(self.source("source/proof.txt", data))
         with self.assertRaisesRegex(PrivacyError, "private-file"):
             self.scanner.source(self.source("source/.ssh/config", b"test fixture"))
+
+    def test_checks_archive_owner_and_extended_metadata(self):
+        file = self.work / "test-source.tar.gz"
+        for field in ("uname", "gname", "comment"):
+            with self.subTest(field=field), tarfile.open(file, "w:gz") as archive:
+                entry = tarfile.TarInfo("source/readme.txt")
+                if field == "comment":
+                    entry.pax_headers = {field: "review-fixture-host"}
+                else:
+                    setattr(entry, field, "review-fixture-host")
+                archive.addfile(entry)
+            with self.assertRaisesRegex(PrivacyError, "private-identifier"):
+                self.scanner.source(file)
 
     def test_rejects_bad_policy_without_showing_value(self):
         self.policy.write_text('"\"')
