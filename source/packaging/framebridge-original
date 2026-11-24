@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import secrets
 from pathlib import Path
 import shutil
 import signal
@@ -98,14 +99,80 @@ def prepare(args):
         home / ".local/lib/framebridge-native/host": PREFIX / LAYOUT["native_host_dir"],
         home / "Descargas/framebridge_v0_1/host": PREFIX / LAYOUT["native_host_dir"],
     }
+    # An upgrade may retain dangling links to a retired role-specific layout.
+    # Only a known package-managed link with the SAME relative suffix is safe
+    # to migrate. Reject active legacy paths, custom targets and ambiguities.
+    old_root = PREFIX / "original"
+    migrations = {}
     for dst, src in links.items():
+        if not src.is_dir():
+            raise RuntimeError("Missing packaged runtime path: " + str(src))
         if dst.is_symlink():
-            if dst.resolve() != src.resolve():
+            if dst.resolve() == src.resolve():
+                continue
+            previous = Path(os.readlink(dst))
+            try:
+                before = previous.relative_to(old_root).parts
+                after = src.relative_to(old_root).parts
+            except ValueError:
+                raise RuntimeError("Unexpected link: " + str(dst)) from None
+            if (not previous.is_absolute() or
+                os.path.normpath(str(previous)) != str(previous) or
+                len(before) < 2 or len(after) < 2 or
+                before[0] == after[0] or before[1:] != after[1:] or
+                previous.exists()):
                 raise RuntimeError("Unexpected link: " + str(dst))
+            migrations[dst] = (previous, src)
         elif dst.exists():
             raise RuntimeError("Runtime program path already exists: " + str(dst))
-        else:
-            dst.symlink_to(src, target_is_directory=True)
+
+    # Write a private rollback manifest before replacing any link.
+    if migrations:
+        audit = state / ("layout-migration-" + secrets.token_hex(8) + ".json")
+        fd = os.open(audit, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            with os.fdopen(fd, "w") as stream:
+                json.dump({"links": [
+                    {"path": str(dst), "previous": str(old), "new": str(src)}
+                    for dst, (old, src) in migrations.items()
+                ]}, stream, sort_keys=True, indent=2)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+        except BaseException:
+            audit.unlink(missing_ok=True)
+            raise
+
+    changed = []
+    created = []
+    try:
+        for dst, src in links.items():
+            if dst in migrations:
+                old, _ = migrations[dst]
+                temporary = dst.with_name("." + dst.name + "." + secrets.token_hex(8))
+                try:
+                    temporary.symlink_to(src, target_is_directory=True)
+                    os.replace(temporary, dst)
+                finally:
+                    temporary.unlink(missing_ok=True)
+                changed.append((dst, old, src))
+            elif not dst.is_symlink():
+                dst.symlink_to(src, target_is_directory=True)
+                created.append((dst, src))
+    except BaseException:
+        # Undo only changes still owned by this migration.
+        for dst, src in reversed(created):
+            if dst.is_symlink() and os.readlink(dst) == str(src):
+                dst.unlink()
+        for dst, old, src in reversed(changed):
+            if dst.is_symlink() and os.readlink(dst) == str(src):
+                temporary = dst.with_name("." + dst.name + "." + secrets.token_hex(8))
+                try:
+                    temporary.symlink_to(old, target_is_directory=True)
+                    os.replace(temporary, dst)
+                finally:
+                    temporary.unlink(missing_ok=True)
+        raise
     registry = home / ".config/framebridge/nodes.json"
     if not registry.exists():
         registry.write_text(json.dumps({"nodes": {}}, indent=2) + "\n")

@@ -1,5 +1,22 @@
 # FrameBridge release notes
 
+## 0.3.9+fbterm.6
+
+Fixes the upgrade regression affecting some existing Linux profiles when the
+packaged Original runtime switches from a retired role-specific directory to
+the current generic layout. Previously saved runtime links could point to
+removed package directories, preventing the managed service from starting.
+
+On startup, FrameBridge now migrates only broken package-managed links with
+matching relative destinations, records a private rollback manifest, and
+leaves valid or customized links untouched. Failed migration operations
+restore their previously replaced links when possible.
+
+The fix is scoped to runtime link compatibility. It does not delete profile
+configuration, stored job history, application credentials, or other
+services. Supported distribution packages and signed APT publication require
+independent acceptance and approval.
+
 ## 0.3.9+fbterm.4
 
 Bundled components use role-based paths for the workstation, fleet hub and terminal node. Tests use synthetic node identifiers and sample addresses. Fleet nodes are selected through their enrolled identities.
