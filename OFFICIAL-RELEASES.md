@@ -28,6 +28,8 @@ The development source includes the Linux job changes and the role-based compone
 
 ## Release records
 
+- **Current release 0.3.9+fbterm.18.** Signed portable Linux amd64; informational persistent FBTERM. [Release-source record](docs/RELEASE-SOURCE-0.3.9+fbterm.18.md) · [Download and verification](https://framebridge.betancourt.one/download/) · [Signed stable APT origin](https://framebridge.betancourt.one/debian/stable/).
+
 - **Historical release 0.3.9.** Published on 11 November 2026 Eastern Time. The release record identifies the frozen source, the three signed package profiles and the public HTTPS and APT verification evidence. [Official download page](https://framebridge.betancourt.one/download/) · [Release catalog](https://framebridge.betancourt.one/assets/release.json) · [Source-to-artifact record](docs/RELEASE-SOURCE-0.3.9.md) · [Release notes](RELEASE-NOTES.md#039)
 - **Historical release 0.3.8.** Publicly promoted on 11 November 2026. Its record identifies the frozen source, signed package profiles and publication evidence. [Source-to-artifact record](docs/RELEASE-SOURCE-0.3.8.md) · [Release notes](RELEASE-NOTES.md#038)
 - **Historical: 0.3.7.** Publicly promoted on 9 November 2026. Its record identifies the three signed package profiles, the corresponding source and the verification material. [Source-to-artifact record](docs/RELEASE-SOURCE-0.3.7.md) · [GitHub v0.3.7 source release](https://github.com/gerabh1128/framebridge/releases/tag/v0.3.7) · [Release notes](RELEASE-NOTES.md#037)

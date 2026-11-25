@@ -93,14 +93,23 @@ def main():
         (web/'assets').mkdir()
         for p in (BASE/'assets').iterdir():
             if p.is_file():shutil.copyfile(p,web/'assets'/p.name)
-        fixture=json.loads(json.dumps(meta));fixture.update(state='ready',signing_fingerprint='2B1F01BC806C0B33CB6CEDDE52859CEBC91B8808',checksums_url='/downloads/TEST-SHA256SUMS',checksums_signature_url='/downloads/TEST-SHA256SUMS.asc')
+        fixture=json.loads(json.dumps(meta))
+        portable=fixture.get("package_mode")=="portable"
+        import runpy
+        fixture.update(state='ready',signing_fingerprint=runpy.run_path(str(BASE/'release_catalog.py'))["FINGERPRINT"],checksums_url='/downloads/TEST-SHA256SUMS',checksums_signature_url='/downloads/TEST-SHA256SUMS.asc')
         fixture['source']=dict(filename='TEST-SOURCE.tar.gz',url='/downloads/TEST-SOURCE.tar.gz',signature_url='/downloads/TEST-SOURCE.tar.gz.asc',sha256='a'*64,size_bytes=1)
         for i,profile in enumerate(fixture['profiles']):
             filename='TEST-profile-'+str(i)+'.deb'
             profile.update(filename=filename,url='/downloads/'+filename,signature_url='/downloads/'+filename+'.asc',sha256='a'*64,size_bytes=1)
         for dependency in fixture['dependency_sources']:
             dependency.setdefault('signature_url',dependency['url']+'.asc')
+        if portable:
+            fixture['source']['verification']='signed-checksums'
+            for dependency in fixture['dependency_sources']:
+                dependency['verification']='signed-checksums'
         (web/'release.json').write_text(json.dumps(fixture))
+        (temp/'source/docs').mkdir(parents=True)
+        shutil.copyfile(BASE.parent/'source/docs/COMMAND-GUIDE.json',temp/'source/docs/COMMAND-GUIDE.json')
         result=subprocess.run(['/usr/bin/python3','-I','-S',str(web/'build_site.py')],capture_output=True,text=True,timeout=10)
         if result.returncode:failures.append('Synthetic-ready rendering failed: '+result.stderr[-600:])
         else:
@@ -118,14 +127,23 @@ def main():
             for text in blocks:
                 result=subprocess.run(['/bin/bash','-n'],input=text,text=True,capture_output=True,timeout=3)
                 if result.returncode:failures.append('Rendered install block shell syntax: '+result.stderr.strip())
-            apt_blocks=[x for x in blocks if 'sources.list.d/framebridge.sources' in x]
-            if len(apt_blocks)!=3:failures.append('Expected three independent APT profile setup blocks')
-            for apt in apt_blocks:
-                if 'Signed-By:' not in apt or 'primary_count' not in apt or 'apt-key' in apt:
-                    failures.append('APT key trust must be pinned and scoped with Signed-By')
-            for suite in ['trixie','noble','mint22']:
-                if not any('Suites: '+suite in block for block in apt_blocks):
-                    failures.append('Missing APT suite '+suite)
+            if portable:
+                apt_blocks=[x for x in blocks if 'gpgv --keyring' in x and 'SHA256SUMS.asc' in x and 'sudo apt install' in x]
+                if len(apt_blocks)!=1:failures.append('Expected exactly one verified portable install block')
+                for apt in apt_blocks:
+                    if fixture['signing_fingerprint'] not in apt or 'sha256sum -c' not in apt or 'apt-key' in apt:
+                        failures.append('Portable package verification must pin the archive key and signed checksum')
+                if not any('sudo apt install --only-upgrade framebridge-original-expanded' in block for block in blocks):
+                    failures.append('Missing stable update instruction')
+            else:
+                apt_blocks=[x for x in blocks if 'sources.list.d/framebridge.sources' in x]
+                if len(apt_blocks)!=3:failures.append('Expected three independent APT profile setup blocks')
+                for apt in apt_blocks:
+                    if 'Signed-By:' not in apt or 'primary_count' not in apt or 'apt-key' in apt:
+                        failures.append('APT key trust must be pinned and scoped with Signed-By')
+                for suite in ['trixie','noble','mint22']:
+                    if not any('Suites: '+suite in block for block in apt_blocks):
+                        failures.append('Missing APT suite '+suite)
     status={'host':'TERMINAL_NODE','website_source':str(BASE),'web_root':str(DIST),'language':'English','buildless':True,'html_pages_checked':len(pages),'loopback_http_paths_checked':http_count,'static_failures':failures,'pending_assets':sorted(set(pending)),'infra_routes_expected':sorted(infra),'external_links':sorted(external),'no_external_runtime_dependencies':True,'copy_controls_progressive':True,'ready_branch_rendered_with_synthetic_fixture':True,'install_blocks_syntax_checked_not_executed':True,'release_state':meta.get('state'),'package_sha256_present':all(p.get('sha256') for p in meta.get('profiles',[])),'signing_fingerprint_present':bool(meta.get('signing_fingerprint')),'video_present':(DIST/'assets/framebridge-preview-0.3.1-original-r4.mp4').is_file(),'visual_browser_QA_performed':False,'visual_browser_QA_limit':'No browser or user desktop was operated by this subtask. Root may inspect the staged site via the authorized TERMINAL_NODE surface.','production_network_or_services_changed':False,'site_ready_for_private_staging':not failures,'public_release_ready':not failures and not pending and meta.get('state')=='ready','homepage_sha256':hashlib.sha256((DIST/'index.html').read_bytes()).hexdigest()}
     visual=BASE/'qa/VISUAL-REVIEW.json'
     if visual.exists():

@@ -75,6 +75,8 @@ def support_callout():
 
 release_label='Official release' if READY else 'Release preparation'
 def release_announcement():
+    if READY and META.get("package_mode")=="portable":
+        return ('<aside class="release-notice" aria-label="Latest signed release"><p><strong>FrameBridge '+E(META["version"])+' — signed portable Linux release</strong></p><p>One amd64 DEB and a permanent signed APT channel for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. Private Python, a persistent read-only FBTERM history and safe update preparation. Existing jobs must finish before package maintenance.</p><p><a href="/download/">Download and verify</a></p></aside>')
     if not READY or META['version'] != '0.3.9+fbterm.15':
         return ''
     return ('<aside class="release-notice" aria-label="Latest signed release">'
@@ -170,7 +172,7 @@ for topic in order:
         for command in section.get('commands',[]):
             article+=code(command if isinstance(command,str) else json.dumps(command,indent=2))
     if guide_data.get('publication',{}).get('topic')==topic:
-        article+='<p class="aside-note">This web copy corrects the release-profile label in the frozen 0.3.7 guide. The packaged CLI/MCP guide and signed release artifacts remain unchanged. The <a href="/assets/command-guide.json">published guide data</a> records the source digest and documentation revision. Use <code>fb help '+E(topic)+'</code> for the installed reference.</p></article>'
+        article+='<p class="aside-note">This web copy includes a documented release-profile erratum. The packaged CLI/MCP guide and signed release artifacts remain unchanged. The <a href="/assets/command-guide.json">published guide data</a> records the source digest and documentation revision. Use <code>fb help '+E(topic)+'</code> for the installed reference.</p></article>'
     else:
         article+='<p class="aside-note">This page is generated from the same versioned guide used by the CLI and MCP help tool. Use <code>fb help '+E(topic)+'</code> for the local reference.</p></article>'
     dest=DIST/'docs'/topic;dest.mkdir(parents=True,exist_ok=True)

@@ -29,6 +29,25 @@ def guide_digest(value):
 def publication_guide(raw):
     """Correct a release-label erratum in a web copy, never in frozen sources."""
     original = json.loads(raw)
+    if original.get("version") == "0.3.9+fbterm.16":
+        require(original.get("guide_sha256")==guide_digest({k:v for k,v in original.items() if k!="guide_sha256"}),"Frozen guide digest mismatch")
+        published=copy.deepcopy(original)
+        corrections=[
+            ("start","Install and connect","Install the verified portable amd64 DEB with private CPython 3.13.18 on Debian 13, Ubuntu 24.04 or Linux Mint 22.x. Keep system Python for GTK/GI and maintenance. The package configures the signed stable/main APT channel. Existing installations must prepare cold maintenance and review legacy sources explicitly. Connect in a normal interactive terminal; advanced setup remains optional."),
+            ("diagnostics","Doctor","Use doctor to inspect prerequisites, the installed portable profile and local runtime. The .16 package contains its own CPython 3.13.18; system Python remains responsible for GTK/GI and system maintenance. Supported laboratory targets are Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. Other distributions are not certified by this release."),
+        ]
+        for topic,heading,body in corrections:
+            value=published["topics"][topic]
+            require(value.get("guide_sha256")==guide_digest({k:v for k,v in value.items() if k!="guide_sha256"}),"Frozen topic digest mismatch")
+            rows=[r for r in value["sections"] if r.get("heading")==heading]
+            require(len(rows)==1,"Expected one portable guide section")
+            rows[0]["body"]=body
+            value["guide_sha256"]=guide_digest({k:v for k,v in value.items() if k!="guide_sha256"})
+        published["publication"]={"kind":"web-documentation-erratum","revision":"0.3.9+fbterm.16-web-r1",
+            "frozen_guide_file_sha256":hashlib.sha256(raw).hexdigest(),"frozen_guide_sha256":original["guide_sha256"],
+            "scope":"Portable installation and diagnostic profile labels; signed source and installed guide remain unchanged."}
+        published["guide_sha256"]=guide_digest({k:v for k,v in published.items() if k!="guide_sha256"})
+        return published
     if original.get("version") != "0.3.7":
         return original
     original_digest = original.get("guide_sha256")
@@ -109,6 +128,8 @@ def validate(meta, ready):
     require(meta.get("git_url") == "/git/gerardo/framebridge", "Use existing canonical Gitea repository")
     require(meta.get("git_clone_url") == "https://framebridge.betancourt.one/git/gerardo/framebridge.git",
             "Use existing canonical Gitea clone URL")
+    if meta.get("package_mode")=="portable":
+        return validate_portable(meta,ready)
     expected = {x[0]: x[1:] for x in PROFILES}
     profiles = meta.get("profiles", [])
     require(isinstance(profiles, list) and len(profiles) == 3, "Exactly three profiles required")
@@ -135,6 +156,62 @@ def validate(meta, ready):
 
 def code(text):
     return '<div class="codebox"><pre><code>' + E(text) + '</code></pre></div>'
+
+def validate_portable(meta,ready):
+    profiles=meta.get("profiles")
+    require(isinstance(profiles,list) and len(profiles)==1,"One portable profile required")
+    profile=profiles[0]
+    require((profile.get("profile_id"),profile.get("suite"),profile.get("architecture"),profile.get("python"))==
+            ("linux-amd64-cp313","stable","amd64","3.13.18"),"Unexpected portable profile")
+    require(meta.get("apt_repository_url")=="https://framebridge.betancourt.one/debian/stable/","Unexpected permanent APT origin")
+    if not ready:return
+    require(meta.get("signing_fingerprint")==FINGERPRINT,"Unexpected official signing fingerprint")
+    asset(profile)
+    for key,prefix in (("signing_key_url","/debian/"),("checksums_url","/downloads/"),("checksums_signature_url","/downloads/")):
+        project_url(meta.get(key,""),prefix)
+    for spec in [meta.get("source"),*meta.get("dependency_sources",[])]:
+        require(isinstance(spec,dict) and spec.get("verification")=="signed-checksums","Source must use signed checksums")
+        asset(dict(spec,signature_url=meta["checksums_signature_url"]))
+    require(len(meta.get("dependency_sources",[]))==3,"Expected all three corresponding dependency assets")
+    project_url(meta["source_manifest"]["url"],"/downloads/")
+
+def portable_install_commands(meta):
+    validate(meta,True)
+    p=meta["profiles"][0]
+    base=meta["site_url"]
+    return """sudo apt install ca-certificates curl gnupg
+(
+  set -eu
+  mkdir -p framebridge-verified
+  cd framebridge-verified
+  curl -fsSL '"""+base+meta["signing_key_url"]+"""' -o framebridge-stable-archive.gpg
+  curl -fsSL '"""+base+meta["checksums_url"]+"""' -o SHA256SUMS
+  curl -fsSL '"""+base+meta["checksums_signature_url"]+"""' -o SHA256SUMS.asc
+  curl -fsSL '"""+base+p["url"]+"""' -o '"""+p["filename"]+"""'
+  info="$(gpg --batch --show-keys --with-colons framebridge-stable-archive.gpg 2>/dev/null)"
+  test "$(printf '%s\n' "$info" | awk -F: '$1=="pub"{n++} END{print n+0}')" = 1
+  test "$(printf '%s\n' "$info" | awk -F: '$1=="fpr"{print $10;exit}')" = '"""+FINGERPRINT+"""'
+  gpgv --keyring "$PWD/framebridge-stable-archive.gpg" SHA256SUMS.asc SHA256SUMS
+  printf '%s  %s\n' '"""+p["sha256"]+"""' '"""+p["filename"]+"""' | sha256sum -c -
+  grep -Fx '"""+p["sha256"]+"  "+p["filename"]+"""' SHA256SUMS
+  sudo apt install './"""+p["filename"]+"""'
+)"""
+
+def portable_download(meta,support=""):
+    validate(meta,meta["state"]=="ready")
+    p=meta["profiles"][0]
+    body='<main id="content"><div class="page-header"><div class="wrap"><p class="section-label">Download / Verify / Install</p><h1>One Linux package.</h1><p class="lead">Debian 13, Ubuntu 24.04 and Linux Mint 22.x — one amd64 binary and one signed APT channel.</p></div></div><div class="wrap page-content"><article class="prose">'
+    body+='<div class="release-notice"><strong>FrameBridge '+E(meta["version"])+'</strong> contains private Python 3.13.18 and an informational FBTERM history with job details, recorded duration and verified output. System Python remains unchanged. This exact release passed native Mint 22.3 graphical testing; support for other platforms follows the documented compatibility scope.</div>'
+    if support:body+='</article>'+support+'<article class="prose">'
+    if meta["state"]!="ready":return body+'<p>Release preparation: download and installation are pending verification.</p></article></div></main>'
+    body+='</article><div class="profiles"><section class="profile-card" id="linux-amd64-cp313"><p class="section-label">amd64 · Private CPython 3.13.18</p><h2>FrameBridge for Linux</h2><p>Permanent APT suite: <code>stable</code></p><p class="hash">SHA-256: '+E(p["sha256"])+'</p><p>'+E(p["filename"])+' · '+format(p["size_bytes"],",")+' bytes</p><div class="actions"><a class="button primary" href="'+E(p["url"])+'" download>Download .deb</a><a class="button" href="'+E(p["signature_url"])+'">Package signature</a></div></section></div><article class="prose">'
+    body+='<h2>Verify and install</h2><p>Expected archive signing fingerprint:</p><p class="hash">'+FINGERPRINT+'</p><p><a href="'+E(meta["signing_key_url"])+'">Public key</a> · <a href="'+E(meta["checksums_url"])+'">SHA256SUMS</a> · <a href="'+E(meta["checksums_signature_url"])+'">Checksum signature</a></p><p>Verify the initial DEB before installing. For an existing installation, first review jobs and detached effects, back up profiles, stop affected services and supervisors normally, and run these steps from an independent terminal. The package refuses active replacement.</p>'+code(portable_install_commands(meta))
+    body+='<h2 id="normal-updates">Updates from your normal Linux updater</h2><p>The verified DEB installs the scoped key and permanent source. Do not silently replace your earlier sources; review and disable only obsolete FrameBridge channels after verifying the new channel. To update, first prepare admission using the tray or <code>fb --state-dir PROFILE update prepare</code>. Existing jobs may finish; unknown outcomes remain blockers. Review other profiles, TTY/CUA and external effects, back up state and stop the affected services. Use the normal updater or:</p>'+code("sudo apt update\napt-cache policy framebridge-original-expanded\nsudo apt install --only-upgrade framebridge-original-expanded")
+    body+='<p>After verifying the package, start intended services, explicitly resume accepting jobs and check a fresh harmless receipt. This is not an unattended hot upgrade. Job inspection never submits or repeats the original command.</p><h2>Corresponding source and verification</h2><p>All source archives below are covered by the signed SHA256SUMS. Verify that signature and compare each downloaded file hash; individual source detached signatures are not asserted.</p><ul>'
+    for item in [meta["source"],*meta["dependency_sources"]]:
+        body+='<li><a href="'+E(item["url"])+'">'+E(item.get("label",item["filename"]))+'</a><br><span class="hash">SHA-256: '+E(item["sha256"])+'</span></li>'
+    body+='</ul><p><a href="'+E(meta["source_manifest"]["url"])+'">Source reconstruction manifest</a> · <a href="'+E(meta["source_manifest"]["url"].rsplit("/",1)[0]+"/RUNTIME-SOURCES-MANIFEST.json")+'">Runtime source inventory</a>. License: GNU GPLv3 only; third-party notices remain applicable.</p><p><a href="https://github.com/gerabh1128/framebridge/tree/apt-mirror">APT mirror and historical channels</a> · <a href="/docs/">Command guide</a></p></article></div></main>'
+    return body
 
 def apt_commands(meta, profile):
     require(meta.get("state") == "ready", "Do not offer installation commands for an unsigned preparation")
@@ -166,6 +243,8 @@ def apt_commands(meta, profile):
 )"""
 
 def download(meta, *, support=""):
+    if meta.get("package_mode")=="portable":
+        return portable_download(meta,support)
     ready = meta["state"] == "ready"
     body = '<main id="content"><div class="page-header"><div class="wrap"><p class="section-label">Download / Verify / Install</p><h1>Choose your Linux package.</h1><p class="lead">One network administration tool. Three distribution profiles. Updates through signed APT repositories.</p></div></div><div class="wrap page-content"><article class="prose">'
     body += '<p>FrameBridge helps one administrator manage their own home Linux network: inventory, services, storage, diagnostics, commands and persistent terminals. Desktop access is an auxiliary tool.</p>'

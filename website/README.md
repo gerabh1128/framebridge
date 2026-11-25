@@ -11,9 +11,7 @@ repository. Do not substitute a static Git mirror or another hosting backend.
 
 Copy release.example.json to release.json for a preparation preview. The example
 uses the current command guide version. Fill release.json from the exact verified
-release inventory before a public build. Its three profiles are Debian 13 amd64/Python 3.13 (trixie),
-Ubuntu 24.04 amd64/Python 3.12 (noble), and Linux Mint 22.x amd64/Python 3.12
-(mint22). A preparing catalog offers no new download or installation commands.
+release inventory before a public build. The current portable release has one amd64 profile with private CPython 3.13.18 and stable/main APT for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. Historical catalogs retain separate suites. A preparing catalog offers no new download or installation commands.
 Use ready only after verifying all DEBs, corresponding source, dependency
 source archives, signatures, checksums and the official public fingerprint.
 Metadata describes release artifacts; it is not itself evidence that a public
@@ -72,8 +70,7 @@ revision, and recalculates the modified topic and export digests. Unexpected
 input text or an invalid original digest stops the build for review.
 
 QA checks local links/assets, loopback HTTP, the guarded
-ready renderer with a disposable synthetic inventory, and syntax of all three
-APT setup blocks. The test fixtures never sign, publish or install anything.
+ready renderer with a disposable synthetic inventory, and syntax of the applicable APT setup blocks. The test fixtures never sign, publish or install anything.
 Perform final HTTPS, Gitea clone and isolated APT verification through the
 actual public domain before reporting publication complete.
 

@@ -1,0 +1,78 @@
+{
+  "channel": "Signed portable stable release",
+  "package_name": "framebridge-original-expanded",
+  "license": "GPL-3.0-only",
+  "dependency_sources": [
+    {
+      "filename": "FrameBridge-CPython-3.13.18-20261110-runtime-sources.tar",
+      "url": "/downloads/fbterm18/FrameBridge-CPython-3.13.18-20261110-runtime-sources.tar",
+      "sha256": "40a3de7801956e5b7648668e0287a528b3ce537b23c8635206ca2669c23a2e9d",
+      "size_bytes": 162846720,
+      "label": "Pinned CPython and native runtime sources",
+      "verification": "signed-checksums"
+    },
+    {
+      "filename": "FrameBridge-0.3.1-Community-Preview1-dependency-sources.tar.gz",
+      "url": "/downloads/fbterm18/FrameBridge-0.3.1-Community-Preview1-dependency-sources.tar.gz",
+      "sha256": "64540a85bd65eac3f394d8c0a967cacbc00e112676d57d644dcd1bb691c1926a",
+      "size_bytes": 82606998,
+      "label": "Historical Python and Rust dependency sources",
+      "verification": "signed-checksums"
+    },
+    {
+      "filename": "FrameBridge-0.3.1-tunnel-client-dependency-sources.tar.gz",
+      "url": "/downloads/fbterm18/FrameBridge-0.3.1-tunnel-client-dependency-sources.tar.gz",
+      "sha256": "6445d4f0e773aba833fe5c610fbae54102b92de2ce636438f769f21e890c2bd9",
+      "size_bytes": 26941745,
+      "label": "Tunnel client dependency sources",
+      "verification": "signed-checksums"
+    }
+  ],
+  "version": "0.3.9+fbterm.18",
+  "state": "ready",
+  "release_date": "2026-11-25",
+  "distribution": "Debian 13 \u00b7 Ubuntu 24.04 \u00b7 Linux Mint 22.x",
+  "architecture": "amd64",
+  "site_url": "https://framebridge.betancourt.one",
+  "git_url": "/git/gerardo/framebridge",
+  "git_clone_url": "https://framebridge.betancourt.one/git/gerardo/framebridge.git",
+  "signing_key_url": "/debian/stable/framebridge-archive-keyring.gpg",
+  "signing_fingerprint": "69D0E9D83699F96AB986B06F3C24F85D892A517E",
+  "checksums_url": "/downloads/fbterm18/SHA256SUMS",
+  "checksums_signature_url": "/downloads/fbterm18/SHA256SUMS.asc",
+  "source": {
+    "filename": "FrameBridge-0.3.9+fbterm.18-source.tar.gz",
+    "url": "/downloads/fbterm18/FrameBridge-0.3.9+fbterm.18-source.tar.gz",
+    "sha256": "a2efa42ccc0d7523514e5e1b3b449c305265089eae5be688e9575b2995b0abcf",
+    "size_bytes": 18818956,
+    "label": "Corresponding FrameBridge source",
+    "verification": "signed-checksums"
+  },
+  "profiles": [
+    {
+      "filename": "FrameBridge-0.3.9+fbterm.18-linux-amd64-cp313.deb",
+      "url": "/downloads/fbterm18/FrameBridge-0.3.9+fbterm.18-linux-amd64-cp313.deb",
+      "sha256": "8d462384089417c1435074828ad29a536bac77a6824ea076b5bdfc184aae6ec4",
+      "size_bytes": 75233872,
+      "label": "FrameBridge portable Linux",
+      "profile_id": "linux-amd64-cp313",
+      "suite": "stable",
+      "python": "3.13.18",
+      "architecture": "amd64",
+      "signature_url": "/downloads/fbterm18/FrameBridge-0.3.9+fbterm.18-linux-amd64-cp313.deb.asc"
+    }
+  ],
+  "source_manifest": {
+    "filename": "FrameBridge-0.3.9+fbterm.18-source-manifest.json",
+    "url": "/downloads/fbterm18/FrameBridge-0.3.9+fbterm.18-source-manifest.json",
+    "sha256": "c8f824ff90f14a08c6d3e08203ef039f25f6f40de08fe5ad89016f6407a4dbd2",
+    "size_bytes": 297804
+  },
+  "provenance": {
+    "scope": "Exact signed amd64 DEB and corresponding source; verified APT delivery; exact-package read-only GTK menu, persistent viewer and cold upgrade validated on Linux Mint 22.3. Debian 13 and Ubuntu 24.04 are supported portable targets; full native graphical acceptance of this version on Ubuntu has not been repeated.",
+    "artifact_status": "signed-and-https-verified"
+  },
+  "apt_repository_url": "https://framebridge.betancourt.one/debian/stable/",
+  "previous_apt_repository_url": "https://framebridge.betancourt.one/debian/fbterm15/",
+  "package_mode": "portable"
+}
