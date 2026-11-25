@@ -190,7 +190,22 @@ def download(meta, *, support=""):
         body += '<h2>Release verification and source</h2><p>Expected signing-key fingerprint:</p><p class="hash">' + FINGERPRINT + '</p><p><a href="' + E(meta["checksums_url"]) + '">SHA256SUMS</a> · <a href="' + E(meta["checksums_signature_url"]) + '">Checksum signature</a> · <a href="' + E(meta["signing_key_url"]) + '">Public key</a></p><p><a href="' + E(meta["source"]["url"]) + '">Corresponding FrameBridge source</a> · <a href="' + E(meta["source"]["signature_url"]) + '">Source signature</a></p><p class="hash">SHA-256: ' + E(meta["source"]["sha256"]) + '</p><ul>'
         for dep in meta["dependency_sources"]:
             body += '<li><a href="' + E(dep["url"]) + '">' + E(dep.get("label", dep["filename"])) + '</a> · <a href="' + E(dep["signature_url"]) + '">Signature</a><br><span class="hash">SHA-256: ' + E(dep["sha256"]) + '</span></li>'
-        body += '</ul><p>Third-party components retain their original licenses and notices. Unchanged dependency archives retain their historical filenames.</p><h2>Normal updates</h2>' + code("sudo apt update\napt-cache policy framebridge-original-expanded\nsudo apt install --only-upgrade framebridge-original-expanded\nfb status")
+        body += '</ul><p>Third-party components retain their original licenses and notices. Unchanged dependency archives retain their historical filenames.</p><h2 id="normal-updates">Normal updates</h2>'
+        body += '<p>Use these steps from an independent terminal after configuring the current signed APT channel for your distribution. To move from the legacy channel, follow the matching setup above with the rotated signing key and the affected runtime stopped.</p>'
+        body += code("sudo apt update\napt-cache policy framebridge-original-expanded")
+        body += (
+            '<p><strong>Cold upgrade required.</strong> Check that APT selects the intended version. '
+            'Back up the affected profiles, let active jobs finish and check their receipts, close the tray, '
+            'and stop the affected runtimes and autostart supervisors from the independent terminal. '
+            'Keep them stopped until the package transaction completes. '
+            '<a href="https://github.com/gerabh1128/framebridge/blob/424f7b600d5ad855c78524842780019d7eee1559/docs/PACKAGE-MAINTENANCE.md">'
+            'Read cold package maintenance.</a></p>'
+        )
+        body += code("sudo apt install --only-upgrade framebridge-original-expanded")
+        body += (
+            '<p>After installation, resume only the intended profiles according to their prior connection intent. '
+            'Check <code>fb status</code> and, for a resumed connection, verify a harmless job with a fresh receipt.</p>'
+        )
         body += '<p>APT verifies the repository signature and package hashes. Keep the selected distribution suite and its scoped Signed-By key.</p>'
     body += '<h2>Connect and work</h2><p>After installation, connect from the normal terminal on that computer:</p>' + code("fb connect\nfb status\nfb console") + '<p>One central installation can connect enrolled Linux nodes. Nodes use the central connection. Enter passwords and connection keys only in the normal local prompts.</p><p><strong>Tried FrameBridge on Linux?</strong> What worked for you? Where did you get stuck? Even one sentence helps. <a href="https://github.com/gerabh1128/framebridge/discussions/5">Share your first impression on GitHub →</a></p><p><a href="/docs/">Read the shared command guide</a> · <a href="' + E(meta["git_url"]) + '">Browse the canonical source repository</a></p></article></div></main>'
     return body

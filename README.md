@@ -39,10 +39,22 @@ Version-specific signed APT update and managed-service lifecycle results belong 
 
 Verify the signing-key fingerprint, package checksum and detached signature using the instructions on the [official download page](https://framebridge.betancourt.one/download/). Historical release records remain in [Official releases](OFFICIAL-RELEASES.md). A checksum identifies a file; the release signature authenticates it with the independently trusted project key.
 
-For **Mint**, run this from the directory containing the verified 0.3.9 package.
+- **Fresh install.** Install the verified DEB for your distribution or configure
+  its current signed APT channel using the [official download page](https://framebridge.betancourt.one/download/).
+- **Update an existing installation.** Follow [cold package maintenance](docs/PACKAGE-MAINTENANCE.md)
+  before replacing the package. If you already use the current signed APT
+  channel, follow [Normal updates](https://framebridge.betancourt.one/download/#normal-updates)
+  and check the candidate version before installing it.
+- **Move from the legacy APT channel.** With the affected runtime stopped,
+  follow the current channel setup for your distribution on the
+  [official download page](https://framebridge.betancourt.one/download/).
+  Verify the rotated signing key and use the matching suite.
+
+For a **fresh Mint installation**, run this from the directory containing the
+verified 0.3.9+fbterm.15 package.
 
 ~~~bash
-sudo apt install ./FrameBridge-0.3.9-mint22-amd64-py312.deb
+sudo apt install ./FrameBridge-0.3.9+fbterm.15-mint22-amd64-py312.deb
 ~~~
 
 Use the corresponding profile filename on Debian or Ubuntu. Review APT's proposed changes for the actual computer. Installation places the software on disk; it does not establish a ChatGPT connection or replace the system Python.

@@ -4,11 +4,15 @@ This is a setup and verification workflow for an assistant that **already has au
 
 The currently tested connection is the manual ChatGPT workflow. A coding assistant can help prepare it through the CLI; this document does not claim drop-in integration with every AI client.
 
-**FrameBridge 0.3.9** has amd64 package profiles for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. Before installation, verify the package profile, checksum and signature. Before connecting to an existing node, check the version actually installed there. [Official download page](https://framebridge.betancourt.one/download/) · [0.3.9 source-to-artifact record](RELEASE-SOURCE-0.3.9.md)
+**FrameBridge 0.3.9+fbterm.15** has amd64 package profiles for Debian 13, Ubuntu 24.04 and Linux Mint 22.x. Before installation, verify the package profile, checksum and signature. Before connecting to an existing node, check the version actually installed there. [Official download page](https://framebridge.betancourt.one/download/) · [Current signed release record](RELEASE-SOURCE-0.3.9+fbterm.15.md)
 
 ## Before handing over
 
-Give the assistant the computer you want to work on, the intended task, and the local path of the reviewed matching package. Use the [README's package matrix](../README.md#1-install-the-matching-package). If this is a pilot beside an existing installation, identify a new isolated `--state-dir` and the existing services that must remain running.
+Give the assistant the computer you want to work on, the intended task, and the local path of the reviewed matching DEB when installing from a file. Use the [README's package matrix](../README.md#1-install-the-matching-package). For an existing installation, follow [cold package maintenance](PACKAGE-MAINTENANCE.md) and select [Normal updates](https://framebridge.betancourt.one/download/#normal-updates) for the current signed APT channel or the distribution's setup steps to migrate from the legacy channel with the rotated signing key.
+
+For a pilot, a separate `--state-dir` isolates profile data while using the
+installed package. To test a different DEB while the existing services must
+stay available, use a separate computer or disposable VM.
 
 Name both the computer receiving the assistant's tool call and the intended execution target. `LOCAL` means the current FrameBridge receiver, not a fixed computer called WORKSTATION or the computer displaying the chat. Discover enrolled nodes and use their confirmed aliases or IDs. A legacy connector can have a different default target; changing endpoints does not preserve that default automatically.
 
@@ -22,8 +26,8 @@ Do not put passwords, tunnel IDs, server access keys or browser codes in the pro
 Help me install and verify FrameBridge on this Linux computer.
 
 Target computer: [the computer to which you already have authorized shell access]
-Reviewed package: [absolute local path to the matching FrameBridge .deb]
-Scope: [new installation, or the specifically authorized pilot/profile]
+Reviewed package: [absolute local path to the matching FrameBridge .deb when using one]
+Scope: [fresh install, current APT update, legacy channel migration, or an isolated pilot]
 Receiver and execution target: [identify both; do not assume LOCAL means WORKSTATION]
 
 First establish where you are running. Inspect the distribution/version,
@@ -45,13 +49,20 @@ Before package installation:
 - Inspect the actual package-manager plan. Record package versions and relevant
   desktop selections before changes. Explain an unexpected upgrade/removal or
   desktop change rather than approving a different plan silently.
-- For a pilot, keep the existing connection and service processes available.
-  Use the agreed isolated state directory; do not guess an existing profile.
+- For a configuration pilot with the installed package, use the agreed
+  isolated state directory. To test a different package while existing
+  services stay available, use a separate computer or disposable VM.
+- Before replacing a package, back up the affected profiles, let active jobs
+  finish and check their receipts. Close the tray and stop the affected
+  runtimes and autostart supervisors from an independent terminal. Keep them
+  stopped until the package transaction completes.
 
 Treat optional virtual-display prerequisites as optional: install them only
 when a virtual desktop is part of my task.
 
-Install the matching local .deb through APT in the owner's normal terminal.
+For a fresh installation from a local file, install the matching .deb through
+APT. For an APT update or channel migration, use the official steps for the
+matching distribution. Run the package transaction from an independent terminal.
 If OS authentication is required, show the exact action and target terminal
 once and let me type there. Keep that terminal available until post-install
 verification and any required correction have finished. Never ask me to paste
