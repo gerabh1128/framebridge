@@ -83,7 +83,7 @@ def release_announcement():
             'This maintenance release improves FBTERM header ownership, preserves the classic viewer and retains job-history and package-maintenance safeguards. '
             'Signed packages are available for Debian 13, Ubuntu 24.04 and Linux Mint 22.x (amd64).</p>'
             '<p>Existing installations must follow the new signing-key and cold-upgrade instructions. '
-            'Native installation and execution were verified on all three distributions; full graphical regression remains pending on Debian and Ubuntu.</p>'
+            'Native X11 viewer and tray tests passed on Debian 13 and Ubuntu 24.04 (XFCE) and Linux Mint 22.3 (Cinnamon). Cold upgrades from .4 to .15 preserved the tested profiles and execution history. Use the current signed release rather than historical builds.</p>'
             '<p><a href="/download/">Download &amp; verify</a> · '
             '<a href="https://github.com/gerabh1128/framebridge/releases/tag/v0.3.9%2Bfbterm.15">GitHub release</a> · '
             '<a href="/git/gerardo/framebridge/releases/tag/v0.3.9%2Bfbterm.15">Gitea release</a></p></aside>')

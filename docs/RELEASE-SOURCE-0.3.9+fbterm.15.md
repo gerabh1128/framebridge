@@ -38,7 +38,10 @@ Before upgrading an existing installation, back up affected profiles, drain jobs
 - Exact signed package and corresponding-source SHA-256 checks, including public HTTPS read-back: PASS.
 - Signed public APT metadata and candidate selection for all three suites: PASS.
 - Native installation and FrameBridge execution on Debian 13, Ubuntu 24.04 and Mint 22.x: PASS.
-- Mint native graphical lifecycle validation: PASS. Debian and Ubuntu full graphical regression remains pending.
+- Native X11 viewer and tray lifecycle checks: PASS on Debian 13 and Ubuntu 24.04 (XFCE) and Linux Mint 22.3 (Cinnamon). Debian used its standard graphical-capable kernel in an isolated test VM.
+- Direct cold upgrade from the exact signed .4 packages: PASS on three isolated VMs with newly created legacy profiles; execution before and after and existing job records and configuration were verified.
+- Cold-boot persistence: PASS on three isolated VMs. One Mint startup probe returned `FBTERM_CONTROLLER_BUSY` without executing; a fresh probe after the unified viewer settled passed. Runtime readiness is not proof that the graphical controller is immediately available.
+- Public GitHub APT mirror: PASS for the three separately signed .15 suites; the legacy channel remains separate.
 - Reviewed repository tree, exact signed packages/source and rendered site privacy scans: PASS.
 
-This record is not a complete hardware, desktop or reboot compatibility certification. The release addresses FBTERM header ownership, preserves the approved classic viewer and retains the explicit package-maintenance and job-history protections.
+This record is not a complete hardware, desktop or reboot compatibility certification. Production hosts were not rebooted for these tests. Historical builds and repository history are retained for provenance and are not recommended for new installations; the current signed artifacts passed the release privacy gate. For long-lived graphical programs, use an independent desktop launcher rather than keeping a managed shell job's output channels open. A missing execution receipt must never be treated as permission to replay a job. The release addresses FBTERM header ownership, preserves the approved classic viewer and retains the explicit package-maintenance and job-history protections.
