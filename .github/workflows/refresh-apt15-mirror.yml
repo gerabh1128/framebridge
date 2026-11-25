@@ -1,0 +1,128 @@
+name: Refresh signed FrameBridge fbterm15 APT mirror
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/refresh-apt15-mirror.yml']
+  schedule:
+    - cron: '37 8 * * *'
+permissions: {}
+concurrency:
+  group: framebridge-public-apt-mirror
+  cancel-in-progress: false
+jobs:
+  refresh:
+    if: github.repository == 'gerabh1128/framebridge' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      MIRROR_REPO: https://github.com/gerabh1128/framebridge.git
+      REVIEWED_TOOLS: ebea7b3ebfae58236a58e76757072e94f607c63c
+    steps:
+      - name: Fetch mirror and reviewed verification tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init --quiet mirror
+          git -C mirror fetch --quiet --no-tags "$MIRROR_REPO" refs/heads/apt-mirror
+          git -C mirror checkout --quiet --detach FETCH_HEAD
+          git -C mirror merge-base --is-ancestor "$REVIEWED_TOOLS" HEAD
+          test -z "$(find mirror/debian -type l -print -quit)"
+          mkdir -p trusted/tools
+          for tool in refresh.py check-apt.sh; do
+            git -C mirror show "$REVIEWED_TOOLS:tools/$tool" > "trusted/tools/$tool"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          old = "2B1F01BC806C0B33CB6CEDDE52859CEBC91B8808"
+          new = "69D0E9D83699F96AB986B06F3C24F85D892A517E"
+          for name, expected in [
+              ("refresh.py", "3559ed3fe4a24e986b5e66ed720f99c19da8da8a"),
+              ("check-apt.sh", "018959035a3a5df06b0db6bde60839af1568e619"),
+          ]:
+              p = Path("trusted/tools") / name
+              b = p.read_bytes()
+              assert hashlib.sha1(b"blob " + str(len(b)).encode() + b"\0" + b).hexdigest() == expected
+              s = b.decode()
+              assert s.count(old) == 1
+              if name == "refresh.py":
+                  assert s.count("https://framebridge.betancourt.one/debian/") == 1
+                  s = s.replace("https://framebridge.betancourt.one/debian/", "https://framebridge.betancourt.one/debian/fbterm15/").replace(old, new)
+                  s = s.replace('if not response.geturl().startswith("https://"):', 'if not response.geturl().startswith(ORIGIN):')
+              else:
+                  s = s.replace(old, new).replace("apt-mirror/debian/", "apt-mirror/debian/fbterm15/")
+              p.write_text(s)
+          PY
+          if test -d mirror/debian/fbterm15; then
+            cp -a mirror/debian/fbterm15 trusted/debian
+          fi
+      - name: Verify rotated key, signed indexes and all three packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 trusted/tools/refresh.py
+          bash trusted/tools/check-apt.sh "file://$PWD/trusted/debian/"
+          python3 - <<'PY'
+          from pathlib import Path
+          from email.parser import Parser
+          for suite in ("trixie", "noble", "mint22"):
+              p = Path("trusted/debian/dists") / suite / "main/binary-amd64/Packages"
+              assert Parser().parsestr(p.read_text())["Version"] == "0.3.9+fbterm.15"
+          PY
+          mkdir -p mirror/debian/fbterm15
+          cp -a trusted/debian/. mirror/debian/fbterm15/
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("mirror")
+          url = "https://raw.githubusercontent.com/gerabh1128/framebridge/apt-mirror/debian/fbterm15/"
+          fingerprint = "69D0E9D83699F96AB986B06F3C24F85D892A517E"
+          for suite in ("trixie", "noble", "mint22"):
+              (p/"sources"/("framebridge15-"+suite+".sources")).write_text(
+                  "Types: deb\nURIs: "+url+"\nSuites: "+suite+"\nComponents: main\nArchitectures: amd64\n"
+                  "Signed-By: /etc/apt/keyrings/framebridge-fbterm15-archive-keyring.asc "+fingerprint+"\n")
+          (p/"README-fbterm15.md").write_text(
+              "# FrameBridge signed fbterm.15 APT mirror\n\n"
+              "This is the separately signed maintenance channel for Debian 13, Ubuntu 24.04 and Linux Mint 22.x (amd64). "
+              "It does not replace the legacy APT channel or its trust key.\n\n"
+              "Mirror URI: `"+url+"`\n\n"
+              "Signing fingerprint: `"+fingerprint+"`\n\n"
+              "Verify the [public archive key](debian/fbterm15/framebridge-archive-keyring.asc) against the independently trusted fingerprint. "
+              "Use the source definition for your distribution: [Debian](sources/framebridge15-trixie.sources), "
+              "[Ubuntu](sources/framebridge15-noble.sources) or [Mint](sources/framebridge15-mint22.sources). "
+              "Follow the [official cold-upgrade and signing-key instructions](https://framebridge.betancourt.one/download/). "
+              "Existing installations are not migrated automatically.\n\n"
+              "The mirror refreshes signed indexes and verifies actual APT downloads independently of the legacy channel.\n")
+          readme = p/"README.md"
+          s = readme.read_text()
+          line = "> Current signed maintenance channel: [FrameBridge 0.3.9+fbterm.15](README-fbterm15.md). The instructions below describe the legacy channel.\n"
+          if line not in s:
+              marker = "# FrameBridge Linux APT mirror\n"
+              assert s.startswith(marker)
+              readme.write_text(s.replace(marker, marker+"\n"+line, 1))
+          PY
+          git -C mirror add -- debian/fbterm15 sources/framebridge15-trixie.sources sources/framebridge15-noble.sources sources/framebridge15-mint22.sources README-fbterm15.md README.md
+      - name: Publish the verified data if changed
+        shell: bash
+        env:
+          MIRROR_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd mirror
+          if git diff --cached --quiet; then
+            echo 'Mirror is up to date.'
+            exit 0
+          fi
+          git -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m 'Refresh verified APT repository data'
+          cat > "$RUNNER_TEMP/mirror-askpass" <<'SH'
+          #!/bin/sh
+          case "$1" in
+            Username*) printf '%s\n' x-access-token ;;
+            Password*) printf '%s\n' "$MIRROR_TOKEN" ;;
+            *) exit 1 ;;
+          esac
+          SH
+          chmod 700 "$RUNNER_TEMP/mirror-askpass"
+          GIT_ASKPASS="$RUNNER_TEMP/mirror-askpass" GIT_TERMINAL_PROMPT=0 git push "$MIRROR_REPO" HEAD:refs/heads/apt-mirror
