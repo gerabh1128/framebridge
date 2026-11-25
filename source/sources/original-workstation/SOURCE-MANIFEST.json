@@ -11,8 +11,8 @@
     {
       "archive_path": "tool-adapter/bin/framebridge_tool_adapter.py",
       "source_path": "tool-adapter/bin/framebridge_tool_adapter.py",
-      "bytes": 18101,
-      "sha256": "62c433ee2ff41a6e3f06457fb2ce45ef0a15036b32651106e28cbc35935a3dae",
+      "bytes": 18501,
+      "sha256": "e5202ba2643f2a6918d6029ca64c4047cf9e626f1f0e9c0f1546cb6525c301ca",
       "source_mode": "0o700",
       "archive_mode": "0755"
     },
@@ -35,8 +35,8 @@
     {
       "archive_path": "fbterm/bin/fbterm-run",
       "source_path": "fbterm/bin/fbterm-run",
-      "bytes": 2578,
-      "sha256": "c9d42c5448cf53337bf82732875af310e4cb78febfe0eb6b475ef2381fe97acc",
+      "bytes": 7432,
+      "sha256": "4a3b767512f41b95c18a6b91a9096a86e49f5760d432d23744d14a63a2cecc60",
       "source_mode": "0o700",
       "archive_mode": "0755"
     },

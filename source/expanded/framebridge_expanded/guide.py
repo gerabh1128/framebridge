@@ -17,8 +17,9 @@ def _digest(value):
     raw = json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(",", ":")).encode()
     return hashlib.sha256(raw).hexdigest()
 
-def get_guide(topic="start"):
+def get_guide(topic="start", *, version=None):
     """Read static help without touching profiles, credentials, processes or network."""
+    version = __version__ if version is None else version
     if not isinstance(topic, str) or len(topic) > 64:
         return {"ok": False, "error": "HELP_TOPIC_INVALID", "topics": list(topics())}
     topic = topic.strip().lower()
@@ -33,8 +34,8 @@ def get_guide(topic="start"):
         title, sections = entry["title"], copy.deepcopy(entry["sections"])
     else:
         return {"ok": False, "error": "HELP_TOPIC_UNKNOWN", "topic": topic, "topics": list(topics()),
-                "product": PRODUCT, "version": __version__, "guide_schema": GUIDE_SCHEMA}
-    value = {"ok": True, "product": PRODUCT, "version": __version__, "guide_schema": GUIDE_SCHEMA,
+                "product": PRODUCT, "version": version, "guide_schema": GUIDE_SCHEMA}
+    value = {"ok": True, "product": PRODUCT, "version": version, "guide_schema": GUIDE_SCHEMA,
              "topic": topic, "title": title, "sections": sections, "topics": list(topics()),
              "read_only": True, "capabilities_verified": False}
     value["guide_sha256"] = _digest(value)
@@ -55,9 +56,10 @@ def render_text(topic="start"):
         lines.append("More help: fb help " + " | ".join(topics()))
     return "\n".join(lines).rstrip() + "\n"
 
-def export_guide():
+def export_guide(version=None):
     """Return the versioned static export used to generate website documentation."""
-    value = {"product": PRODUCT, "version": __version__, "guide_schema": GUIDE_SCHEMA,
-             "topics": {name: get_guide(name) for name in topics()}}
+    version = __version__ if version is None else version
+    value = {"product": PRODUCT, "version": version, "guide_schema": GUIDE_SCHEMA,
+             "topics": {name: get_guide(name,version=version) for name in topics()}}
     value["guide_sha256"] = _digest(value)
     return value

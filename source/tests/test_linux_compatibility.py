@@ -59,6 +59,27 @@ class LinuxCompatibilityTests(unittest.TestCase):
                 self.assertEqual("candidate", result["validation_status"])
                 self.assertTrue(result["warnings"])
 
+    def test_bundled_profile_requires_its_private_interpreter_on_supported_hosts(self):
+        manifest = self.artifact("debian13-amd64-py313")
+        manifest.update(profile_id="linux-amd64-cp313",
+                        runtime={"implementation": "CPython", "version": "3.13.18"})
+        profile = self.prefix / "release-profile.json"
+        profile.write_text(json.dumps(manifest))
+        exe = self.prefix / "python/bin/python3.13"
+        exe.parent.mkdir(parents=True)
+        exe.touch()
+        with patch.object(compat.sys, "executable", str(exe)), \
+                patch.object(compat.platform, "python_version", return_value="3.13.18"):
+            for distro, version in (("debian", "13"), ("ubuntu", "24.04"), ("linuxmint", "22.3")):
+                with self.subTest(distro=distro):
+                    self.assertTrue(self.check(distro, version, (3, 13))["ok"])
+            self.assertFalse(self.check("ubuntu", "26.04", (3, 13))["ok"])
+            with patch.object(compat.sys, "executable", "/usr/bin/python3"):
+                self.assertFalse(self.check("debian", "13", (3, 13))["ok"])
+            manifest["runtime"] = []
+            profile.write_text(json.dumps(manifest))
+            self.assertFalse(self.check("debian", "13", (3, 13))["ok"])
+
     def test_version_and_derivative_identity_do_not_silently_opt_in(self):
         self.artifact("ubuntu24.04-amd64-py312")
         for distro, version in [("ubuntu", "22.04"), ("ubuntu", "24.10"),

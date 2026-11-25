@@ -1,10 +1,31 @@
-# 0.3.9+fbterm.15 — signed maintenance release
+# 0.3.9+fbterm.18 — informational FBTERM
+
+- Simplify the local job context menu to read-only details, verified output, and copy ID; no request, edit, or cancellation controls.
+- Show the recorded claim-to-finish duration when available. Keep the persistent viewer, read-only VTE client, and existing execution safety and maintenance controls.
+- Retain historical review and job records. No external review task or notification service.
+
+# 0.3.9+fbterm.17 — persistent viewer correction
+
+- Launch the profile-owned GTK/VTE viewer with distribution Python, keeping the private execution interpreter separate.
+- Prevent private Python ABI search paths from leaking into the graphical process; preserve the desktop/profile binding and read-only attachment.
+- Preserve job history, existing update preparation, signed stable APT source and package maintenance safeguards.
+- Correct portable installation and diagnostic guide labels. Release acceptance and signing are separate gates.
+
+# 0.3.9+fbterm.16 — unsigned portable release assembly
+
+- One amd64 package with private CPython 3.13.18 and verified vendor inputs; excludes pip and ensurepip. Retains system GTK/GI and package-maintenance dependencies.
+- Stable APT source and scoped public archive key are package-managed conffiles; signature verification, publication and acceptance of the exact artifact are external gates.
+- Local owner preparation pauses new managed EXEC admissions and lets admitted jobs finish. An uncertain result remains a blocker. No automatic cancellation, restart or replay.
+- Durable owner review requests and new unknown-outcome notifications use exact job identity and digest. Authorized acknowledgements do not constitute resolution. A functioning authenticated transport is needed for remote retrieval.
+- Retains verified original FBTERM activity display and local owner controls. No claim of public availability or unsupported distribution compatibility is made by the source assembly.
+
+# Private candidate 0.3.9+fbterm.15
 
 Correct header visibility ownership; preserve the approved classic .14
 viewer unchanged. Default header text updates cannot toggle tmux visibility.
 Only a verified singular legacy attachment can request the legacy header.
 Separately installed legacy keepers require an explicit operator migration
-check. No automatic disabling of unrelated services. See the [signed release record](docs/RELEASE-SOURCE-0.3.9+fbterm.15.md) for the public packages, source identity, new APT channel and test limits.
+check. No automatic disabling of unrelated services or public release.
 
 # Private candidate 0.3.9+fbterm.14
 

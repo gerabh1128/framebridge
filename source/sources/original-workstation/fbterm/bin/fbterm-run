@@ -1,122 +1,190 @@
-#!/usr/bin/env bash
+#!/usr/bin/python3
+"""FBTERM runner: bounded output finalization, owner-scoped cancellation, durable receipts."""
+import datetime
+import errno
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import signal
+import stat
+import subprocess
+import sys
+import time
 
-umask 077
+os.umask(0o077)
+ID = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,79}")
+HASH = re.compile(r"[a-f0-9]{64}")
+DRAIN_SECONDS = 2.0
+CANCEL_GRACE = 3.0
 
-ROOT="${FBTERM_ROOT:?FBTERM_ROOT no definido}"
+def stamp():
+    return datetime.datetime.now().astimezone().isoformat(timespec="microseconds")+"\n"
 
-JOB_ID="${1:-}"
+def sync_dir(p):
+    fd=os.open(p,os.O_RDONLY|os.O_DIRECTORY)
+    try:os.fsync(fd)
+    finally:os.close(fd)
 
-case "$JOB_ID" in
-    ''|*[!A-Za-z0-9._-]*)
-        printf 'FBTERM_ERROR=INVALID_JOB_ID\n' >&2
-        exit 64
-        ;;
-esac
+def write(p,text):
+    # No existing evidence is ever replaced.
+    fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+    with os.fdopen(fd,"w",encoding="ascii") as out:
+        out.write(text);out.flush();os.fsync(out.fileno())
 
-JOB="$ROOT/jobs/$JOB_ID"
-CMD="$JOB/command.bash"
-TIMEOUT_FILE="$JOB/timeout.seconds"
+def safe_dir(p, private=False):
+    s=p.lstat()
+    return stat.S_ISDIR(s.st_mode) and s.st_uid==os.getuid() and not (s.st_mode & (0o077 if private else 0o022))
 
-if [ ! -f "$CMD" ]; then
-    printf 'FBTERM_ERROR=COMMAND_NOT_FOUND JOB_ID=%s\n' "$JOB_ID" >&2
-    exit 66
-fi
+def digest(p):
+    with p.open("rb") as f:
+        return hashlib.file_digest(f,"sha256").hexdigest()
 
-TIMEOUT_S='120'
+def queue_root(root):
+    return root.parent.parent if root.parent.name=="lanes" and root.name.isdigit() else root
 
-if [ -f "$TIMEOUT_FILE" ]; then
-    VALUE="$(cat "$TIMEOUT_FILE" 2>/dev/null || true)"
-    case "$VALUE" in
-        ''|*[!0-9]*)
-            ;;
-        *)
-            if [ "$VALUE" -ge 1 ] 2>/dev/null &&
-               [ "$VALUE" -le 3600 ] 2>/dev/null
-            then
-                TIMEOUT_S="$VALUE"
-            fi
-            ;;
-    esac
-fi
+def cancel_requested(root,jid,sha):
+    try:
+        d=queue_root(root)/"queue-v2"/"owner-cancel-v1"
+        if not safe_dir(d,True):return False
+        p=d/(jid+".json")
+        fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        try:
+            st=os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode) or st.st_uid!=os.getuid() or st.st_nlink!=1 or st.st_mode&0o077 or st.st_size>4096:return False
+            v=json.loads(os.read(fd,4097))
+        finally:os.close(fd)
+        return (type(v) is dict and v.get("schema")=="framebridge.owner-cancel.v1"
+                and v.get("job_id")==jid and v.get("command_sha256")==sha)
+    except (OSError,ValueError,TypeError):return False
 
-OUT_FIFO="$JOB/stdout.fifo"
-ERR_FIFO="$JOB/stderr.fifo"
+def exit_code(rc):
+    return rc if rc>=0 else 128-rc
 
-STDOUT="$JOB/stdout.bin"
-STDERR="$JOB/stderr.bin"
+def stop_reader(p):
+    if p.poll() is None:
+        p.terminate()
+        try:p.wait(timeout=.5)
+        except subprocess.TimeoutExpired:
+            p.kill();p.wait(timeout=1)
+    return exit_code(p.returncode)
 
-rm -f "$OUT_FIFO" "$ERR_FIFO"
+def drain(readers):
+    deadline=time.monotonic()+DRAIN_SECONDS
+    while any(p.poll() is None for p in readers) and time.monotonic()<deadline:
+        time.sleep(.025)
+    results=[]
+    for p in readers:
+        results.append(stop_reader(p) if p.poll() is None else exit_code(p.returncode))
+    return results
 
-mkfifo "$OUT_FIFO" "$ERR_FIFO"
+def open_channel(job,root,name,display):
+    fifo=job/(name+".fifo")
+    output=job/(name+".bin")
+    os.mkfifo(fifo,0o600)
+    write(output,"")
+    rd=os.open(fifo,os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
+    wr=None
+    try:
+        wr=os.open(fifo,os.O_WRONLY|os.O_NOFOLLOW)
+        os.set_blocking(rd,True)
+        child=subprocess.Popen([str(root/"bin/fbterm-output"),str(output)],
+                               stdin=rd,stdout=display,close_fds=True)
+        return child,wr,fifo
+    except BaseException:
+        if wr is not None:os.close(wr)
+        raise
+    finally:os.close(rd)
 
-: > "$STDOUT"
-: > "$STDERR"
+def main():
+    if len(sys.argv)!=2 or not ID.fullmatch(sys.argv[1]) or sys.argv[1] in (".",".."):
+        print("FBTERM_ERROR=INVALID_JOB_ID",file=sys.stderr);return 64
+    jid=sys.argv[1]
+    root=Path(os.environ["FBTERM_ROOT"])
+    job=root/"jobs"/jid
+    cmd=job/"command.bash"
+    if not safe_dir(job,True):return 66
+    st=cmd.lstat()
+    if not stat.S_ISREG(st.st_mode) or st.st_uid!=os.getuid() or st.st_nlink!=1 or st.st_mode&0o077:return 66
+    if any((job/n).exists() for n in ("DONE","result.env","started.at","stdout.fifo","stderr.fifo")):
+        return 65
+    timeout=120
+    try:
+        t=int((job/"timeout.seconds").read_text().strip())
+        if 1<=t<=3600:timeout=t
+    except (OSError,ValueError):pass
+    sha=digest(cmd)
+    write(job/"started.at",stamp())
+    write(job/"command.sha256",sha+"\n")
+    readers=[];writers=[];fifos=[]
+    process=None;rc=None;cancelled_before=False;signal_sent=False
+    try:
+        for name,display in (("stdout",1),("stderr",2)):
+            reader,writer,fifo=open_channel(job,root,name,display)
+            readers.append(reader);writers.append(writer);fifos.append(fifo)
+        if cancel_requested(root,jid,sha):
+            cancelled_before=True;rc=125
+        else:
+            process=subprocess.Popen(["/usr/bin/timeout","--signal=TERM","--kill-after=2s",
+                       f"{timeout}s","bash","--noprofile","--norc",str(cmd)],
+                       stdout=writers[0],stderr=writers[1],close_fds=True,process_group=0)
+            # The selected command is the only process group this supervisor may signal.
+        for fd in writers:os.close(fd)
+        writers=[]
+        if process is not None:
+            cancelled_at=None
+            while process.poll() is None:
+                if cancelled_at is None and cancel_requested(root,jid,sha):
+                    if os.getpgid(process.pid)==process.pid:
+                        # GNU timeout forwards TERM to its own group, with kill-after.
+                        process.send_signal(signal.SIGTERM)
+                        signal_sent=True
+                        cancelled_at=time.monotonic()
+                if cancelled_at is not None and time.monotonic()-cancelled_at>=CANCEL_GRACE:
+                    if process.poll() is None and os.getpgid(process.pid)==process.pid:
+                        os.killpg(process.pid,signal.SIGKILL)
+                time.sleep(.05)
+            rc=exit_code(process.wait())
+        tee=drain(readers)
+        for p in (job/"stdout.bin",job/"stderr.bin"):
+            with p.open("rb") as f:os.fsync(f.fileno())
+        fields={"JOB_ID":jid,"EXIT":str(rc),"COMMAND_SHA256":sha,
+                "OWNER_CANCEL_BEFORE_EXEC":"1" if cancelled_before else "0",
+                "OWNER_CANCEL_SIGNAL_SENT":"1" if signal_sent else "0"}
+        write(job/"exit.code",str(rc)+"\n")
+        for i,n in enumerate(("stdout","stderr")):
+            out=job/(n+".bin")
+            h=digest(out);size=out.stat().st_size
+            write(job/(n+"-tee.exit"),str(tee[i])+"\n")
+            write(job/(n+".sha256"),h+"\n")
+            write(job/(n+".bytes"),str(size)+"\n")
+            fields[n.upper()+"_SHA256"]=h
+            fields[n.upper()+"_BYTES"]=str(size)
+            fields[n.upper()+"_TEE_EXIT"]=str(tee[i])
+        if any(tee):
+            print("FBTERM_CAPTURE_PARTIAL: output remained open after command exit or a reader failed.",file=sys.stderr,flush=True)
+        write(job/"finished.at",stamp())
+        write(job/"result.tmp","".join(k+"="+v+"\n" for k,v in fields.items()))
+        (job/"result.tmp").rename(job/"result.env")
+        sync_dir(job)
+        write(job/"DONE","")
+        sync_dir(job)
+        for p in fifos:p.unlink()
+        print("FBTERM_JOB_COMPLETE JOB_ID="+jid+" EXIT="+str(rc),flush=True)
+        return rc
+    except Exception:
+        # Never publish a fabricated DONE for an uncertain command.
+        print("FBTERM_RUNNER_UNCONFIRMED JOB_ID="+jid,file=sys.stderr,flush=True)
+        return 74
+    finally:
+        for fd in writers:
+            try:os.close(fd)
+            except OSError:pass
+        for p in readers:
+            try:
+                if p.poll() is None:stop_reader(p)
+            except (OSError,subprocess.TimeoutExpired):pass
 
-date -Ins > "$JOB/started.at"
-
-sha256sum "$CMD" |
-    awk '{print $1}' > "$JOB/command.sha256"
-
-"$ROOT/bin/fbterm-output" "$STDOUT" < "$OUT_FIFO" &
-OUT_TEE_PID=$!
-
-"$ROOT/bin/fbterm-output" "$STDERR" < "$ERR_FIFO" >&2 &
-ERR_TEE_PID=$!
-
-/usr/bin/timeout \
-    --signal=TERM \
-    --kill-after=2s \
-    "${TIMEOUT_S}s" \
-    bash --noprofile --norc "$CMD" \
-    > "$OUT_FIFO" \
-    2> "$ERR_FIFO"
-
-RC=$?
-
-wait "$OUT_TEE_PID"
-OUT_TEE_RC=$?
-
-wait "$ERR_TEE_PID"
-ERR_TEE_RC=$?
-
-printf '%s\n' "$RC" > "$JOB/exit.code"
-printf '%s\n' "$OUT_TEE_RC" > "$JOB/stdout-tee.exit"
-printf '%s\n' "$ERR_TEE_RC" > "$JOB/stderr-tee.exit"
-
-sha256sum "$STDOUT" |
-    awk '{print $1}' > "$JOB/stdout.sha256"
-
-sha256sum "$STDERR" |
-    awk '{print $1}' > "$JOB/stderr.sha256"
-
-stat -c '%s' "$STDOUT" > "$JOB/stdout.bytes"
-stat -c '%s' "$STDERR" > "$JOB/stderr.bytes"
-
-date -Ins > "$JOB/finished.at"
-
-{
-    printf 'JOB_ID=%s\n' "$JOB_ID"
-    printf 'EXIT=%s\n' "$RC"
-    printf 'COMMAND_SHA256=%s\n' \
-        "$(cat "$JOB/command.sha256")"
-    printf 'STDOUT_SHA256=%s\n' \
-        "$(cat "$JOB/stdout.sha256")"
-    printf 'STDERR_SHA256=%s\n' \
-        "$(cat "$JOB/stderr.sha256")"
-    printf 'STDOUT_BYTES=%s\n' \
-        "$(cat "$JOB/stdout.bytes")"
-    printf 'STDERR_BYTES=%s\n' \
-        "$(cat "$JOB/stderr.bytes")"
-    printf 'STDOUT_TEE_EXIT=%s\n' "$OUT_TEE_RC"
-    printf 'STDERR_TEE_EXIT=%s\n' "$ERR_TEE_RC"
-} > "$JOB/result.tmp"
-
-mv "$JOB/result.tmp" "$JOB/result.env"
-touch "$JOB/DONE"
-
-rm -f "$OUT_FIFO" "$ERR_FIFO"
-
-printf 'FBTERM_JOB_COMPLETE JOB_ID=%s EXIT=%s\n' \
-    "$JOB_ID" "$RC"
-
-exit "$RC"
+if __name__=="__main__":
+    raise SystemExit(main())

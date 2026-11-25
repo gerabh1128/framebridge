@@ -573,6 +573,22 @@ def framebridge_jobs(target: str, job_id: str = "", session_id: str = "", includ
                        session_id=session_id, include_stdout=include_stdout)
 
 
+@_blocking_tools.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                                                   idempotentHint=True, openWorldHint=False))
+def framebridge_feedback(target: str) -> dict:
+    """Read persistent owner review requests without using an EXEC scheduler slot.
+    Pending is not delivered. Acknowledged is not resolved. Requires working enrolled transport."""
+    return managed_job(target,"feedback_list")
+
+
+@_blocking_tools.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False,
+                                                   idempotentHint=True, openWorldHint=False))
+def framebridge_feedback_ack(target: str, incident_id: str, command_sha256: str, authorized: bool=False) -> dict:
+    """Acknowledge receipt of the exact owner incident; never cancel, replay or resolve a job.
+    Requires explicit authorization and the incident/digest from framebridge_feedback."""
+    return managed_job(target,"feedback_ack",job_id=incident_id,sha256=command_sha256,authorized=authorized)
+
+
 def _cua_frame_fields(frame_output: str) -> dict:
     result={}
     safe_lines=[]

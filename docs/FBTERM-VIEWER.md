@@ -58,3 +58,7 @@ The package does not automatically disable external user units. Validate
 absence of a competing writer during real execution before accepting the
 upgrade. A return to a legacy configuration requires an explicit rollback
 decision, not automatic restoration of a competing header writer.
+
+## Read-only job information
+
+The compact history includes a recorded duration from scheduler claim to completion when available; absent or unconfirmed times are not estimated. Right-click opens only details, verified output, and copy job ID. No job request, edit, cancellation, or retry is available from this menu. The authorized conversation remains the administration interface. Historical feedback and safety records are preserved.

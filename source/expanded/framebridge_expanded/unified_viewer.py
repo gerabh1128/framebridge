@@ -47,6 +47,12 @@ def job_state(row):
             status = "Completed (exit code unverified)"
         elif code != "0":
             status = "Completed with error"
+    if row.get("owner_cancel_before_exec"):
+        return "Cancelled before execution"
+    if row.get("owner_cancel_signal_sent"):
+        return "Cancel signal sent; command ended"
+    if row.get("capture_status") == "partial" and row["state"]=="completed":
+        return status + " (partial capture)"
     return status
 
 
@@ -61,7 +67,8 @@ def job_text(row):
         value = "Unconfirmed"
     else:
         value = code if code is not None else "Unconfirmed"
-    return "JOB: " + row["id"] + " | STATE: " + job_state(row) + " | EXIT: " + value
+    from .owner_job_menu import duration
+    return "JOB: " + row["id"] + " | STATE: " + job_state(row) + " | DUR: " + duration(row) + " | EXIT: " + value
 
 
 def job_colour(row):
@@ -118,7 +125,7 @@ def create_window(profile, tmux, terminal_env, observe=None):
     counts = Gtk.Label(xalign=0, label="Execution state not verified")
     counts.set_ellipsize(Pango.EllipsizeMode.END)
     header.pack_start(counts, False, False, 0)
-    stamp = Gtk.Label(xalign=0, label="Read only | GPL-3.0-only | Copyleft")
+    stamp = Gtk.Label(xalign=0, label="Read-only output | Right-click a job for actions | GPL-3.0-only | Copyleft")
     stamp.set_ellipsize(Pango.EllipsizeMode.END)
     header.pack_start(stamp, False, False, 0)
     root.pack_start(Gtk.Separator(), False, False, 0)
@@ -126,7 +133,7 @@ def create_window(profile, tmux, terminal_env, observe=None):
     lower = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
     root.pack_start(lower, True, True, 0)
     root.pack_start(Gtk.Separator(), False, False, 0)
-    expander = Gtk.Expander(label="Recorded jobs / history")
+    expander = Gtk.Expander(label="Recorded jobs / history (right-click for actions)")
     expander.set_expanded(False)
     root.pack_start(expander, False, False, 0)
     history = Gtk.TextView()
@@ -176,7 +183,7 @@ def create_window(profile, tmux, terminal_env, observe=None):
         state["pending"] = False
         if result is None:
             counts.set_text("Execution state not verified")
-            stamp.set_text("Read only | Last observation unavailable | GPL-3.0-only | Copyleft")
+            stamp.set_text("Read-only output | Last observation unavailable | GPL-3.0-only | Copyleft")
             return False
         c = result["counts"]
         active = c.get("running", 0) + c.get("in_flight", 0)
@@ -186,7 +193,7 @@ def create_window(profile, tmux, terminal_env, observe=None):
         counts.set_markup('<span foreground="' + accent + '">' +
                           GLib.markup_escape_text(summary(result)) + '</span>')
         updated = datetime.fromtimestamp(result["updated"]).astimezone()
-        stamp.set_text(f"Read only | Updated {updated:%H:%M:%S %Z} | GPL-3.0-only | Copyleft")
+        stamp.set_text(f"Right-click a job for details | Updated {updated:%H:%M:%S %Z} | GPL-3.0-only | Copyleft")
         state["total"] = result["total"]
         position = adjust.get_value()
         if older:
@@ -263,6 +270,8 @@ def create_window(profile, tmux, terminal_env, observe=None):
         if not state["closed"]:
             window.destroy()
 
+    from . import owner_job_menu
+    owner_job_menu.install(window,history,state,profile,Gtk,Gdk,GLib,refresh)
     window.connect("destroy", close)
     terminal.connect("child-exited", exited)
     adjust.connect("value-changed", scroll_changed)

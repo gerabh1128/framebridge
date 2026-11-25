@@ -684,6 +684,9 @@ def build_parser():
     recover_node.add_argument("--central", required=True)
     run = ns.add_parser("run", help="Advanced foreground node agent.")
     run.add_argument("--once", action="store_true", help="Process at most one polling cycle.")
+    sub.add_parser("feedback", help="Read local review requests and agent acknowledgement state.")
+    update = sub.add_parser("update", help="Prepare a local queue for safe package maintenance; never runs APT.")
+    update.add_argument("update_action", choices=("status","prepare","resume"))
     recovery = sub.add_parser("recovery", help="Local interactive maintenance of an offline job queue.")
     reconcile = recovery.add_subparsers(dest="recovery_command", required=True).add_parser(
         "reconcile", help="Retain an unknown outcome; release only its reviewed reservation.")
@@ -932,6 +935,25 @@ def _dispatch(parser, args):
                     value.update(_module("viewer").observe_window(state))
             except _module("viewer").Waiting as exc:
                 value = {"ok": False, "error": str(exc)}
+            _show(value)
+            return _result_code(value)
+        if args.command == "feedback":
+            p = _module("activity_data").profile_at(state)
+            f = _module("job_feedback")
+            value = f.list_root(f.root_for(p))
+            _show(value)
+            return _result_code(value)
+        if args.command == "update":
+            if args.update_action != "status":
+                if args.json or args.non_interactive or not sys.stdin.isatty():
+                    return _interaction_required("fb update " + args.update_action)
+                if not args.state_dir:
+                    raise ValueError("Choose the exact local profile using --state-dir.")
+                phrase = "PREPARE" if args.update_action == "prepare" else "RESUME"
+                print("This changes admission of NEW local managed EXEC jobs only. Existing jobs and receipts are retained.")
+                if input("Type " + phrase + " to confirm: ") != phrase:
+                    return 130
+            value = _module("update_control").control(_module("activity_data").profile_at(state),args.update_action)
             _show(value)
             return _result_code(value)
         if args.command == "recovery":

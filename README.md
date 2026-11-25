@@ -7,13 +7,11 @@
 
 Use a central gateway and enrolled nodes to administer Linux computers you control. Run commands and return to persistent Bash terminals; an existing X11 desktop adds optional graphical tools. ChatGPT remains hosted; FrameBridge runs the tools on your Linux computers.
 
-> **FrameBridge 0.3.9+fbterm.15 — signed Linux maintenance release.** [Download the three signed packages](https://framebridge.betancourt.one/download/) or read the [exact release record](docs/RELEASE-SOURCE-0.3.9+fbterm.15.md), including the signing-key rotation, APT channel and native validation limits.
+## Portable Linux distribution
 
-The .15 release uses a separate [signed APT channel](https://framebridge.betancourt.one/debian/fbterm15/) with the new signing key. The [current GitHub APT mirror](https://github.com/gerabh1128/framebridge/blob/apt-mirror/README-fbterm15.md) independently verifies all three .15 suites. The previous APT channel remains separate for existing installations. See the download page for the correct trust and cold-upgrade instructions; historical builds are not recommended for new installations.
+The 0.3.9+fbterm.18 release assembly targets Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64 with one private CPython runtime. Use it only after the official release catalog identifies this exact version and its signed artifact. The signed archive channel is designed to use a permanent URI and the independently trusted archive key. Earlier releases and their separate package profiles remain historical.
 
-FrameBridge 0.3.9 lets compatible Linux peers negotiate larger blocks for original PNG captures. After a broker restart, nodes can resume polling when the broker acknowledges an authenticated result whose request is no longer recorded. The release also corrects local TLS control, CLI exit status and managed-profile checks during package upgrades. Read an uncertain execution receipt with `fb nodes execution` before deciding whether to submit another command. See the [0.3.9 release notes](RELEASE-NOTES.md#039).
-
-The current signed **0.3.9+fbterm.15** source retains the [privacy checks](docs/PRIVACY-REVIEW.md#publication-checks) in the public-release builders. Bundled components use role-based names, and tests use synthetic identities. Each managed job has an ID and an execution receipt. Independent jobs can share a node, and callers can retrieve verified output from the node that ran the command. See the [job changes and validation scope](RELEASE-NOTES.md#linux-job-updates). The [local offline review procedure](docs/JOB-RECONCILIATION.md), introduced in the private .8 candidate, is limited to the documented missing-original-directory case and never declares success or permits replay.
+The persistent FBTERM job history is informational only. Inspect exact job details, recorded duration, exit code and verified output; ask the authorized administrator in the conversation to investigate. Do not replay an unknown outcome. Prepare local maintenance before changing packages, and verify the actual outcome afterwards.
 
 ## Start here
 
@@ -21,43 +19,23 @@ Start on the Linux computer you want to connect, with a person at its terminal o
 
 | Step | What you do | What to check |
 | --- | --- | --- |
-| **1. Install** | Choose the package matching your distribution and Python version, verify its release record, then install it with APT. | The package manager resolves dependencies for that computer. |
+| **1. Install** | Verify the portable amd64 package and release record, then install it with APT. | The package manager resolves dependencies for that computer. |
 | **2. Connect** | Run `fb connect` in your normal terminal and enter the requested connection details there. Complete browser sign-in and approval yourself. | The command reports the real connection result and returns to the prompt. |
 | **3. Verify** | Run `fb status`, `fb doctor`, then `fb console`. In ChatGPT, ask the connected FrameBridge help tool for a small terminal task. | Confirm the selected machine and the result of the task. |
 
 ### 1. Install the matching package
 
-The release has three native Python builds. Choose the package matching the distribution and system Python.
+One portable amd64 DEB contains the fixed CPython 3.13.18 runtime. System Python is retained for GTK/GI and system maintenance. Supported release targets are Debian 13, Ubuntu 24.04 and Mint 22.x; other releases, architectures and native Wayland control are not certified by this assembly.
 
-| Distribution | Architecture | System Python | Release package profile |
-| --- | --- | --- | --- |
-| Debian 13 | amd64 / x86_64 | 3.13 | `debian13-amd64-py313` |
-| Ubuntu 24.04 | amd64 / x86_64 | 3.12 | `ubuntu24.04-amd64-py312` |
-| Linux Mint 22.x | amd64 / x86_64 | 3.12 | `mint22-amd64-py312` |
-
-Version-specific signed APT update and managed-service lifecycle results belong to the accompanying release acceptance record. Ubuntu 26.04, LMDE 7, other distributions, older releases and other CPU architectures are outside the validated scope of this release. Earlier compatibility experiments are recorded in the [compatibility history](docs/LINUX-COMPATIBILITY-CANDIDATE.md).
-
-Verify the signing-key fingerprint, package checksum and detached signature using the instructions on the [official download page](https://framebridge.betancourt.one/download/). Historical release records remain in [Official releases](OFFICIAL-RELEASES.md). A checksum identifies a file; the release signature authenticates it with the independently trusted project key.
-
-- **Fresh install.** Install the verified DEB for your distribution or configure
-  its current signed APT channel using the [official download page](https://framebridge.betancourt.one/download/).
-- **Update an existing installation.** Follow [cold package maintenance](docs/PACKAGE-MAINTENANCE.md)
-  before replacing the package. If you already use the current signed APT
-  channel, follow [Normal updates](https://framebridge.betancourt.one/download/#normal-updates)
-  and check the candidate version before installing it.
-- **Move from the legacy APT channel.** With the affected runtime stopped,
-  follow the current channel setup for your distribution on the
-  [official download page](https://framebridge.betancourt.one/download/).
-  Verify the rotated signing key and use the matching suite.
-
-For a **fresh Mint installation**, run this from the directory containing the
-verified 0.3.9+fbterm.15 package.
+Only after official publication, obtain the DEB and detached signature through the [official download page](https://framebridge.betancourt.one/download/). Independently verify the archive fingerprint, signature and hash before installation.
 
 ~~~bash
-sudo apt install ./FrameBridge-0.3.9+fbterm.15-mint22-amd64-py312.deb
+sudo apt install ./FrameBridge-0.3.9+fbterm.18-linux-amd64-cp313.deb
 ~~~
 
-Use the corresponding profile filename on Debian or Ubuntu. Review APT's proposed changes for the actual computer. Installation places the software on disk; it does not establish a ChatGPT connection or replace the system Python.
+The verified DEB installs the scoped deb822 APT source and its public key. The permanent URI is https://framebridge.betancourt.one/debian/stable/ (stable/main). Do not activate it until the signed catalog and index are available. Preserve or disable old sources explicitly; this package never silently removes them. APT update refreshes indexes; the system updater or apt upgrade installs available upgrades.
+
+Before an upgrade, prepare new-job admission from the tray or local owner CLI, review all existing and unconfirmed work and detached effects, back up affected profiles, stop the relevant services normally, and use the system updater outside FBEXEC. Restart and verify the intended profiles, then resume accepting jobs. The cold guard remains mandatory. No unattended automatic stop/restart or automatic replay is provided.
 
 ### 2. Connect from your terminal
 

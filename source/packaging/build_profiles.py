@@ -11,7 +11,7 @@ from pathlib import Path
 import re
 
 
-CANDIDATE_VERSION = "0.3.9+fbterm.15"
+CANDIDATE_VERSION = "0.3.9+fbterm.18"
 VENDOR_RELATIVE = Path("original/hub/FrameBridge-Fleet-Hub/vendor")
 SOURCE_VENDOR = Path("sources/original-hub/FrameBridge-Fleet-Hub/vendor")
 GLIBC_BASELINE = (2, 34)

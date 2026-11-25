@@ -1,12 +1,12 @@
 {
   "product": "FrameBridge",
-  "version": "0.3.9+fbterm.15",
+  "version": "0.3.9+fbterm.18",
   "guide_schema": 1,
   "topics": {
     "start": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9+fbterm.15",
+      "version": "0.3.9+fbterm.18",
       "guide_schema": 1,
       "topic": "start",
       "title": "Start with FrameBridge",
@@ -22,7 +22,7 @@
         },
         {
           "heading": "Install and connect",
-          "body": "Install the package built for your exact Debian 13, Ubuntu 24.04 or Linux Mint 22.x amd64 profile. These are the three release profiles; other distributions and architectures are outside this release. Keep the distribution system Python: 3.13 on Debian 13, 3.12 on Ubuntu 24.04 and Mint 22.x. Use the matching signed APT suite: trixie, noble or mint22. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.",
+          "body": "For the portable release, install the single verified amd64 package for Debian 13, Ubuntu 24.04 or Linux Mint 22.x. The package includes private CPython 3.13.18 and retains system Python for GTK/GI/VTE and package maintenance. Use the signed stable/main APT channel. Earlier separate-profile packages use their historical suites. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.",
           "commands": [
             "fb connect"
           ]
@@ -63,12 +63,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "9543b8f697219c04dff0f132e05f8ca87d9f16939226937d99434c1871c50553"
+      "guide_sha256": "d8e0365c2d7b4175771fd17ad5cb1aeecffc1398103e5198ba33c6181d86e4b9"
     },
     "commands": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9+fbterm.15",
+      "version": "0.3.9+fbterm.18",
       "guide_schema": 1,
       "topic": "commands",
       "title": "Command reference",
@@ -125,7 +125,7 @@
         },
         {
           "heading": "Single local FBTERM viewer",
-          "body": "The graphical tray opens the one persistent FBTERM window for the selected local profile. Its title is >framebridge_; the profile ID in its header distinguishes local profiles without showing their paths. The upper read-only history scrolls independently, displaying one compact JOB | STATE | EXIT line per recorded job. The lower terminal attaches to the existing Original tmux session in read-only mode; there is no extra activity window. The >fb_ mark and factual activity colours are retained in the notification area. Local start, stop and restart preserve boot policy. Stop/restart require confirmation and a fresh queue check, which is not an atomic drain. ChatGPT through the authorized administrator’s chat remains the administration interface. There is no additional login, remote host selection, enrollment dialog or credential prompt. Use fb doctor for local diagnostics. Headless execution needs no desktop. During a cold upgrade close a remaining legacy viewer of the same profile before starting the new viewer.",
+          "body": "The graphical tray opens the one persistent FBTERM window for the selected local profile. Its title is >framebridge_; the profile ID in its header distinguishes local profiles without showing their paths. The upper read-only history scrolls independently, displaying one compact JOB | STATE | DUR | EXIT line per recorded job. The lower terminal attaches to the existing Original tmux session in read-only mode; there is no extra activity window. The >fb_ mark and factual activity colours are retained in the notification area. Local start, stop and restart preserve boot policy. Stop/restart require confirmation and a fresh queue check, which is not an atomic drain. ChatGPT through the authorized administrator’s chat remains the administration interface. There is no additional login, remote host selection, enrollment dialog or credential prompt. Use fb doctor for local diagnostics. Headless execution needs no desktop. During a cold upgrade close a remaining legacy viewer of the same profile before starting the new viewer.",
           "commands": [
             "framebridge-tray --show",
             "fb viewer status"
@@ -154,12 +154,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "d56eb43eaebb25687b26d815e178020dcd4135e3d369c75303c72e220bf3e432"
+      "guide_sha256": "4e6954a830bbb79773fe276a1b50b992b375d61a5e603b805f12f6b88eabfbf6"
     },
     "connection": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9+fbterm.15",
+      "version": "0.3.9+fbterm.18",
       "guide_schema": 1,
       "topic": "connection",
       "title": "Connect and disconnect ChatGPT",
@@ -208,12 +208,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "0b6268d2303e607042cefb90a3773aad5f969375451be60ed201e241fd22f9e0"
+      "guide_sha256": "b84d635a02bebcf67e9caec7a61e9e2af883b35a94cf043a1bcc89c29e445219"
     },
     "lifecycle": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9+fbterm.15",
+      "version": "0.3.9+fbterm.18",
       "guide_schema": 1,
       "topic": "lifecycle",
       "title": "Services, connection intent and boot policy",
@@ -274,12 +274,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "1933449f8452f119d4046c13f4007d5b4e0dd29e7b7d29a8934df7ce333a2bdd"
+      "guide_sha256": "2f9a79243d0229c594302b86d98c6c93d73fe3df1bfc0503fac60d1c097d536e"
     },
     "nodes": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9+fbterm.15",
+      "version": "0.3.9+fbterm.18",
       "guide_schema": 1,
       "topic": "nodes",
       "title": "Central and node operation",
@@ -348,12 +348,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "404c0a1a4ab820e623c7f5c2ac4843c030469b23025b5664db81ede060c576a7"
+      "guide_sha256": "43cecc0e8ae2aed64f36bad2a1e00d3cf921469b228c896226e38891ce8b7953"
     },
     "terminals": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9+fbterm.15",
+      "version": "0.3.9+fbterm.18",
       "guide_schema": 1,
       "topic": "terminals",
       "title": "Persistent Bash terminals",
@@ -422,12 +422,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "0c63be0742fd47ca4e7cc2f74381573dda9f79e79b5ae4a27be40a50dfe899ea"
+      "guide_sha256": "be4f1e46474650a1883d13089a2fe1e118f40aa4ca5081f99e31e088a2c9c4a5"
     },
     "screens": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9+fbterm.15",
+      "version": "0.3.9+fbterm.18",
       "guide_schema": 1,
       "topic": "screens",
       "title": "Authentic screen observation and input",
@@ -477,12 +477,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "18043dcb65068bbc91f1ebd35e3da96078f84b7fcdc9c4ccc882f5c29277fc09"
+      "guide_sha256": "e58affccdbebcc05e602a2841e4e6779cd6c6d67878c96fa050010ab988b9762"
     },
     "diagnostics": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9+fbterm.15",
+      "version": "0.3.9+fbterm.18",
       "guide_schema": 1,
       "topic": "diagnostics",
       "title": "Status and diagnosis",
@@ -499,7 +499,7 @@
         },
         {
           "heading": "Doctor",
-          "body": "doctor diagnoses prerequisites and reports findings with suggested next steps. Inspect the diagnosis, the live connection state and relevant private application logs before considering configuration changes. Eligibility checks the exact OS release, amd64 architecture, package profile and CPython ABI before starting native components. The release profiles cover Debian 13 with cp313 and Ubuntu 24.04/Mint 22.x with cp312. LMDE 7 and Ubuntu 26.04 remain experimental build targets. Verify installation and runtime acceptance on the matching profile. Resolve an ABI mismatch by selecting the package built for the distribution and its system Python.",
+          "body": "doctor diagnoses prerequisites and reports findings with suggested next steps. Inspect the diagnosis, the live connection state and relevant private application logs before considering configuration changes. Eligibility checks the OS release, amd64 architecture, package profile and Python ABI. The portable package uses private CPython 3.13.18 for execution and system Python for GTK/GI/VTE. Historical packages used separate cp313/cp312 profiles. Debian 13, Ubuntu 24.04 and Linux Mint 22.x are the supported targets; LMDE 7 and Ubuntu 26.04 remain experimental. Verify the package and the actual graphical viewer separately.",
           "commands": [
             "fb doctor"
           ]
@@ -526,6 +526,15 @@
           "commands": [
             "fb recovery reconcile --help"
           ]
+        },
+        {
+          "heading": "Read-only job inspection and APT maintenance preparation",
+          "body": "The job context menu is informational only: inspect the exact job details, recorded claim-to-finish duration and verified output, or copy the job ID. It does not submit, edit, cancel or request a review. Ask the authorized administrator in the conversation to investigate. Existing feedback and cancellation records and execution safeguards are preserved. Never replay an unknown result. Prepare APT update from the tray or explicit local owner command: new managed EXEC admissions pause, existing jobs may finish. Unknown results keep the queue from being reported drained. The owner must review other profiles, external effects, TTY/CUA, stop the relevant services, verify backups and run APT in the normal OS interface, not in FBEXEC. Resume admission after package verification. This does not automatically stop services or launch the package manager.",
+          "commands": [
+            "fb --json update status",
+            "fb --state-dir /path/to/profile update prepare",
+            "fb --state-dir /path/to/profile update resume"
+          ]
         }
       ],
       "topics": [
@@ -542,12 +551,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "f481d04e8d62a1ee648d90a1e52b5503bce412d1ff21d27bd9daf73317c25b06"
+      "guide_sha256": "1929be9ad78c261185a1ea436dff3322ed784d3ffdeda2a8491685b78371cb3d"
     },
     "security": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9+fbterm.15",
+      "version": "0.3.9+fbterm.18",
       "guide_schema": 1,
       "topic": "security",
       "title": "Authorization, distribution and safe operation",
@@ -582,12 +591,12 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "2fa4be3f85e716cabf9d3c5ae7f4595a5d1366e6aa5adfa1ae02a689f6bc785b"
+      "guide_sha256": "815fc449c54f01ee60d92005e517ee3f0f5ba4cd4ff86ce7dd646767a305819a"
     },
     "compatibility": {
       "ok": true,
       "product": "FrameBridge",
-      "version": "0.3.9+fbterm.15",
+      "version": "0.3.9+fbterm.18",
       "guide_schema": 1,
       "topic": "compatibility",
       "title": "Compatibility with earlier commands",
@@ -630,8 +639,8 @@
       ],
       "read_only": true,
       "capabilities_verified": false,
-      "guide_sha256": "d9eca51955e190986b2ee06a57a4346040ea41c4c566fd9f7b7fc17e527ad119"
+      "guide_sha256": "577ff34f6915cacc7bbd6f11a5952c52f7f888c5aa24aaee196cc5f58c9f6461"
     }
   },
-  "guide_sha256": "b318580ff6dc1faba101c033616d08fb56423df3a24e5ca0cecd96182e12444b"
+  "guide_sha256": "b95c8891013a185c5fe4de74c4d0f902cca1f7bba3b26a2439caa90dc00d3983"
 }

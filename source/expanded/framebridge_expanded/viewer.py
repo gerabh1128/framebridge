@@ -369,10 +369,19 @@ def _launch_pending(lock_fd, *, reserve=False):
 
 
 def _launch_unified(desktop):
+    # GTK/GI and VTE belong to the distribution Python ABI, not the private
+    # execution interpreter. Do not import cp313 vendor extensions into the
+    # GUI process on Ubuntu/Mint. Keep the exact profile and desktop binding.
+    ui_env = dict(desktop)
+    ui_env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+    ui_env["PYTHONDONTWRITEBYTECODE"] = "1"
+    ui_env["PYTHONNOUSERSITE"] = "1"
+    for key in ("PYTHONHOME", "PYTHONEXECUTABLE", "PYTHONUSERBASE", "LD_LIBRARY_PATH"):
+        ui_env.pop(key, None)
     try:
-        subprocess.Popen([sys.executable, "-B", "-m", "framebridge_expanded.unified_viewer",
+        subprocess.Popen(["/usr/bin/python3", "-B", "-s", "-m", "framebridge_expanded.unified_viewer",
                           "--profile", desktop["FRAMEBRIDGE_EXPANDED_STATE"]],
-                         env=desktop, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         env=ui_env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, start_new_session=True)
     except OSError:
         raise Waiting("viewer_launch_failed") from None

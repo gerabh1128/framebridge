@@ -1,0 +1,22 @@
+{
+  "archive_key": {
+    "bytes": 250,
+    "filename": "portable-archive-keyring.gpg",
+    "fingerprint": "69D0E9D83699F96AB986B06F3C24F85D892A517E",
+    "sha256": "e969ce8e22d0068c6b855b0d188e9afed6543875acbb7ff6a6a02cd9095acf1b"
+  },
+  "profile": "linux-amd64-cp313",
+  "python_version": "3.13.18",
+  "runtime_inputs": {
+    "full_sha256": "dec4f6d23031233beddfe91b99751977ef96e90642109836b1f9ad80b0019a68",
+    "install_only_sha256": "50c774f6674740739f791c05a9177ed03e2fe02abebda9bca3512eb7309b37cc"
+  },
+  "runtime_sources": {
+    "bytes": 162846720,
+    "filename": "FrameBridge-CPython-3.13.18-20261110-runtime-sources.tar",
+    "sha256": "40a3de7801956e5b7648668e0287a528b3ce537b23c8635206ca2669c23a2e9d"
+  },
+  "schema": 1,
+  "upstream_commit": "9244801782b78e4c4afc5c82a4524aa2101d3298",
+  "upstream_tag": "20261110"
+}

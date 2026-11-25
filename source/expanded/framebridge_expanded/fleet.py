@@ -597,14 +597,20 @@ def managed_job(alias, action, *, job_id="", session_id="", resources=None, scri
     node = None
     attempted = False
     submit = action == "submit"
+    list_action = action in ("list","feedback_list")
+    feedback_ack = action == "feedback_ack"
     try:
-        _require(action in ("submit", "status", "list"), "INVALID_JOB_ACTION")
-        _require(not submit or authorized is True, "AUTHORIZED_TRUE_REQUIRED")
+        _require(action in ("submit", "status", "list", "feedback_list", "feedback_ack"), "INVALID_JOB_ACTION")
+        _require(not (submit or feedback_ack) or authorized is True, "AUTHORIZED_TRUE_REQUIRED")
+        if feedback_ack:
+            from . import job_feedback
+            _require(isinstance(job_id,str) and job_feedback.HASH.fullmatch(job_id)
+                     and isinstance(sha256,str) and job_feedback.HASH.fullmatch(sha256),"INVALID_FEEDBACK_IDENTITY")
         _require(isinstance(session_id, str) and ((not session_id and not submit)
                  or jobs.ID.fullmatch(session_id)), "INVALID_JOB_SESSION")
         if submit and not job_id:
             job_id = "job-" + uuid.uuid4().hex
-        if action != "list":
+        if not list_action:
             _require(isinstance(job_id, str) and JOB_RE.fullmatch(job_id)
                      and job_id not in (".", ".."), "INVALID_JOB_ID")
         if submit:
@@ -627,6 +633,8 @@ def managed_job(alias, action, *, job_id="", session_id="", resources=None, scri
                        subject_job_id=job_id)
         if submit:
             payload.update(job_script=script, job_sha256=digest, resources=resources)
+        if feedback_ack:
+            payload.update(job_sha256=sha256)
         if node["transport"] == "local":
             attempted = True
             payload["origin_request_id"] = transport_job
@@ -645,13 +653,17 @@ def managed_job(alias, action, *, job_id="", session_id="", resources=None, scri
             state = _received_execution_state(value)
             return dict(jobs.failure(value.get("error","JOB_REQUEST_FAILED"), job_id,
                         state if state != "completed" else "outcome_unknown"), **_target_identity(alias,node))
-        if action != "list":
+        if not list_action:
             _require(value.get("job_id") == job_id, "NODE_EXEC_JOB_BINDING_INVALID")
         if submit and value.get("ok") is True:
             _require(value.get("command_sha256") == digest, "NODE_EXEC_HASH_BINDING_INVALID")
+        if feedback_ack and value.get("ok") is True:
+            _require(value.get("incident_id")==job_id and value.get("command_sha256")==sha256
+                     and value.get("state")=="acknowledged" and value.get("resolved") is False,
+                     "FEEDBACK_ACK_BINDING_INVALID")
         result = {k:v for k,v in value.items() if k not in ("stdout_path","stderr_path","mcp_script_sha256","mcp_job_id")}
         result.update(_target_identity(alias,node,value))
-        if action != "list":
+        if not list_action and not feedback_ack:
             result.update(mcp_job_id=job_id, mcp_script_sha256=value.get("command_sha256"))
             result["transport_request_id"] = value.get("request_id")
             result["request_id"] = value.get("origin_request_id")

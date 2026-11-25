@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 import sys
 
-from . import activity_data as data, viewer
+from . import activity_data as data, viewer, update_control
 
 MESSAGES = {
     "PROFILE_NOT_CONFIGURED": "No configured local profile",
@@ -47,6 +47,7 @@ def main():
             self.p = None
             self.status = None
             self.local = None
+            self.update_state = None
             self.pending = set()
             self.pool = ThreadPoolExecutor(max_workers=2)
             self.stopped = False
@@ -119,6 +120,8 @@ def main():
             self.start_item = self.item("Start service", lambda *_: self.admin("start"))
             self.restart_item = self.item("Restart service…", lambda *_: self.admin("restart"))
             self.stop_item = self.item("Stop service…", lambda *_: self.admin("stop"))
+            self.prepare_item = self.item("Prepare APT update…", lambda *_: self.update_admission("prepare"))
+            self.resume_item = self.item("Resume accepting jobs…", lambda *_: self.update_admission("resume"))
             self.menu.append(Gtk.SeparatorMenuItem())
             self.item("Refresh local status", lambda *_: self.refresh_local())
             self.reload_item = self.item("Reload selected profile", self.reload_profile)
@@ -135,7 +138,13 @@ def main():
             clear = self.local is not None and not self.local.get("other") and not any(
                 self.local["counts"].get(s, 0) for s in ("queued", "running", "in_flight", "outcome_unknown"))
             state, txt = data.activity_indicator(self.status, self.local)
+            gate=self.update_state
+            if gate and gate["admission_paused"]:
+                txt += " | " + ("Queue drained" if gate["queue_drained"] else "Update preparation")
+                if state != "busy":state="attention"
             self.menu_status.set_label((self.p.name if self.p else ">framebridge_") + " | " + (self.error or txt))
+            self.prepare_item.set_sensitive(usable and managed and gate is not None and not gate["admission_paused"] and "update" not in self.pending)
+            self.resume_item.set_sensitive(usable and gate is not None and gate["admission_paused"] and "update" not in self.pending)
             self.start_item.set_sensitive(usable and managed and not running and "admin" not in self.pending)
             self.restart_item.set_sensitive(usable and managed and running and clear and "admin" not in self.pending)
             self.stop_item.set_sensitive(usable and managed and running and clear and "admin" not in self.pending)
@@ -186,12 +195,16 @@ def main():
                     history = data.local_jobs(p)
                 except (OSError, data.ObservationError):
                     history = None
-                return st, history
+                try:
+                    gate = update_control.control(p,"status")
+                except (OSError, data.ObservationError):
+                    gate = None
+                return st, history, gate
             def done(value):
-                self.status, self.local = value
+                self.status, self.local, self.update_state = value
                 self.error = None
             def failed(e):
-                self.status = self.local = None
+                self.status = self.local = self.update_state = None
             self.task("local", read, done, failed)
 
         def tick(self):
@@ -216,12 +229,27 @@ def main():
                 return
             try:
                 self.p = data.profile()
-                self.status = self.local = None
+                self.status = self.local = self.update_state = None
                 self.error = None
             except Exception as e:
                 self.error = message(e)
             self.update_menu()
             self.refresh_local()
+
+        def update_admission(self,action):
+            if self.p is None or self.update_state is None:return
+            p=self.p
+            d=Gtk.MessageDialog(title=">framebridge_",modal=True,message_type=Gtk.MessageType.QUESTION,
+                 buttons=Gtk.ButtonsType.OK_CANCEL,text="Prepare local APT update?" if action=="prepare" else "Resume accepting new jobs?")
+            d.format_secondary_text("Existing jobs may finish. No job is cancelled or repeated. Review the queue, detached effects and all profiles before stopping the service and running the system updater. This does not run APT." if action=="prepare" else "Resume new local EXEC admissions only after maintenance and verification. Existing receipts remain intact.")
+            d.set_default_response(Gtk.ResponseType.CANCEL)
+            answer=d.run();d.destroy()
+            if answer!=Gtk.ResponseType.OK:return
+            def done(v):
+                self.update_state=v
+                self.error=None
+                self.refresh_local()
+            self.task("update",lambda:update_control.control(p,action),done)
 
         def admin(self, action):
             if not self.p or not self.status or not self.status.get("managed"):

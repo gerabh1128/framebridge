@@ -160,7 +160,9 @@ def _job(row):
     return {"id": ident, "state": state, "created": timestamp(row.get("created_at", row.get("created"))),
             "started": timestamp(row.get("started_at", row.get("started"))),
             "finished": timestamp(row.get("finished_at", row.get("finished"))),
-            "exit_code": code}
+            "exit_code": code, "owner_cancel_before_exec": row.get("owner_cancel_before_exec")==1,
+            "owner_cancel_signal_sent": row.get("owner_cancel_signal_sent")==1,
+            "capture_status": safe_text(row.get("capture_status"),30)}
 
 
 def local_jobs(p, offset=0):
@@ -173,7 +175,10 @@ def local_jobs(p, offset=0):
             c.execute("BEGIN")
             counts = dict(c.execute("SELECT state,count(*) FROM jobs GROUP BY state"))
             sql = """SELECT id,state,created,started,finished,
-                CASE WHEN json_valid(result) THEN json_extract(result,'$.exit_code') END AS exit_code
+                CASE WHEN json_valid(result) THEN json_extract(result,'$.exit_code') END AS exit_code,
+                CASE WHEN json_valid(result) THEN json_extract(result,'$.owner_cancel_before_exec') END AS owner_cancel_before_exec,
+                CASE WHEN json_valid(result) THEN json_extract(result,'$.owner_cancel_signal_sent') END AS owner_cancel_signal_sent,
+                CASE WHEN json_valid(result) THEN json_extract(result,'$.capture_status') END AS capture_status
                 FROM jobs ORDER BY (state IN ('queued','in_flight','outcome_unknown','running')) DESC,
                 created DESC,id LIMIT ? OFFSET ?"""
             rows = [_job(dict(x)) for x in c.execute(sql, (HISTORY_PAGE, offset))]
@@ -186,9 +191,13 @@ def local_jobs(p, offset=0):
         raise ObservationError("QUEUE_UNAVAILABLE") from None
 
 
-def verified_output(result,node_id,job_id):
+def verified_output(result,node_id,job_id,*,expected_digest=None,expected_request=None):
     require(result.get("node_id")==node_id and result.get("job_id")==job_id,
             "RECEIPT_IDENTITY_MISMATCH")
+    if expected_digest is not None:
+        require(result.get("command_sha256")==expected_digest,"RECEIPT_DIGEST_MISMATCH")
+    if expected_request is not None:
+        require(result.get("request_id")==expected_request,"RECEIPT_REQUEST_MISMATCH")
     require(result.get("execution_state")=="completed"
             and result.get("stdout_integrity")=="verified"
             and result.get("stdout_sanitized") is True
@@ -199,12 +208,12 @@ def verified_output(result,node_id,job_id):
             "truncated":result.get("stdout_truncated") is True}
 
 
-def job_output(p,job_id):
+def job_output(p,job_id,*,expected_digest=None,expected_request=None):
     require(isinstance(job_id,str) and JOB_ID.fullmatch(job_id), "JOB_ID_UNVERIFIED")
     check_profile(p)
     r = query(local_argv(p,"--json","nodes","jobs","--target","LOCAL",
                          "--job-id",job_id,"--include-stdout"),timeout=28)
-    return verified_output(r,p.node_id,job_id)
+    return verified_output(r,p.node_id,job_id,expected_digest=expected_digest,expected_request=expected_request)
 
 
 def activity_indicator(status, history):

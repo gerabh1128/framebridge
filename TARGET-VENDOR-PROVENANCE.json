@@ -1,233 +1,36 @@
 {
   "omitted_vendor_abis": [
+    "cp312",
     "cp314"
   ],
+  "portable_release_inputs": {
+    "archive_key": {
+      "bytes": 250,
+      "filename": "portable-archive-keyring.gpg",
+      "fingerprint": "69D0E9D83699F96AB986B06F3C24F85D892A517E",
+      "sha256": "e969ce8e22d0068c6b855b0d188e9afed6543875acbb7ff6a6a02cd9095acf1b"
+    },
+    "profile": "linux-amd64-cp313",
+    "python_version": "3.13.18",
+    "runtime_inputs": {
+      "full_sha256": "dec4f6d23031233beddfe91b99751977ef96e90642109836b1f9ad80b0019a68",
+      "install_only_sha256": "50c774f6674740739f791c05a9177ed03e2fe02abebda9bca3512eb7309b37cc"
+    },
+    "runtime_sources": {
+      "bytes": 162846720,
+      "filename": "FrameBridge-CPython-3.13.18-20261110-runtime-sources.tar",
+      "sha256": "40a3de7801956e5b7648668e0287a528b3ce537b23c8635206ca2669c23a2e9d"
+    },
+    "schema": 1,
+    "upstream_commit": "9244801782b78e4c4afc5c82a4524aa2101d3298",
+    "upstream_tag": "20261110"
+  },
   "release_profiles": [
-    "debian13-amd64-py313",
-    "ubuntu24.04-amd64-py312",
-    "mint22-amd64-py312"
+    "linux-amd64-cp313"
   ],
   "schema": 1,
   "validation_status": "release_source",
   "vendors": {
-    "cp312": {
-      "native_extensions": [
-        "_cffi_backend.cpython-312-x86_64-linux-gnu.so",
-        "cryptography/hazmat/bindings/_rust.abi3.so",
-        "pydantic_core/_pydantic_core.cpython-312-x86_64-linux-gnu.so",
-        "rpds/rpds.cpython-312-x86_64-linux-gnu.so"
-      ],
-      "packages": [
-        {
-          "name": "annotated-types",
-          "version": "0.8.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "anyio",
-          "version": "4.15.1",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "attrs",
-          "version": "26.1.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "certifi",
-          "version": "2026.7.22",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "cffi",
-          "version": "2.1.1",
-          "wheel_tags": [
-            "cp312-cp312-manylinux_2_17_x86_64",
-            "cp312-cp312-manylinux2014_x86_64"
-          ]
-        },
-        {
-          "name": "click",
-          "version": "8.5.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "cryptography",
-          "version": "50.0.1",
-          "wheel_tags": [
-            "cp311-abi3-manylinux_2_34_x86_64"
-          ]
-        },
-        {
-          "name": "h11",
-          "version": "0.16.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "httpcore",
-          "version": "1.0.9",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "httpx",
-          "version": "0.28.1",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "httpx-sse",
-          "version": "0.4.3",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "idna",
-          "version": "3.20",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "jsonschema",
-          "version": "4.26.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "jsonschema-specifications",
-          "version": "2025.9.1",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "mcp",
-          "version": "1.26.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "pycparser",
-          "version": "3.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "pydantic",
-          "version": "2.13.5",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "pydantic-core",
-          "version": "2.46.5",
-          "wheel_tags": [
-            "cp312-cp312-manylinux_2_17_x86_64",
-            "cp312-cp312-manylinux2014_x86_64"
-          ]
-        },
-        {
-          "name": "pydantic-settings",
-          "version": "2.15.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "pyjwt",
-          "version": "2.14.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "python-dotenv",
-          "version": "1.2.3",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "python-multipart",
-          "version": "0.0.32",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "referencing",
-          "version": "0.37.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "rpds-py",
-          "version": "2026.6.3",
-          "wheel_tags": [
-            "cp312-cp312-manylinux_2_17_x86_64",
-            "cp312-cp312-manylinux2014_x86_64"
-          ]
-        },
-        {
-          "name": "sse-starlette",
-          "version": "3.4.11",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "starlette",
-          "version": "1.7.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "typing-extensions",
-          "version": "4.16.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "typing-inspection",
-          "version": "0.4.4",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        },
-        {
-          "name": "uvicorn",
-          "version": "0.53.0",
-          "wheel_tags": [
-            "py3-none-any"
-          ]
-        }
-      ],
-      "path": "source/target-vendors/cp312",
-      "vendor_sha256": "f4ea1dfb4f71b11eb1a9963bfe55dc6f94e6b10e927f77a7bd9b62433a29ddf1"
-    },
     "cp313": {
       "native_extensions": [
         "_cffi_backend.cpython-313-x86_64-linux-gnu.so",
@@ -447,5 +250,5 @@
       "vendor_sha256": "80e2917f19003e95f74a6250ee08043cb90681100faf510c0e034843740c0950"
     }
   },
-  "version": "0.3.5"
+  "version": "0.3.9+fbterm.18"
 }

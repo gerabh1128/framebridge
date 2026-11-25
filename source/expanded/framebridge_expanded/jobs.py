@@ -4,6 +4,7 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import json
+import logging
 import os
 import re
 import sqlite3
@@ -12,7 +13,7 @@ import time
 from contextlib import closing
 from pathlib import Path
 
-from . import job_reconciliation as reconciliation
+from . import job_reconciliation as reconciliation, owner_jobs, update_control, job_feedback
 
 ID = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,79}")
 RESOURCE = re.compile(r"(read|write):([A-Za-z0-9][A-Za-z0-9_.:/-]{0,95})")
@@ -50,7 +51,7 @@ def failure(code, job_id, state="not_started"):
 
 class JobQueue:
     """The adapter owns one scheduler. SQLite commits the claim before dispatch."""
-    def __init__(self, root, execute, slots=2, *, recover=None):
+    def __init__(self, root, execute, slots=2, *, recover=None, feedback_root=None):
         if not 1 <= slots <= 8:
             raise ValueError("INVALID_JOB_SLOTS")
         self.root = Path(root)
@@ -63,6 +64,7 @@ class JobQueue:
             raise
         self.changed = threading.Condition()
         self.recover = recover
+        self.feedback_root = feedback_root
         self.execute = execute
         self.slots = slots
         self.db = self.root / "jobs.sqlite3"
@@ -80,12 +82,27 @@ class JobQueue:
                 CREATE INDEX IF NOT EXISTS jobs_session ON jobs(session,created);
             """)
             db.execute(reconciliation.SCHEMA)
+            db.execute(update_control.SCHEMA)
             # A previous command may still have effects. Never redispatch its claim.
+            interrupted = db.execute("SELECT id,digest,request FROM jobs WHERE state='in_flight'").fetchall()
             db.execute("UPDATE jobs SET state='outcome_unknown', script=NULL WHERE state='in_flight'")
+        for row in interrupted:
+            self.report_unknown(row)
         self.workers = [threading.Thread(target=self.work, daemon=True,
                         name=f"fbterm-jobs-{i}") for i in range(slots)]
         for worker in self.workers:
             worker.start()
+
+    def report_unknown(self,row):
+        if self.feedback_root is None:
+            return
+        try:
+            job_feedback.record(self.feedback_root,row["id"],row["digest"],row["request"],
+                                "outcome_unknown","watchdog")
+        except (OSError,ValueError,RuntimeError):
+            # An unavailable notification store must never rewrite a receipt or
+            # terminate a scheduler worker. Unknown state remains visible in Jobs.
+            logging.getLogger(__name__).warning("JOB_FEEDBACK_RECORD_UNAVAILABLE")
 
     def connect(self):
         db = sqlite3.connect(self.db, timeout=10)
@@ -121,11 +138,14 @@ class JobQueue:
         deadline = min(payload.get("start_before", now + timeout), now + timeout)
         identity = (session, digest, resources, timeout, int(legacy))
         with self.changed, closing(self.connect()) as db, db:
+            db.execute("BEGIN IMMEDIATE")
             row = db.execute(f"SELECT {META_COLUMNS} FROM jobs WHERE id=?", (job,)).fetchone()
             if row is not None:
                 if tuple(row[k] for k in ("session","digest","resources","timeout","legacy")) != identity:
                     return failure("JOB_ID_CONFLICT", job)
                 return self.waiting_receipt(db, row)
+            if update_control.paused(db):
+                return failure("UPDATE_PREPARATION_NEW_JOBS_PAUSED", job)
             if db.execute("SELECT count(*) FROM jobs WHERE state='queued'").fetchone()[0] >= 128:
                 return failure("JOB_QUEUE_FULL", job)
             db.execute("""INSERT INTO jobs(id, session, digest, resources, timeout, legacy,
@@ -215,8 +235,8 @@ class JobQueue:
                     if row["state"] == "outcome_unknown":
                         result = self.recover(row)
                         if result:
-                            db.execute("UPDATE jobs SET state='completed',result=?,finished=? WHERE id=?",
-                                       (json.dumps(result), now, row["id"]))
+                            db.execute("UPDATE jobs SET state=?,result=?,finished=? WHERE id=?",
+                                       (result["execution_state"],json.dumps(result),now,row["id"]))
                             self.changed.notify_all()
                             return None
             active = [r for r in rows if r["state"] != "queued"]
@@ -225,6 +245,13 @@ class JobQueue:
             for row in rows:
                 if row["state"] != "queued":
                     continue
+                if owner_jobs.is_requested(self.root,row["id"],row["digest"]):
+                    result = failure("OWNER_CANCELLED_BEFORE_START",row["id"],"not_started")
+                    result["owner_cancel_before_exec"] = True
+                    db.execute("UPDATE jobs SET state='not_started',result=?,finished=?,script=NULL,blocker=NULL WHERE id=? AND state='queued'",
+                               (json.dumps(result),now,row["id"]))
+                    self.changed.notify_all()
+                    return None
                 resources = json.loads(row["resources"])
                 blocker = next((job for job, held in earlier if conflict(resources, held)), None)
                 slots = (0,) if row["legacy"] else range(1, self.slots + 1)
@@ -264,6 +291,8 @@ class JobQueue:
                 db.execute("UPDATE jobs SET state=?,result=?,finished=?,script=NULL WHERE id=?",
                            (state, json.dumps(result), None if state == "outcome_unknown" else time.time(), row["id"]))
                 self.changed.notify_all()
+            if state == "outcome_unknown":
+                self.report_unknown(row)
 
 
 WIRE_SCRIPT = "# FrameBridge job protocol v2"
@@ -329,10 +358,11 @@ def install(adapter):
         fields["COMMAND_HASH_GATE"] = "PASS" if fields.get("COMMAND_SHA256") == row["digest"] else "FAIL"
         result = adapter.decode_receipt(subprocess.CompletedProcess([], 0, json.dumps(fields)),
                                         row["id"], row["digest"], job)
-        return result if result["execution_state"] == "completed" else None
+        return result if (result["execution_state"] == "completed" or
+                          result["execution_state"] == "not_started" and result.get("owner_cancel_before_exec") is True) else None
 
     queue = JobQueue(root / "queue-v2", execute,
-                     int(os.environ.get("FRAMEBRIDGE_JOB_SLOTS", "2")), recover=recover)
+                     int(os.environ.get("FRAMEBRIDGE_JOB_SLOTS", "2")), recover=recover, feedback_root=root)
     serial = threading.Lock()
 
     def handle(payload):
@@ -351,6 +381,20 @@ def install(adapter):
             if payload.get("script") != WIRE_SCRIPT or payload.get("sha256") != hashlib.sha256(WIRE_SCRIPT.encode()).hexdigest():
                 return failure("INVALID_JOB_ENVELOPE", job)
             action = payload.get("job_action")
+            # Feedback RPCs do not submit or wait for an EXEC scheduler slot.
+            # The pre-existing authorized adapter/broker transport still applies.
+            if action in ("feedback_list","feedback_ack"):
+                try:
+                    if action == "feedback_list":
+                        return dict(job_feedback.list_root(root),job_protocol=2)
+                    incident=payload.get("subject_job_id")
+                    value=job_feedback.acknowledge_root(root,incident,payload.get("job_sha256"),
+                                                       authorized=payload.get("authorized") is True)
+                    return dict(value,job_protocol=2,job_id=incident,
+                                incident_job_id=value["job_id"])
+                except (OSError,ValueError,RuntimeError):
+                    return {"ok":False,"job_protocol":2,"job_id":payload.get("subject_job_id"),
+                            "error":"FEEDBACK_UNAVAILABLE_OR_IDENTITY_REJECTED"}
             if action == "list":
                 session = payload.get("session_id", "")
                 if session and (not isinstance(session, str) or not ID.fullmatch(session)):

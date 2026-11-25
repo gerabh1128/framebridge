@@ -2,10 +2,10 @@ import unittest
 from framebridge_expanded import unified_viewer as u
 
 class CompactHistory(unittest.TestCase):
-    def test_one_line_without_job_times(self):
+    def test_one_line_with_recorded_duration_without_timestamps(self):
         row = {"id":"demo-job-1", "state":"completed", "exit_code":"0",
                "created":100,"started":101,"finished":102}
-        self.assertEqual(u.job_text(row), "JOB: demo-job-1 | STATE: Completed | EXIT: 0")
+        self.assertEqual(u.job_text(row), "JOB: demo-job-1 | STATE: Completed | DUR: 1s | EXIT: 0")
         self.assertEqual(u.history_text([row,row]).count("\n"),1)
         self.assertNotIn("CREATED",u.history_text([row]))
         self.assertNotIn("STARTED",u.history_text([row]))

@@ -278,6 +278,12 @@ def decode_receipt(proc, job_id, digest, job):
         response[name + "_bytes"] = expected_bytes
         if not manifest_ok or not present:
             response["capture_status"] = "partial"
+    if result.get("OWNER_CANCEL_BEFORE_EXEC") == "1" and rc == "125":
+        response.update(ok=False,execution_state="not_started",error="OWNER_CANCELLED_BEFORE_START",
+                        owner_cancel_before_exec=True,do_not_replay=False)
+    if result.get("OWNER_CANCEL_SIGNAL_SENT") == "1":
+        response["owner_cancel_signal_sent"] = True
+        response["effects_not_reverted"] = True
     for key in ("PTY","PANE_PID","PANE_TTY","SHELL_READY"):
         response[key.lower()] = result.get(key)
     return response

@@ -12,13 +12,16 @@ PUBLIC_RELEASE_PROFILES = (
 )
 
 
-def release_source(manifest_path, version, profile_id, current_files, vendor_evidence):
+PORTABLE_RELEASE_PROFILE = "linux-amd64-cp313"
+
+def release_source(manifest_path, version, profile_id, current_files, vendor_evidence, *, portable_inputs=None):
     """Require the same reviewed source and ABI input used by this package.
 
     The manifest and archive are release inputs kept beside one another. Their
     signatures and the OS acceptance record are verified outside the builder.
     """
-    if profile_id not in PUBLIC_RELEASE_PROFILES or not re.fullmatch(PUBLIC_RELEASE_VERSION, version):
+    portable = profile_id == PORTABLE_RELEASE_PROFILE
+    if (profile_id not in PUBLIC_RELEASE_PROFILES and not portable) or not re.fullmatch(PUBLIC_RELEASE_VERSION, version):
         raise RuntimeError("Public release requires a stable version and an official release profile")
     manifest_path = Path(manifest_path)
     data = json.loads(manifest_path.read_text())
@@ -31,10 +34,19 @@ def release_source(manifest_path, version, profile_id, current_files, vendor_evi
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     if archive.stat().st_size != data.get("bytes") or digest != data.get("sha256"):
         raise RuntimeError("Release source archive hash or size differs from its manifest")
-    vendors = data.get("vendor_inputs", {}).get("vendors", {})
-    if set(vendors) != {"cp312", "cp313"}:
-        raise RuntimeError("Release source must contain the reviewed cp312 and cp313 inputs")
-    abi = "cp313" if profile_id == "debian13-amd64-py313" else "cp312"
+    provenance = data.get("vendor_inputs", {})
+    vendors = provenance.get("vendors", {})
+    if portable:
+        if not isinstance(portable_inputs,dict) or provenance.get("portable_release_inputs") != portable_inputs or provenance.get("release_profiles") != [PORTABLE_RELEASE_PROFILE]:
+            raise RuntimeError("Portable corresponding source identity mismatch")
+        if set(vendors) != {"cp313"}:
+            raise RuntimeError("Portable source requires exactly the reviewed cp313 input")
+        if "source/packaging/portable-release-inputs.json" not in current_files or "source/packaging/portable-archive-keyring.gpg" not in current_files:
+            raise RuntimeError("Portable source identity files missing")
+    else:
+        if portable_inputs is not None or set(vendors) != {"cp312", "cp313"}:
+            raise RuntimeError("Release source must contain the reviewed cp312 and cp313 inputs")
+    abi = "cp313" if portable or profile_id == "debian13-amd64-py313" else "cp312"
     if vendors[abi].get("vendor_sha256") != vendor_evidence.get("vendor_sha256"):
         raise RuntimeError("Package vendor input differs from corresponding source")
     rows = data.get("files", [])
@@ -62,10 +74,10 @@ def release_source(manifest_path, version, profile_id, current_files, vendor_evi
         raise RuntimeError("Release source manifest contains files absent from the archive")
     # Bind the ABI claims to the archived bytes, including the ABI not selected
     # by this particular package. A manifest field alone is not vendor evidence.
-    for vendor_abi, expected_prefix in (
-        ("cp313", "source/sources/original-hub/FrameBridge-Fleet-Hub/vendor"),
-        ("cp312", "source/target-vendors/cp312"),
-    ):
+    vendor_paths = [("cp313", "source/sources/original-hub/FrameBridge-Fleet-Hub/vendor")]
+    if not portable:
+        vendor_paths.append(("cp312","source/target-vendors/cp312"))
+    for vendor_abi, expected_prefix in vendor_paths:
         if vendors[vendor_abi].get("path") != expected_prefix:
             raise RuntimeError("Unexpected corresponding-source vendor path")
         vendor_digest = hashlib.sha256()
@@ -85,4 +97,7 @@ def release_source(manifest_path, version, profile_id, current_files, vendor_evi
     for relative, path in current_files.items():
         if recorded.get(relative) != hashlib.sha256(path.read_bytes()).hexdigest():
             raise RuntimeError("Package source differs from corresponding archive: " + relative)
-    return {"filename": expected_name, "bytes": data["bytes"], "sha256": digest}
+    result = {"filename": expected_name, "bytes": data["bytes"], "sha256": digest}
+    if portable:
+        result["runtime_sources"] = portable_inputs["runtime_sources"]
+    return result

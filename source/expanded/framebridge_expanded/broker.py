@@ -106,7 +106,7 @@ def is_job_control(request):
     body = request.get("payload")
     return (isinstance(body, dict) and body.get("request_type") == "fbterm_jobs_v2"
             and body.get("script") == "# FrameBridge job protocol v2"
-            and body.get("job_action") in ("submit", "status", "list"))
+            and body.get("job_action") in ("submit", "status", "list", "feedback_list", "feedback_ack"))
 
 
 class _NodeHeartbeatStore:

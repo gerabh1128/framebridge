@@ -3,7 +3,7 @@
   "base_deb_sha256": "9517e405725a4c514841822eee3344392c13f21a171823edd9f45f2e955b96b7",
   "source_file_count": 983,
   "source_hashes": {
-    "original-workstation/SOURCE-MANIFEST.json": "750881b2eb355241911fe3af973f36e243f4a76ffbd114dd5c0214ec431e2450",
+    "original-workstation/SOURCE-MANIFEST.json": "09440238a6c9e6001063aaabd7d51f420c1c32ba851605c45d68c52a4d3f0ca6",
     "original-hub/MANIFEST.json": "ae7870032ff581f159a52b30a45f6d658271924835b1cb397867948c7bcdddcd",
     "original-hub/FrameBridge-Broker-RC1/dev/fbpair_dev_broker.py": "4f75f78d40228db8fa1b23768f8b3660bfd25669e8198ebb4d7afbcb500c1c75",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/classic_tty.py": "f195566a43eaefd329080c12f4095cdbfa49f8548cbd6afeb5fd83c70ae832f6",
@@ -972,10 +972,10 @@
     "original-hub/FrameBridge-Fleet-Hub/app/framebridge_linux_chatgpt/fleet_hub.py": "8301ea08c402a77f23ab354b5d600cd808120f6572ad8b6830e255e367f6fa89",
     "original-hub/.local/share/framebridge/tool-adapter/bin/framebridge_tool_adapter.py": "609657517fa0077b5ee425bb0a114e0bc65d0d790a1db13744a0186613d059d8",
     "original-workstation/tool-adapter/bin/framebridge_tool_client.py": "1d1514f08653c31f6b67ebcdcf61686947321bec96752a692b7e46cee6285f6e",
-    "original-workstation/tool-adapter/bin/framebridge_tool_adapter.py": "62c433ee2ff41a6e3f06457fb2ce45ef0a15036b32651106e28cbc35935a3dae",
+    "original-workstation/tool-adapter/bin/framebridge_tool_adapter.py": "e5202ba2643f2a6918d6029ca64c4047cf9e626f1f0e9c0f1546cb6525c301ca",
     "original-workstation/fbterm/bin/fbterm_engine.py": "37385bd861fddb5d2ea863bc26dd9cd1c8c2eab4df7dcf7da194cbd41bb832ce",
     "original-workstation/fbterm/bin/fbx": "84589ad19ea0eab7cfc766ef4dba736be05c509c3918f572f4054585ee4c5efb",
-    "original-workstation/fbterm/bin/fbterm-run": "c9d42c5448cf53337bf82732875af310e4cb78febfe0eb6b475ef2381fe97acc",
+    "original-workstation/fbterm/bin/fbterm-run": "4a3b767512f41b95c18a6b91a9096a86e49f5760d432d23744d14a63a2cecc60",
     "original-workstation/fbterm/bin/fbterm-prompt-ready": "276f657e23ff26c75f5e430731fdf5b095d777eabcbaad86e11c69b0919c691c",
     "original-workstation/fbterm/bin/fbterm-shell": "43e1e3b861f2c7303369a38a9913aabaa01d53d3a588b9c7c0b270ecd7a99e1d",
     "original-workstation/framebridge-native/host/open-progress-console.sh": "adc359d9468dfd4cc5372a2e133b8f0e1555c13a457204b40a04288dc363ec90",
@@ -1168,6 +1168,33 @@
       "patch": "ENROLLMENT-RECOVERY-CANDIDATE.patch",
       "patch_sha256": "23de923ca7893a25a0e7e27a17c577b0c36b28bd2775be3664436f78d28b6028",
       "reason": "Validate and atomically commit a pending enrollment recovery using the original authenticated pairing protocol."
+    },
+    {
+      "version": "0.3.9+fbterm.16~rc1",
+      "date": "2026-11-25",
+      "path": "original-workstation/fbterm/bin/fbterm-run",
+      "previous_sha256": "c9d42c5448cf53337bf82732875af310e4cb78febfe0eb6b475ef2381fe97acc",
+      "reviewed_sha256": "4a3b767512f41b95c18a6b91a9096a86e49f5760d432d23744d14a63a2cecc60",
+      "reason": "Bound output drain after command exit; owner-scoped cancellation and immutable receipts.",
+      "validation": "candidate-local-fixtures; production deployment pending"
+    },
+    {
+      "version": "0.3.9+fbterm.16~rc1",
+      "date": "2026-11-25",
+      "path": "original-workstation/tool-adapter/bin/framebridge_tool_adapter.py",
+      "previous_sha256": "62c433ee2ff41a6e3f06457fb2ce45ef0a15036b32651106e28cbc35935a3dae",
+      "reviewed_sha256": "e5202ba2643f2a6918d6029ca64c4047cf9e626f1f0e9c0f1546cb6525c301ca",
+      "reason": "Report owner cancellation before execution or signal delivery without changing the recorded command exit.",
+      "validation": "candidate-local-fixtures; production deployment pending"
+    },
+    {
+      "version": "0.3.9+fbterm.16~rc1",
+      "date": "2026-11-25",
+      "path": "original-workstation/SOURCE-MANIFEST.json",
+      "previous_sha256": "750881b2eb355241911fe3af973f36e243f4a76ffbd114dd5c0214ec431e2450",
+      "reviewed_sha256": "09440238a6c9e6001063aaabd7d51f420c1c32ba851605c45d68c52a4d3f0ca6",
+      "reason": "Update the two explicitly reviewed file entries; preserve all other manifest entries.",
+      "validation": "candidate; production deployment pending"
     }
   ]
 }

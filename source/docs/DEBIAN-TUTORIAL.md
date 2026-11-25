@@ -1,6 +1,6 @@
 # FrameBridge — Debian, Ubuntu and Linux Mint installation and first use
 
-Version: 0.3.9+fbterm.15 | Guide schema: 1
+Version: 0.3.9+fbterm.18 | Guide schema: 1
 
 This reference is generated from the shared CLI/MCP guide. Use the matching installed version.
 
@@ -33,7 +33,7 @@ fb --json status
 
 ### Install and connect
 
-Install the package built for your exact Debian 13, Ubuntu 24.04 or Linux Mint 22.x amd64 profile. These are the three release profiles; other distributions and architectures are outside this release. Keep the distribution system Python: 3.13 on Debian 13, 3.12 on Ubuntu 24.04 and Mint 22.x. Use the matching signed APT suite: trixie, noble or mint22. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.
+For the portable release, install the single verified amd64 package for Debian 13, Ubuntu 24.04 or Linux Mint 22.x. The package includes private CPython 3.13.18 and retains system Python for GTK/GI/VTE and package maintenance. Use the signed stable/main APT channel. Earlier separate-profile packages use their historical suites. Normal first connection does not require a separate setup, doctor or start sequence. Run connect in a normal interactive terminal; advanced setup is optional for central/node roles and public settings.
 
 ~~~sh
 fb connect
@@ -122,7 +122,7 @@ fb screen-access --help
 
 ### Single local FBTERM viewer
 
-The graphical tray opens the one persistent FBTERM window for the selected local profile. Its title is >framebridge_; the profile ID in its header distinguishes local profiles without showing their paths. The upper read-only history scrolls independently, displaying one compact JOB | STATE | EXIT line per recorded job. The lower terminal attaches to the existing Original tmux session in read-only mode; there is no extra activity window. The >fb_ mark and factual activity colours are retained in the notification area. Local start, stop and restart preserve boot policy. Stop/restart require confirmation and a fresh queue check, which is not an atomic drain. ChatGPT through the authorized administrator’s chat remains the administration interface. There is no additional login, remote host selection, enrollment dialog or credential prompt. Use fb doctor for local diagnostics. Headless execution needs no desktop. During a cold upgrade close a remaining legacy viewer of the same profile before starting the new viewer.
+The graphical tray opens the one persistent FBTERM window for the selected local profile. Its title is >framebridge_; the profile ID in its header distinguishes local profiles without showing their paths. The upper read-only history scrolls independently, displaying one compact JOB | STATE | DUR | EXIT line per recorded job. The lower terminal attaches to the existing Original tmux session in read-only mode; there is no extra activity window. The >fb_ mark and factual activity colours are retained in the notification area. Local start, stop and restart preserve boot policy. Stop/restart require confirmation and a fresh queue check, which is not an atomic drain. ChatGPT through the authorized administrator’s chat remains the administration interface. There is no additional login, remote host selection, enrollment dialog or credential prompt. Use fb doctor for local diagnostics. Headless execution needs no desktop. During a cold upgrade close a remaining legacy viewer of the same profile before starting the new viewer.
 
 ~~~sh
 framebridge-tray --show
@@ -395,7 +395,7 @@ fb status boot
 
 ### Doctor
 
-doctor diagnoses prerequisites and reports findings with suggested next steps. Inspect the diagnosis, the live connection state and relevant private application logs before considering configuration changes. Eligibility checks the exact OS release, amd64 architecture, package profile and CPython ABI before starting native components. The release profiles cover Debian 13 with cp313 and Ubuntu 24.04/Mint 22.x with cp312. LMDE 7 and Ubuntu 26.04 remain experimental build targets. Verify installation and runtime acceptance on the matching profile. Resolve an ABI mismatch by selecting the package built for the distribution and its system Python.
+doctor diagnoses prerequisites and reports findings with suggested next steps. Inspect the diagnosis, the live connection state and relevant private application logs before considering configuration changes. Eligibility checks the OS release, amd64 architecture, package profile and Python ABI. The portable package uses private CPython 3.13.18 for execution and system Python for GTK/GI/VTE. Historical packages used separate cp313/cp312 profiles. Debian 13, Ubuntu 24.04 and Linux Mint 22.x are the supported targets; LMDE 7 and Ubuntu 26.04 remain experimental. Verify the package and the actual graphical viewer separately.
 
 ~~~sh
 fb doctor
@@ -425,6 +425,16 @@ An unknown execution outcome retains its reservation until authentic receipt rec
 
 ~~~sh
 fb recovery reconcile --help
+~~~
+
+### Read-only job inspection and APT maintenance preparation
+
+The job context menu is informational only: inspect the exact job details, recorded claim-to-finish duration and verified output, or copy the job ID. It does not submit, edit, cancel or request a review. Ask the authorized administrator in the conversation to investigate. Existing feedback and cancellation records and execution safeguards are preserved. Never replay an unknown result. Prepare APT update from the tray or explicit local owner command: new managed EXEC admissions pause, existing jobs may finish. Unknown results keep the queue from being reported drained. The owner must review other profiles, external effects, TTY/CUA, stop the relevant services, verify backups and run APT in the normal OS interface, not in FBEXEC. Resume admission after package verification. This does not automatically stop services or launch the package manager.
+
+~~~sh
+fb --json update status
+fb --state-dir /path/to/profile update prepare
+fb --state-dir /path/to/profile update resume
 ~~~
 
 

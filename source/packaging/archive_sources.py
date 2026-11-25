@@ -13,7 +13,8 @@ import tempfile
 import sys
 
 from build_profiles import CANDIDATE_VERSION, SOURCE_VENDOR, target_profile, validate_vendor, vendor_versions
-from release_metadata import PUBLIC_RELEASE_PROFILES, PUBLIC_RELEASE_VERSION
+from release_metadata import PUBLIC_RELEASE_PROFILES, PUBLIC_RELEASE_VERSION, PORTABLE_RELEASE_PROFILE
+import portable_release
 from release_privacy import ReleasePrivacy, PrivacyError, external_public_policy
 
 BASE = Path(__file__).resolve().parents[1]
@@ -131,7 +132,17 @@ def main(argv=None):
     parser.add_argument("--vendor-cp312", type=Path, help="Reviewed cp312 vendor input to include")
     parser.add_argument("--vendor-cp314", type=Path, help="Reviewed cp314 vendor input to include")
     parser.add_argument("--privacy-policy", type=Path, help="Local JSON array of private identifiers to reject")
+    parser.add_argument("--portable-release", action="store_true", help="Public source for the private-runtime amd64 build")
+    parser.add_argument("--runtime-source-bundle", type=Path)
     args = parser.parse_args(argv)
+    if args.portable_release:
+        if not args.public_release or not args.runtime_source_bundle or args.vendor_cp312 or args.vendor_cp314:
+            parser.error("Portable public source requires the runtime source bundle and cp313 only")
+        portable_inputs = portable_release.load_inputs(BASE/"packaging",args.runtime_source_bundle)
+    else:
+        if args.runtime_source_bundle:
+            parser.error("Runtime source bundle is only for portable public source")
+        portable_inputs = None
     try:
         if args.public_release:
             args.privacy_policy = external_public_policy(args.privacy_policy, ROOT)
@@ -140,7 +151,7 @@ def main(argv=None):
         parser.error(str(error))
     if args.public_release and not re.fullmatch(PUBLIC_RELEASE_VERSION, CANDIDATE_VERSION):
         parser.error("--public-release requires a stable project version")
-    if args.public_release and (args.vendor_cp312 is None or args.vendor_cp314 is not None):
+    if args.public_release and not args.portable_release and (args.vendor_cp312 is None or args.vendor_cp314 is not None):
         parser.error("--public-release requires --vendor-cp312 and excludes experimental cp314 input")
     names = source_files()
     expected_versions = vendor_versions(BASE / SOURCE_VENDOR)
@@ -166,10 +177,25 @@ def main(argv=None):
             if name in names:
                 raise RuntimeError("Archive input path collision: " + name)
             names[name] = path
+    if args.portable_release:
+        provenance["release_profiles"] = [PORTABLE_RELEASE_PROFILE]
+        provenance["portable_release_inputs"] = portable_inputs
     provenance["omitted_vendor_abis"] = sorted({"cp312", "cp314"} - set(provenance["vendors"]))
     if provenance["omitted_vendor_abis"] and not args.public_release:
         print("Candidate source excludes alternate vendor ABIs: " + ", ".join(provenance["omitted_vendor_abis"]), file=sys.stderr)
-    generated = {ARCHIVE_README_NAME: PUBLIC_ARCHIVE_README if args.public_release else ARCHIVE_README,
+    portable_readme = (
+        "# FrameBridge "+CANDIDATE_VERSION+" portable corresponding source\n\n"
+        "One amd64 binary with a pinned private CPython runtime for Debian 13, Ubuntu 24.04 and Mint 22.x. "
+        "Source assembly alone does not certify installation, signature or publication.\n\n"
+        "Retain the separate runtime source bundle, the two pinned upstream runtime binary inputs, "
+        "the historical dependency source assets and this archive's matching manifest. "
+        "See source/docs/APT-BOOTSTRAP-CANDIDATE.md and source/packaging/portable-release-inputs.json.\n\n"
+        "Build offline with:\n\n"
+        "    python3 source/packaging/build_expanded.py --target debian13-amd64-py313 --public-release --source-manifest ../SOURCE-ARCHIVE-MANIFEST.json --privacy-policy /path/outside/repository/private-identifiers.json --bundled-runtime /path/install.tar.gz /path/full.tar.zst --apt-bootstrap-mode stable --apt-bootstrap-key source/packaging/portable-archive-keyring.gpg --runtime-source-bundle /path/FrameBridge-CPython-3.13.18-20261110-runtime-sources.tar\n\n"
+        "The builder never signs, publishes or starts services. Original FrameBridge code is GPLv3-only. "
+        "Third-party license notices and source availability are retained. See LICENSE and LICENSING.md.\n"
+    ).encode("utf-8")
+    generated = {ARCHIVE_README_NAME: portable_readme if args.portable_release else PUBLIC_ARCHIVE_README if args.public_release else ARCHIVE_README,
                  "TARGET-VENDOR-PROVENANCE.json": (json.dumps(provenance, indent=2, sort_keys=True) + "\n").encode()}
     release = BASE / "release" / ("public-source" if args.public_release else "candidate-source")
     release.mkdir(parents=True, exist_ok=True)
