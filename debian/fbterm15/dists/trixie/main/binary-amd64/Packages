@@ -1,0 +1,26 @@
+Package: framebridge-original-expanded
+Version: 0.3.9+fbterm.15
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: FrameBridge <framebridge@localhost>
+Bugs: https://github.com/gerabh1128/framebridge/issues
+Homepage: https://framebridge.betancourt.one/
+Installed-Size: 54924
+Depends: python3 (>= 3.13), python3 (<< 3.14), libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core, avahi-daemon, avahi-utils, python3-gi, gir1.2-gtk-3.0, gir1.2-vte-2.91, gir1.2-ayatanaappindicator3-0.1
+Suggests: xvfb, openbox
+Description: FrameBridge with standalone, central and node modes
+ Original execution and desktop programs, a real persistent terminal,
+ authenticated node enrollment, and a manual ChatGPT tunnel wizard.
+ Includes real active-screen capture, saved original PNG viewing,
+ per-console sudo capability, explicit read-only framebuffer access,
+ a shared graphical/text console, and an English Debian tutorial.
+ Optional virtual displays are explicitly identified as virtual.
+ No phone or Owner Device pairing. Services start after connection setup.
+ LAN discovery chooses a role on fresh installation.
+ Enrollment remains explicit. Includes a graphical notification-area launcher.
+Filename: pool/main/f/framebridge/framebridge-original-expanded_0.3.9+fbterm.15_debian13-amd64-py313.deb
+Size: 13480056
+SHA256: 55e14abd3cca623f6523c5a67bd41f2fceb05ac3b54828352493c6b17f7fa109
+SHA512: 6deb33411433cd0c1ffef76c9c33b419c47d603da78ede84d195457d67c352a318b56181a9a34f3013decb3b62c4a4d8b003f47c0437ac48a8a9392fb71b4f26
+

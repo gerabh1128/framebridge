@@ -1,5 +1,7 @@
 # FrameBridge Linux APT mirror
 
+> Current signed maintenance channel: [FrameBridge 0.3.9+fbterm.15](README-fbterm15.md). The instructions below describe the legacy channel.
+
 This branch serves the public FrameBridge Debian repository over HTTPS. It mirrors signed metadata and packages from the official origin. APT verifies the release using the FrameBridge archive key. The package name is `framebridge-original-expanded`.
 
 | Distribution | Suite | Source definition |

@@ -1,0 +1,26 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+Origin: FrameBridge
+Label: FrameBridge
+Suite: mint22
+Codename: mint22
+Date: Tue, 24 Nov 2026 22:24:00 +0000
+Valid-Until: Thu, 24 Dec 2026 22:24:00 +0000
+Architectures: amd64
+Components: main
+Description: FrameBridge for Linux Mint 22.x
+Acquire-By-Hash: yes
+SHA256:
+ d5734dd5a581d7dd7280738d6f2600621a31c905e35afdefd6e526934fa3e352             1789 main/binary-amd64/Packages
+ 536b211387a65413117d420e0ba4bdceff730fe14a3435b9f5df5a9e0eb19e18             1082 main/binary-amd64/Packages.gz
+SHA512:
+ c4a65fb4ad7634ce4865ed48a5f09e821cf28f134b56f56f056639db26df12aa34c0cc4a0e1b6278baf8de957f8e72d5f37af3d757ff90224d69dbc26d84e354             1789 main/binary-amd64/Packages
+ 06e5c1ed00ffdba6ce3bbf35f96f17c21607460d7d5202fbae1a3576f79cf43bde0cba11349a452fb30814ca2d113b14692c7ebbdd9e583a29b0cd8f04431303             1082 main/binary-amd64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iHUEARYIAB0WIQRp0OnYNpn5armGsG88JPhdiSpRfgUCawYPfAAKCRA8JPhdiSpR
+fmsjAPwOVCAWnvJpiD/vO8pWFFjdg2SbRqp5ftN3rE7cjGHh8AD9GsaoSuWMtQJN
+GKdsMYrwvFgZlhuUz0fZM6rvCugIgAU=
+=P7pL
+-----END PGP SIGNATURE-----

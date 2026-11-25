@@ -1,0 +1,16 @@
+Origin: FrameBridge
+Label: FrameBridge
+Suite: trixie
+Codename: trixie
+Date: Tue, 24 Nov 2026 22:24:00 +0000
+Valid-Until: Thu, 24 Dec 2026 22:24:00 +0000
+Architectures: amd64
+Components: main
+Description: FrameBridge for Debian 13
+Acquire-By-Hash: yes
+SHA256:
+ 0324df58cb0d3652bf292fe68c831e72682ca13a1c096ba8a44196e2115c7d3f             1791 main/binary-amd64/Packages
+ 1e0fb90c4bafa8cfccb7634dfbe2848165e56287761b6268652d3e9b2ea64aff             1080 main/binary-amd64/Packages.gz
+SHA512:
+ 8169a7f573ce698da57f9d2e0a3b61945942171fd696d7ff3c575c69852e69348dcee4ba61a3ffb34f955ff92f122f74415c39320ea4d5ad49c60d9fb8686871             1791 main/binary-amd64/Packages
+ 338af1dd981287be580b1fcd1b5dce1ba6802c51a860d184f90ac399fac6abd66893f510b3d81048ed7f8f7708dceae47245578066a16e9deefa98f7b8fbe40b             1080 main/binary-amd64/Packages.gz
