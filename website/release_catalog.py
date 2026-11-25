@@ -7,7 +7,7 @@ import re
 from urllib.parse import parse_qsl, urlsplit
 
 E = lambda value: html.escape(str(value), quote=True)
-FINGERPRINT = "2B1F01BC806C0B33CB6CEDDE52859CEBC91B8808"
+FINGERPRINT = "69D0E9D83699F96AB986B06F3C24F85D892A517E"
 PROFILES = (
     ("debian13-amd64-py313", "trixie", "Debian 13", "3.13"),
     ("ubuntu24.04-amd64-py312", "noble", "Ubuntu 24.04", "3.12"),
@@ -152,15 +152,15 @@ def apt_commands(meta, profile):
   test "$primary_count" -eq 1
   test "$actual" = '""" + FINGERPRINT + """'
   sudo install -d -m 0755 /etc/apt/keyrings
-  sudo install -m 0644 "$key_file" /etc/apt/keyrings/framebridge-archive-keyring.asc
+  sudo install -m 0644 "$key_file" /etc/apt/keyrings/framebridge-fbterm15-archive-keyring.asc
   printf '%s\\n' \\
     'Types: deb' \\
-    'URIs: https://framebridge.betancourt.one/debian/' \\
+    'URIs: https://framebridge.betancourt.one/debian/fbterm15/' \\
     'Suites: """ + profile["suite"] + """' \\
     'Components: main' \\
     'Architectures: amd64' \\
-    'Signed-By: /etc/apt/keyrings/framebridge-archive-keyring.asc' \\
-    | sudo tee /etc/apt/sources.list.d/framebridge.sources >/dev/null
+    'Signed-By: /etc/apt/keyrings/framebridge-fbterm15-archive-keyring.asc' \\
+    | sudo tee /etc/apt/sources.list.d/framebridge-fbterm15.sources >/dev/null
   sudo apt update
   sudo apt install framebridge-original-expanded
 )"""
@@ -169,6 +169,8 @@ def download(meta, *, support=""):
     ready = meta["state"] == "ready"
     body = '<main id="content"><div class="page-header"><div class="wrap"><p class="section-label">Download / Verify / Install</p><h1>Choose your Linux package.</h1><p class="lead">One network administration tool. Three distribution profiles. Updates through signed APT repositories.</p></div></div><div class="wrap page-content"><article class="prose">'
     body += '<p>FrameBridge helps one administrator manage their own home Linux network: inventory, services, storage, diagnostics, commands and persistent terminals. Desktop access is an auxiliary tool.</p>'
+    if ready:
+        body += '<div class="release-notice" role="note"><strong>0.3.9+fbterm.15 — signing-key rotation and maintenance.</strong> The new signed APT channel is separate from the previous channel. Existing installations are not switched automatically. Verify the new fingerprint below and use the matching distribution suite. Before upgrading an existing installation, back up the profile, drain jobs, close the tray and stop the applicable FrameBridge runtime from an independent terminal. Active-profile package replacement is refused. Native package installation and execution passed on Debian 13, Ubuntu 24.04 and Linux Mint 22.x; full native desktop regression is complete on Mint, while Debian and Ubuntu graphical regression remains pending. Do not interpret this as a complete compatibility certification. <a href="https://github.com/gerabh1128/framebridge/blob/424f7b600d5ad855c78524842780019d7eee1559/docs/PACKAGE-MAINTENANCE.md">Read cold package maintenance.</a></div>'
     if support:
         body += '</article>' + support + '<article class="prose">'
     body += '<h2>Match the target computer</h2>' + code("cat /etc/os-release\ndpkg --print-architecture\npython3 --version")
@@ -179,7 +181,7 @@ def download(meta, *, support=""):
     for profile in meta["profiles"]:
         body += '<section class="profile-card" id="' + E(profile["profile_id"]) + '"><p class="section-label">amd64 · Python ' + E(profile["python"]) + '</p><h2>' + E(profile["label"]) + '</h2><p>APT suite: <code>' + E(profile["suite"]) + '</code></p>'
         if ready:
-            body += '<p class="hash">SHA-256: ' + E(profile["sha256"]) + '</p><p class="micro">' + E(profile["filename"]) + ' · ' + format(profile["size_bytes"], ",") + ' bytes</p><div class="actions"><a class="button primary" href="' + E(profile["url"]) + '" download>Download .deb</a><a class="button" href="' + E(profile["signature_url"]) + '">Package signature</a></div><details><summary>Install the signed APT channel</summary>' + code(apt_commands(meta, profile)) + '</details>'
+            body += '<p class="hash">SHA-256: ' + E(profile["sha256"]) + '</p><p class="micro">' + E(profile["filename"]) + ' · ' + format(profile["size_bytes"], ",") + ' bytes</p><div class="actions"><a class="button primary" href="' + E(profile["url"]) + '" download>Download .deb</a><a class="button" href="' + E(profile["signature_url"]) + '">Package signature</a></div><details><summary>Configure the new signed APT channel (fresh install or stopped runtime)</summary>' + code(apt_commands(meta, profile)) + '</details>'
         else:
             body += '<p class="micro">Version ' + E(meta["version"]) + ' · package and signature pending.</p>'
         body += '</section>'

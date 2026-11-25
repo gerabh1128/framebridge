@@ -7,9 +7,9 @@
 
 Use a central gateway and enrolled nodes to administer Linux computers you control. Run commands and return to persistent Bash terminals; an existing X11 desktop adds optional graphical tools. ChatGPT remains hosted; FrameBridge runs the tools on your Linux computers.
 
-> **FrameBridge 0.3.9.** Builds cover Debian 13, Ubuntu 24.04 and Linux Mint 22.x on amd64. For installation, confirm that the official catalog lists 0.3.9 for your distribution and verify the matching package signature or signed APT metadata. See the [0.3.9 source-to-artifact record](docs/RELEASE-SOURCE-0.3.9.md) and [official download page](https://framebridge.betancourt.one/download/).
+> **FrameBridge 0.3.9+fbterm.15 — signed Linux maintenance release.** [Download the three signed packages](https://framebridge.betancourt.one/download/) or read the [exact release record](docs/RELEASE-SOURCE-0.3.9+fbterm.15.md), including the signing-key rotation, APT channel and native validation limits.
 
-APT users can select the signed source for their distribution from the [public APT mirror](https://github.com/gerabh1128/framebridge/tree/apt-mirror#framebridge-linux-apt-mirror). It refreshes daily from the official origin.
+The .15 release uses a separate [signed APT channel](https://framebridge.betancourt.one/debian/fbterm15/) with the new signing key. The [previous APT mirror](https://github.com/gerabh1128/framebridge/tree/apt-mirror#framebridge-linux-apt-mirror) remains on the legacy channel. See the download page for the correct trust and cold-upgrade instructions.
 
 FrameBridge 0.3.9 lets compatible Linux peers negotiate larger blocks for original PNG captures. After a broker restart, nodes can resume polling when the broker acknowledges an authenticated result whose request is no longer recorded. The release also corrects local TLS control, CLI exit status and managed-profile checks during package upgrades. Read an uncertain execution receipt with `fb nodes execution` before deciding whether to submit another command. See the [0.3.9 release notes](RELEASE-NOTES.md#039).
 

@@ -1,10 +1,10 @@
-# Private candidate 0.3.9+fbterm.15
+# 0.3.9+fbterm.15 — signed maintenance release
 
 Correct header visibility ownership; preserve the approved classic .14
 viewer unchanged. Default header text updates cannot toggle tmux visibility.
 Only a verified singular legacy attachment can request the legacy header.
 Separately installed legacy keepers require an explicit operator migration
-check. No automatic disabling of unrelated services or public release.
+check. No automatic disabling of unrelated services. See the [signed release record](docs/RELEASE-SOURCE-0.3.9+fbterm.15.md) for the public packages, source identity, new APT channel and test limits.
 
 # Private candidate 0.3.9+fbterm.14
 
