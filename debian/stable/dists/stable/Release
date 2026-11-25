@@ -1,0 +1,21 @@
+Acquire-By-Hash: yes
+Architectures: amd64
+Codename: stable
+Components: main
+Date: Wed, 25 Nov 2026 23:24:26 +0000
+Valid-Until: Wed, 09 Dec 2026 23:24:26 +0000
+Label: FrameBridge
+Origin: FrameBridge
+Suite: stable
+MD5Sum:
+ 2eb765d4fccd105f11592ccdc9f8e523             1864 main/binary-amd64/Packages
+ 6176303f0caed0c2de8b47666768a3e8             1141 main/binary-amd64/Packages.gz
+SHA1:
+ 63a54a69371339d650f3272a5dfd5bd5da66a28e             1864 main/binary-amd64/Packages
+ e9abaabd9ff783c6ba8d1f1d1f9d964d0b14b009             1141 main/binary-amd64/Packages.gz
+SHA256:
+ c365fc7a6f0f6675432d72c395ee84e2e476f4953292b0d5c992c4f1e0fbcabf             1864 main/binary-amd64/Packages
+ f7ba5a08253b68e7691388200fb588542afc82534799976e98659922eb28d9d9             1141 main/binary-amd64/Packages.gz
+SHA512:
+ 7fb526c4725fe9f3441e3a838bab506b3f44093d5bbe21a080839d31feb4acb31cc044e35b636ed59e232cd9987733e313c1ae99594b92d531f048272a80141a             1864 main/binary-amd64/Packages
+ 5fac0548da0083ba6a78bb204f25708f9462a11b20bb02aafae057c699ddf0de45e57a4f4f4f769fc567a6d7f007a98a7f9b0e2a3545ee848442c45173e3b84a             1141 main/binary-amd64/Packages.gz
