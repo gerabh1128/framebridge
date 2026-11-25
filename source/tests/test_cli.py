@@ -23,6 +23,12 @@ class CliTests(unittest.TestCase):
         patch = mock.patch.object(cli.profiles, "_home", return_value=home)
         patch.start()
         self.addCleanup(patch.stop)
+        # The setup wizard fixtures exercise a new standalone/legacy install.
+        # Never inherit the test host's installed LAN node role.
+        from framebridge_expanded import installation
+        installed = mock.patch.object(installation, "status", return_value={"role": "legacy"})
+        installed.start()
+        self.addCleanup(installed.stop)
 
     def directory(self):
         return tempfile.TemporaryDirectory(prefix="cli-test-", dir=ROOT / "qa")

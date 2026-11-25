@@ -704,6 +704,21 @@ class AutostartTests(unittest.TestCase):
         self.assertFalse(final.exists())
         self.assertEqual(before, {p: (p.stat().st_uid, p.stat().st_mode) for p in before})
 
+    def test_node_unit_bounds_restart_storm_without_changing_other_roles(self):
+        profile = Path("/tmp/framebridge-synthetic-profile")
+        blob = Path("/tmp/framebridge-synthetic-blob")
+        node_unit = autostart.unit_text(profile, blob, node=True)
+        default_unit = autostart.unit_text(profile, blob)
+        for setting in ("StartLimitIntervalSec=600", "StartLimitBurst=4"):
+            self.assertIn(setting + "\n", node_unit)
+            self.assertNotIn(setting + "\n", default_unit)
+        self.assertNotIn("StartLimitIntervalSec=0\n", node_unit)
+        self.assertIn("StartLimitIntervalSec=0\n", default_unit)
+        self.assertIn("Restart=on-failure\n", node_unit)
+        self.assertIn("RestartSec=15\n", node_unit)
+        self.assertEqual(node_unit.count("StartLimitIntervalSec="), 1)
+        self.assertEqual(node_unit.count("StartLimitBurst="), 1)
+
     def test_unit_quotes_specifiers_and_dollars_without_shell_or_missing_package_loop(self):
         text = autostart.unit_text(Path('/tmp/a % b ${HOME} "quoted"'), Path('/tmp/key % file'))
         self.assertIn("%%", text)

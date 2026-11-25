@@ -4823,8 +4823,8 @@
     },
     {
       "path": "FrameBridge-MCP-Private/bin/framebridge-mcp-private-run",
-      "bytes": 816,
-      "sha256": "61fc24212d60599589b451e6babe6aad81c8f5f0401e4b168409df6bc3d72f68"
+      "bytes": 1000,
+      "sha256": "b65e131c1ccbac870f137e3338029d5cd7bdb0faf3755322d16ab6d8666b619a"
     },
     {
       "path": "FrameBridge-MCP-Private/bin/tunnel-client",

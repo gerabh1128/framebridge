@@ -1,5 +1,6 @@
 """Profile-scoped detached ChatGPT supervision without a persistent credential."""
 from __future__ import annotations
+from .package_maintenance import guarded as _package_guard
 import fcntl
 import hashlib
 import json
@@ -279,6 +280,7 @@ class _StatusOutput:
         return len(text)
 
 
+@_package_guard
 def worker_main(state, lock_fd):
     """Read one bounded anonymous-pipe payload; the credential is never a file."""
     os.umask(0o077)

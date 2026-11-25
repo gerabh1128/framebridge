@@ -84,6 +84,18 @@ GUIDE = {'start': {'title': 'Start with FrameBridge',
                                          'fb nodes --help',
                                          'fb certificates --help',
                                          'fb screen-access --help']},
+                           {'heading': 'Single local FBTERM viewer',
+                            'body': 'The graphical tray opens the one persistent FBTERM window for the selected local profile. '
+                                    'Its title is >framebridge_; the profile ID in its header distinguishes local profiles without showing their paths. '
+                                    'The upper read-only history scrolls independently, displaying one compact JOB | STATE | EXIT line per recorded job. '
+                                    'The lower terminal attaches to the existing Original tmux session in read-only mode; there is no extra activity window. '
+                                    'The >fb_ mark and factual activity colours are retained in the notification area. '
+                                    'Local start, stop and restart preserve boot policy. Stop/restart require confirmation and a fresh queue check, which is not an atomic drain. '
+                                    'ChatGPT through the authorized administrator’s chat remains the administration interface. '
+                                    'There is no additional login, remote host selection, enrollment dialog or credential prompt. '
+                                    'Use fb doctor for local diagnostics. Headless execution needs no desktop. '
+                                    'During a cold upgrade close a remaining legacy viewer of the same profile before starting the new viewer.',
+                            'commands': ['framebridge-tray --show', 'fb viewer status']},
                            {'heading': 'Human and structured output',
                             'body': 'Use explicit commands in automation rather than the '
                                     'interactive no-argument menu. --json selects structured '
@@ -152,7 +164,11 @@ GUIDE = {'start': {'title': 'Start with FrameBridge',
                                      'Startup on the next boot follows the retained policy and '
                                      'intended connection state. A non-node profile without '
                                      'managed setup starts only local tools. Stopping a terminal '
-                                     'service or session can interrupt its running work.',
+                                     'service or session can interrupt its running work. Repeated ordinary '
+                                     'node runtime failures are bounded, including legacy managed '
+                                     'units. Diagnose the cause before an explicit service start. '
+                                     'A stopped node can reset its restart budget through the '
+                                     'normal managed start command; automatic restarts cannot reset it.',
                              'commands': ['fb service start', 'fb service stop']},
                             {'heading': 'Future boot policy',
                              'body': 'Once managed setup exists, service boot enable/disable '
@@ -210,6 +226,28 @@ GUIDE = {'start': {'title': 'Start with FrameBridge',
                                  'topic for first managed node startup and its explicit initial '
                                  'boot-policy effect.',
                          'commands': ['fb nodes list', 'fb nodes pending', 'fb nodes status']},
+                        {'heading': 'Recover a lost central registration',
+                         'body': 'Use recover-enrollment only as the authenticated local profile owner '
+                                 'after stopping the managed node, reviewing detached effects and '
+                                 'verifying that the intended central lost this registration. '
+                                 'Verify the UUID, public fingerprint and existing broker address '
+                                 'against the central operator. The old standby must remain inactive. '
+                                 'The stopped profile must have no queued, active or uncertain work. '
+                                 'The existing trust and identity are retained. An owner-confirmed '
+                                 'recovery can restrict the recognized owner-owned legacy node directory '
+                                 'from 0755 to 0700 without modifying its contents. Other unexpected '
+                                 'permissions, symbolic links and foreign owners are rejected. A validated signed '
+                                 'pending request replaces the previous local association atomically; '
+                                 'it does not grant authorization or start the node. The central '
+                                 'operator must match the pending UUID and public fingerprint before '
+                                 'approval. Poll the existing request to receive and confirm approval, '
+                                 'then start the node. An ambiguous submission requires review; '
+                                 'do not repeat it, delete the recovery journal, or restore an obsolete '
+                                 'association. Only a confirmed recovery can be followed by another '
+                                 'owner-confirmed recovery. Metadata-only recovery records preserve '
+                                 'audit history without duplicating authorization material.',
+                         'commands': ['fb nodes recover-enrollment --help', 'fb nodes pending',
+                                      'fb nodes approve --help', 'fb nodes poll', 'fb nodes status']},
                         {'heading': 'Targets',
                          'body': 'Use target to select one enrolled alias or ID for FBEXEC and CUA. '
                                  'LOCAL means the actual receiver and remains the default in the '
@@ -442,4 +480,10 @@ GUIDE['terminals']['sections'].append({
     'heading': 'Automatic read-only FBTERM viewer',
     'body': 'When an execution job needs the original FBTERM activity viewer, a current validated X11 session of the same Linux user can open the FrameBridge Expanded window automatically. Its tmux attachment is read-only and remains separate from the interactive work console. A service that started before graphical login discovers the current desktop and session bus when opening the viewer. Only the viewer subprocess receives the graphical environment; existing shells and jobs retain theirs. Without an available desktop, text execution remains available and no visible window is claimed.',
     'commands': ['fb console', 'fb status console'],
+})
+
+GUIDE['diagnostics']['sections'].append({
+    'heading': 'Offline reconciliation of unknown jobs',
+    'body': 'An unknown execution outcome retains its reservation until authentic receipt recovery or a separately authorized local review. The recovery command requires the exact job/request/digest, an offline profile, quiescent FBTERM engines, a private evidence file and explicit interactive confirmation. It retains the unknown state and forbids replay. It does not prove the original outcome. Review external effects independently; do not use it merely because a receipt is missing. No remote MCP reconciliation or noninteractive override is available.',
+    'commands': ['fb recovery reconcile --help'],
 })

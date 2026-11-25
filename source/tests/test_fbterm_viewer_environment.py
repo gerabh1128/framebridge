@@ -193,7 +193,53 @@ class ViewerEnvironment(unittest.TestCase):
             self.term.ensure(visible=False)
         discovery.assert_not_called()
 
-    def test_ensure_launches_only_readonly_viewer_with_copy_environment(self):
+    def test_expanded_ensure_delegates_to_shared_viewer_with_environment_copy(self):
+        shared=types.ModuleType("framebridge_expanded.viewer")
+        shared.open_existing=Mock(return_value={"code":"viewer_present"})
+        before=dict(os.environ)
+        with (
+            patch.dict(sys.modules, {"framebridge_expanded.viewer":shared}),
+            patch.object(self.term, "has_session", return_value=True),
+            patch.object(self.term, "status", return_value={"session":True,"visible":True}),
+            patch.object(engine.subprocess, "Popen") as direct_launch,
+        ):
+            result=self.term.ensure()
+        shared.open_existing.assert_called_once()
+        root,session,env=shared.open_existing.call_args.args
+        self.assertEqual((root,session),(self.term.root,self.term.session))
+        self.assertEqual(env,before);self.assertIsNot(env,os.environ)
+        self.assertEqual(dict(os.environ),before)
+        self.assertTrue(result["session"]);self.assertTrue(result["visible"])
+        direct_launch.assert_not_called()
+
+    def test_expanded_header_delegates_to_shared_factual_header(self):
+        shared=types.ModuleType("framebridge_expanded.viewer")
+        shared.configure_header=Mock()
+        before=dict(os.environ)
+        with patch.dict(sys.modules, {"framebridge_expanded.viewer":shared}), patch.object(self.term,"_run") as legacy_header:
+            self.term._set_viewer_header()
+        shared.configure_header.assert_called_once()
+        root,session,env=shared.configure_header.call_args.args
+        self.assertEqual((root,session),(self.term.root,self.term.session))
+        self.assertEqual(env,before);self.assertIsNot(env,os.environ)
+        legacy_header.assert_not_called()
+
+    def test_expanded_viewer_failure_keeps_the_original_session_result(self):
+        shared=types.ModuleType("framebridge_expanded.viewer")
+        shared.open_existing=Mock(side_effect=RuntimeError("synthetic viewer failure"))
+        with (
+            patch.dict(sys.modules, {"framebridge_expanded.viewer":shared}),
+            patch.object(self.term, "has_session", return_value=True),
+            patch.object(self.term, "status", return_value={"session":True,"visible":False}),
+            patch.object(engine.subprocess,"Popen") as direct_launch,
+        ):
+            result=self.term.ensure()
+        shared.open_existing.assert_called_once()
+        self.assertEqual(result,{"session":True,"visible":False})
+        direct_launch.assert_not_called()
+
+    def test_legacy_ensure_launches_only_readonly_viewer_with_copy_environment(self):
+        os.environ.pop('FRAMEBRIDGE_EXPANDED_STATE',None)
         env=self.term._viewer_environment();before=dict(os.environ)
         with (
             patch.object(self.term, 'has_session', return_value=True),
@@ -212,7 +258,8 @@ class ViewerEnvironment(unittest.TestCase):
         self.assertEqual(visible.call_args_list[0].args,(env,));self.assertEqual(visible.call_args_list[1].args,(env,))
         self.assertEqual(dict(os.environ),before)
 
-    def test_viewer_header_uses_runtime_version_and_window_local_options(self):
+    def test_legacy_viewer_header_uses_runtime_version_and_window_local_options(self):
+        os.environ.pop('FRAMEBRIDGE_EXPANDED_STATE',None)
         sys.modules['framebridge_expanded'].__version__ = '0.4.0~rc3'
         with patch.object(self.term, '_run') as run:
             self.term._set_viewer_header()
@@ -226,7 +273,8 @@ class ViewerEnvironment(unittest.TestCase):
         self.assertEqual(command[7:], [';', 'set-option', '-w', '-t', target, 'pane-border-status', 'top'])
         self.assertEqual(kwargs, {'timeout': 2})
 
-    def test_viewer_launch_failure_does_not_destroy_or_fake_session(self):
+    def test_legacy_viewer_launch_failure_does_not_destroy_or_fake_session(self):
+        os.environ.pop('FRAMEBRIDGE_EXPANDED_STATE',None)
         env=self.term._viewer_environment()
         with patch.object(self.term,'has_session',return_value=True),patch.object(self.term,'_viewer_environment',return_value=env),patch.object(self.term,'visible_window',return_value=False),patch.object(self.term,'status',return_value={'session':True,'visible':False}),patch.object(engine.subprocess,'Popen',side_effect=OSError('launch failed')):
             result=self.term.ensure()

@@ -1,5 +1,8 @@
 # FrameBridge
 
+> **Upgrade safety:** stop affected FrameBridge profiles before updating the package. The new maintenance gate refuses active-profile replacement; it does not stop or replay jobs automatically. See [cold package maintenance](docs/PACKAGE-MAINTENANCE.md). The [Original FBTERM viewer](docs/FBTERM-VIEWER.md) supports profile-isolated titles and explicit pause/resume.
+
+
 **Administer your Linux network from a connected conversation.**
 
 Use a central gateway and enrolled nodes to administer Linux computers you control. Run commands and return to persistent Bash terminals; an existing X11 desktop adds optional graphical tools. ChatGPT remains hosted; FrameBridge runs the tools on your Linux computers.
@@ -10,7 +13,7 @@ APT users can select the signed source for their distribution from the [public A
 
 FrameBridge 0.3.9 lets compatible Linux peers negotiate larger blocks for original PNG captures. After a broker restart, nodes can resume polling when the broker acknowledges an authenticated result whose request is no longer recorded. The release also corrects local TLS control, CLI exit status and managed-profile checks during package upgrades. Read an uncertain execution receipt with `fb nodes execution` before deciding whether to submit another command. See the [0.3.9 release notes](RELEASE-NOTES.md#039).
 
-The development source for **0.3.9+fbterm.4** uses role-based names for bundled components and synthetic data in tests. Each managed job has an ID and an execution receipt. Independent jobs can share a node, and callers can retrieve verified output from the node that ran the command. See the [job changes and validation scope](RELEASE-NOTES.md#linux-job-updates).
+The development source for **0.3.9+fbterm.9** retains the [privacy checks](docs/PRIVACY-REVIEW.md#publication-checks) in the public-release builders. Bundled components use role-based names, and tests use synthetic identities. Each managed job has an ID and an execution receipt. Independent jobs can share a node, and callers can retrieve verified output from the node that ran the command. See the [job changes and validation scope](RELEASE-NOTES.md#linux-job-updates). The private .8 candidate adds a [local offline review procedure](docs/JOB-RECONCILIATION.md) for a missing original receipt without declaring success or permitting replay. It is not a published release.
 
 ## Start here
 

@@ -443,7 +443,7 @@ class HttpContractTests(unittest.TestCase):
 
     def test_full_node_run_real_signed_http_stays_online_past_five_seconds(self):
         package_name = 'r4_isolated_protocol_test'
-        package = types.ModuleType(package_name); package.__path__ = []
+        package = types.ModuleType(package_name); package.__path__ = [str(PACKAGE_ROOT)]
         package.broker = broker
         sys.modules[package_name] = package
         self.addCleanup(sys.modules.pop, package_name, None)

@@ -123,33 +123,114 @@ def _poster(state):
     return post
 
 
+def _operation_lock(state):
+    # The agent and enrollment operations must never run concurrently.
+    from .job_reconciliation import _offline_lock
+    return _offline_lock(Path(state) / "node-operation.lock", create=True)
+
+
 def enroll(broker_url, node_label, state_dir=None):
     url = broker.validate_endpoint(broker_url)
-    state, config, ctx, identity = _context(state_dir, create=True, node_label=node_label)
+    from .config import private_dir
+    state = private_dir(broker.state_path(state_dir))
+    with _operation_lock(state):
+        state, config, ctx, identity = _context(state, create=True, node_label=node_label)
+        journal = ctx.state_dir / "enrollment-recovery.json"
+        if journal.exists() or journal.is_symlink():
+            raise NodeError("RECOVERY_PREVIOUS_ATTEMPT_REVIEW_REQUIRED")
+        return _submit_enrollment(state, config, ctx, identity, url, node_label)
+
+
+def _submit_enrollment(state, config, ctx, identity, url, node_label, *, save_config=True,
+                       recover_from=None):
     store = _original("pairing").PairingStore(ctx.state_dir)
     existing = store.load()
-    if existing.get("state") in {"pair_requested", "paired"}:
-        raise NodeError("NODE_ENROLLMENT_ALREADY_EXISTS")
+    if recover_from is None:
+        if existing.get("state") in {"pair_requested", "paired"}:
+            raise NodeError("NODE_ENROLLMENT_ALREADY_EXISTS")
+        extra = {}
+    else:
+        if existing.get("state") != "paired":
+            raise NodeError("RECOVERY_CONFIRMED_ASSOCIATION_REQUIRED")
+        extra = {"recovery_expected_sha256": recover_from}
     manifest = _original("seed_capabilities").list_capabilities()
     digest = hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     result = _original("pairing_client").start_pairing(
         state_dir=ctx.state_dir, node_id=identity["node_id"], node_label=node_label,
         node_host_id=identity["node_host_id"], public_jwk=identity["node_public_jwk"],
         provider="chatgpt", capability_manifest_sha256=digest, broker_base_url=url,
-        allow_insecure_dev=url.startswith("http://"), poster=_poster(state))
-    config["broker_url"] = url
-    _write_json(state / "config.json", config)
+        allow_insecure_dev=url.startswith("http://"), poster=_poster(state), **extra)
+    if save_config:
+        config["broker_url"] = url
+        _write_json(state / "config.json", config)
     return dict(result, node_id=identity["node_id"], node_label=node_label,
                 fingerprint=identity["node_public_key_sha256"])
 
 
+def _recovery_record(ctx, identity, url):
+    from .job_reconciliation import _read_private
+    path = ctx.state_dir / "enrollment-recovery.json"
+    if not path.exists() and not path.is_symlink():
+        return None
+    try:
+        value = json.loads(_read_private(path, 32768))
+        if (not isinstance(value, dict) or value.get("schema") != 1
+                or value.get("state") not in ("submission_review_required", "approval_required", "confirmed")
+                or value.get("node_id") != identity["node_id"]
+                or value.get("fingerprint") != identity["node_public_key_sha256"]
+                or value.get("broker") != url
+                or not isinstance(value.get("previous_pair_id"), str)
+                or not value["previous_pair_id"]
+                or (value["state"] != "submission_review_required"
+                    and (not isinstance(value.get("new_pair_id"), str)
+                         or not value["new_pair_id"]))):
+            raise ValueError("invalid recovery binding")
+        return value
+    except (OSError, RuntimeError, ValueError, KeyError, TypeError):
+        raise NodeError("RECOVERY_JOURNAL_INVALID") from None
+
+
+def _sync_recovery(ctx, identity, url, pairing):
+    """Resume only a locally recorded new request; never submit another one."""
+    from .job_reconciliation import _sync_dir
+    record = _recovery_record(ctx, identity, url)
+    if record is None:
+        return None
+    pair_id = pairing.get("pair_id")
+    if (not isinstance(pair_id, str) or not pair_id
+            or pair_id == record["previous_pair_id"]
+            or pairing.get("node_id") != identity["node_id"]
+            or pairing.get("broker_base_url", "").rstrip("/") != url
+            or pairing.get("state") not in ("pair_requested", "paired")
+            or (record.get("new_pair_id") and record["new_pair_id"] != pair_id)):
+        raise NodeError("RECOVERY_SUBMISSION_REVIEW_REQUIRED")
+    phase = ("confirmed" if pairing.get("state") == "paired"
+             and pairing.get("broker_confirm_required") is not True
+             else "approval_required")
+    if record["state"] == "confirmed" and phase != "confirmed":
+        raise NodeError("RECOVERY_JOURNAL_BINDING_CHANGED")
+    if record["state"] != phase or record.get("new_pair_id") != pair_id:
+        record.update(state=phase, new_pair_id=pair_id)
+        if phase == "confirmed":
+            record["confirmed_at"] = time.time()
+        _write_json(ctx.state_dir / "enrollment-recovery.json", record)
+        _sync_dir(ctx.state_dir)
+    return record
+
+
 def poll_enrollment(state_dir=None):
     state, config, ctx, identity = _context(state_dir)
+    with _operation_lock(state):
+        return _poll_enrollment(state, config, ctx, identity)
+
+
+def _poll_enrollment(state, config, ctx, identity):
     url = broker.validate_endpoint(config.get("broker_url", ""))
     store = _original("pairing").PairingStore(ctx.state_dir)
     pairing = store.load()
     if pairing.get("broker_base_url") and pairing["broker_base_url"].rstrip("/") != url:
         raise NodeError("PAIRING_BROKER_CONFIG_MISMATCH")
+    _sync_recovery(ctx, identity, url, pairing)
     if pairing.get("state") == "paired" and pairing.get("broker_confirm_required") is not True:
         return status(state)
     result = _original("pairing_client").poll_pairing(
@@ -159,6 +240,7 @@ def poll_enrollment(state_dir=None):
         _write_json(ctx.config_path, {"schema": 1, "provider": "chatgpt", "pairing": {
             "state": "paired", "broker_base_url": url,
             "broker_confirm_required": pairing.get("broker_confirm_required") is True}})
+    _sync_recovery(ctx, identity, url, pairing)
     return dict(result, node_id=identity["node_id"])
 
 
@@ -168,11 +250,21 @@ def status(state_dir=None):
     except NodeError as exc:
         return {"ok": False, "error": str(exc), "state": "not_enrolled"}
     pairing = _original("pairing").PairingStore(ctx.state_dir).load()
-    return {"ok": True, "node_id": identity["node_id"], "node_label": identity["hostname"],
-            "fingerprint": identity["node_public_key_sha256"],
-            "state": pairing.get("state", "not_paired"),
-            "broker_confirm_required": pairing.get("broker_confirm_required") is True,
-            "broker_url": config.get("broker_url"), "agent_state": "not_checked"}
+    result = {"ok": True, "node_id": identity["node_id"], "node_label": identity["hostname"],
+              "fingerprint": identity["node_public_key_sha256"],
+              "state": pairing.get("state", "not_paired"),
+              "broker_confirm_required": pairing.get("broker_confirm_required") is True,
+              "broker_url": config.get("broker_url"), "agent_state": "not_checked"}
+    try:
+        record = _recovery_record(ctx, identity, config.get("broker_url", "").rstrip("/"))
+        if record is not None:
+            result["recovery_state"] = record["state"]
+            if (record["state"] != "confirmed"
+                    or record.get("new_pair_id") != pairing.get("pair_id")):
+                result["agent_state"] = "blocked_for_recovery"
+    except NodeError:
+        result.update(recovery_state="review_required", agent_state="blocked_for_recovery")
+    return result
 
 
 def dispatch_request(request, adapter_request=None, state_dir=None):
@@ -378,12 +470,21 @@ def _dispatch_with_heartbeat(request, *, url, ctx, state, outbound, contact=None
 
 def run(state_dir=None, once=False):
     state, config, ctx, identity = _context(state_dir)
+    with _operation_lock(state):
+        return _run_locked(state, config, ctx, identity, once=once)
+
+
+def _run_locked(state, config, ctx, identity, *, once=False):
     url = broker.validate_endpoint(config.get("broker_url", ""))
     pairing = _original("pairing").PairingStore(ctx.state_dir).load()
     if pairing.get("state") != "paired" or pairing.get("broker_confirm_required") is True:
         raise NodeError("NODE_NOT_CONFIRMED")
     if pairing.get("node_id") != identity["node_id"] or pairing.get("broker_base_url", "").rstrip("/") != url:
         raise NodeError("PAIRING_BINDING_MISMATCH")
+    record = _recovery_record(ctx, identity, url)
+    if record is not None and (record["state"] != "confirmed"
+                              or record.get("new_pair_id") != pairing.get("pair_id")):
+        raise NodeError("RECOVERY_SUBMISSION_REVIEW_REQUIRED")
     outbound = _original("outbound_agent")
     contact = _BrokerContact(state, identity["node_id"])
     while True:

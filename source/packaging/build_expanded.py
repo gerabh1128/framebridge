@@ -12,9 +12,11 @@ from pathlib import Path
 import shutil
 import shlex
 import subprocess
+import tempfile
 
 from build_profiles import CANDIDATE_VERSION, PROFILES, SOURCE_VENDOR, VENDOR_RELATIVE, target_profile, validate_vendor, vendor_versions
 from release_metadata import release_source
+from release_privacy import ReleasePrivacy, PrivacyError, external_public_policy
 
 BASE = Path(__file__).resolve().parents[1]
 ROOT = BASE.parent
@@ -181,9 +183,11 @@ def maintainer_prerm(version):
         "    fi\n"
         "    " + INSTALLATION + " remove\n"
         "    ;;\n"
+        "  failed-upgrade)\n" + maintenance_hook("begin") + "    ;;\n"
         "  upgrade)\n"
         '    /usr/bin/dpkg --validate-version "$2"\n'
-        '    if /usr/bin/dpkg --compare-versions "$2" lt ' + shlex.quote(version) + "; then\n"
+        + maintenance_hook("begin")
+        + '    if /usr/bin/dpkg --compare-versions "$2" lt ' + shlex.quote(version) + "; then\n"
         "      /usr/bin/python3 -I -S -c " + shlex.quote(helper_cleanup) + "\n"
         "    fi\n"
         '    if /usr/bin/dpkg --compare-versions "$2" lt ' + shlex.quote(ROLE_DEPLOYMENT_FLOOR) + "; then\n"
@@ -194,22 +198,26 @@ def maintainer_prerm(version):
 
 
 
+def maintenance_hook(operation):
+    if operation not in ("begin", "finish"):
+        raise ValueError("Invalid maintenance hook operation")
+    module = (BASE / "expanded/framebridge_expanded/package_maintenance.py").read_text()
+    module = module.rsplit('if __name__ == "__main__":', 1)[0]
+    return ("/usr/bin/python3 -I -S - <<'FRAMEBRIDGE_MAINTENANCE_" + operation.upper() + "'\n"
+            + module + "\nraise SystemExit(main([" + repr(operation) + "]))\n"
+            + "FRAMEBRIDGE_MAINTENANCE_" + operation.upper() + "\n")
+
+
 def maintainer_preinst(version=None):
-    """Snapshot upgrades, reinstalls and the 0.4 RC lineage transition."""
+    """Refuse live replacement and hold persistent maintenance until configure."""
     version = version or VERSION
-    if not re.fullmatch(r"[0-9][0-9A-Za-z.+:~\\-]*", version):
+    if not re.fullmatch(r"[0-9][0-9A-Za-z.+:~\-]*", version):
         raise ValueError("Invalid package upgrade version")
-    eligible = '/usr/bin/dpkg --compare-versions "$2" le ' + shlex.quote(version)
-    if version == "0.3.7":
-        eligible += "".join(f' || [ "$2" = {shlex.quote(previous)} ]' for previous in RC_LINEAGE_FOR_037)
-    module = (BASE / "expanded/framebridge_expanded/package_upgrade.py").read_text()
-    module = module.rsplit("if __name__ == '__main__':", 1)[0]
-    return ("#!/bin/sh\nset -eu\ncase \"$1\" in\n  upgrade)\n"
-            '/usr/bin/dpkg --validate-version "$2"\n'
-            "if " + eligible + "; then\n"
-            "/usr/bin/python3 -I -S - <<'FRAMEBRIDGE_UPGRADE_SNAPSHOT'\n"
-            + module + "\nraise SystemExit(main(['snapshot']))\n"
-            + "FRAMEBRIDGE_UPGRADE_SNAPSHOT\nfi\n    ;;\nesac\n")
+    return ("#!/bin/sh\nset -eu\ncase \"$1\" in\n"
+            "  install)\n" + maintenance_hook("begin") + "    ;;\n"
+            "  upgrade)\n"
+            '    /usr/bin/dpkg --validate-version "$2"\n'
+            + maintenance_hook("begin") + "    ;;\nesac\n")
 
 
 def bytecode_cleanup_source(prefix="/usr/lib/framebridge-expanded"):
@@ -277,18 +285,19 @@ print("FRAMEBRIDGE_BYTECODE_INVALIDATED=" + str(removed))
 
 def maintainer_postinst():
     return ("#!/bin/sh\nset -eu\ncase \"$1\" in\n  configure)\n"
-            "/usr/bin/python3 -I -S - <<'FRAMEBRIDGE_BYTECODE_CLEANUP'\n"
+            + maintenance_hook("begin")
+            + "/usr/bin/python3 -I -S - <<'FRAMEBRIDGE_BYTECODE_CLEANUP'\n"
             + bytecode_cleanup_source()
             + "FRAMEBRIDGE_BYTECODE_CLEANUP\n"
             + "    " + INSTALLATION + ' configure "${2:-}"\n'
-            "/usr/bin/python3 -I -S /usr/lib/framebridge-expanded/expanded/framebridge_expanded/package_upgrade.py schedule\n"
-            "    ;;\nesac\n")
+            + maintenance_hook("finish")
+            + "    ;;\nesac\n")
 
 
 def package_relationships(profile):
     """Keep the opt-in virtual window manager out of automatic APT installs."""
     return {
-        "Depends": "python3 (>= " + profile["python_minor"] + "), python3 (<< 3." + str(int(profile["python_minor"].split(".")[1]) + 1) + "), libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core, avahi-daemon, avahi-utils, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1",
+        "Depends": "python3 (>= " + profile["python_minor"] + "), python3 (<< 3." + str(int(profile["python_minor"].split(".")[1]) + 1) + "), libc6 (>= 2.34), libgcc-s1, python3-cryptography, sudo, libpam-systemd, dbus-user-session, udev, libx11-6, ca-certificates, iproute2, procps, systemd, bash, tmux, coreutils, util-linux, mawk | gawk, gnome-terminal, wmctrl, xdotool, x11-utils, xclip, imagemagick, xterm, dbus-x11, xauth, x11-xkb-utils, fonts-dejavu-core, avahi-daemon, avahi-utils, python3-gi, gir1.2-gtk-3.0, gir1.2-vte-2.91, gir1.2-ayatanaappindicator3-0.1",
         "Suggests": "xvfb, openbox",
     }
 
@@ -301,8 +310,15 @@ def main(argv=None):
     parser.add_argument("--vendor-dir", type=Path, help="Reviewed target-ABI Fleet Hub vendor tree; never installed globally")
     parser.add_argument("--public-release", action="store_true", help="Bind an official release profile to its assembled corresponding-source archive")
     parser.add_argument("--source-manifest", type=Path, help="Matching SOURCE-ARCHIVE-MANIFEST.json kept beside its source archive")
+    parser.add_argument("--privacy-policy", type=Path, help="Local JSON array of private identifiers to reject")
     parser.add_argument("--check-vendor", action="store_true", help="Validate inputs without staging or building a package")
     args = parser.parse_args(argv)
+    try:
+        if args.public_release:
+            args.privacy_policy = external_public_policy(args.privacy_policy, ROOT)
+        privacy = ReleasePrivacy(args.privacy_policy)
+    except PrivacyError as error:
+        parser.error(str(error))
     if not re.fullmatch(r"[0-9][0-9A-Za-z.+:~\-]*", args.version) or args.version == "0.3.1":
         parser.error("A distinct valid Debian candidate version is required")
     subprocess.run(["dpkg", "--validate-version", args.version], check=True)
@@ -328,6 +344,11 @@ def main(argv=None):
     if args.public_release:
         from archive_sources import source_files
         SOURCE_ARCHIVE = release_source(args.source_manifest, VERSION, args.target, source_files(), vendor_evidence)
+        if not args.check_vendor:
+            corresponding = args.source_manifest.parent / SOURCE_ARCHIVE["filename"]
+            privacy.source(corresponding)
+            if sha(corresponding) != SOURCE_ARCHIVE["sha256"]:
+                raise RuntimeError("Corresponding source changed during privacy review")
         profile["validation_status"] = "release_build"
         profile["source_archive"] = SOURCE_ARCHIVE
     PUBLIC_FILENAME = "FrameBridge-" + VERSION + "-" + args.target + ".deb"
@@ -390,11 +411,15 @@ def main(argv=None):
     shutil.copy2(tray, bindir / tray.name)
     autostart = STAGE / "etc/xdg/autostart"
     autostart.mkdir(parents=True)
-    for folder in (applications, autostart):
-        shutil.copy2(BASE / "packaging/framebridge-tray.desktop", folder)
+    tray_desktop = BASE / "packaging/framebridge-tray.desktop"
+    shutil.copy2(tray_desktop, applications)
+    (autostart / tray_desktop.name).write_text(
+        tray_desktop.read_text().replace("Exec=/usr/bin/framebridge-tray --show",
+                                         "Exec=/usr/bin/framebridge-tray --autostart"))
     icons = STAGE / "usr/share/icons/hicolor/scalable/apps"
     icons.mkdir(parents=True)
-    shutil.copy2(BASE / "packaging/framebridge-tray.svg", icons / "framebridge-tray.svg")
+    for icon in ("framebridge-tray","framebridge-tray-ready","framebridge-tray-busy","framebridge-tray-attention","framebridge-tray-stopped"):
+        shutil.copy2(BASE / ("packaging/"+icon+".svg"), icons / (icon+".svg"))
     docs = STAGE / "usr/share/doc" / PACKAGE
     docs.mkdir(parents=True)
     for file in sorted((BASE / "docs").glob("*")):
@@ -461,11 +486,16 @@ def main(argv=None):
         os.utime(path, (EPOCH, EPOCH), follow_symlinks=False)
     manifest = [{"path": str(p.relative_to(STAGE)), "sha256": sha(p), "bytes": p.stat().st_size}
                 for p in sorted(STAGE.rglob("*")) if p.is_file() and not p.is_symlink()]
-    (RELEASE / "RELEASE-PROFILE.json").write_text(json.dumps(profile, indent=2, sort_keys=True) + "\n")
-    (RELEASE / "PACKAGE-MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n")
     output = RELEASE / ("framebridge-expanded_" + VERSION + "_amd64.deb")
     env = dict(os.environ, SOURCE_DATE_EPOCH=str(EPOCH))
-    subprocess.run(["dpkg-deb", "--root-owner-group", "-Zxz", "-z6", "--build", str(STAGE), str(output)], check=True, env=env)
+    with tempfile.TemporaryDirectory(prefix=".package-build-", dir=RELEASE) as temporary:
+        staged = Path(temporary) / output.name
+        subprocess.run(["dpkg-deb", "--root-owner-group", "-Zxz", "-z6", "--build", str(STAGE), str(staged)], check=True, env=env)
+        if PUBLIC_RELEASE or args.privacy_policy is not None:
+            privacy.deb(staged)
+        staged.replace(output)
+    (RELEASE / "RELEASE-PROFILE.json").write_text(json.dumps(profile, indent=2, sort_keys=True) + "\n")
+    (RELEASE / "PACKAGE-MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n")
     shutil.copy2(output, RELEASE / PUBLIC_FILENAME)
     print(json.dumps({"package": str(output), "bytes": output.stat().st_size, "sha256": sha(output), "payload_entries": len(manifest), "profile_id": args.target, "validation_status": "release_build" if PUBLIC_RELEASE else "candidate", "public_filename": PUBLIC_FILENAME, "status": "PUBLIC_RELEASE_BUILD_ASSEMBLED" if PUBLIC_RELEASE else "COMPATIBILITY_CANDIDATE_BUILD"}))
 

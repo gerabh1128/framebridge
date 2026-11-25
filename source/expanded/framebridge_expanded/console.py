@@ -227,7 +227,7 @@ def run(state, node="LOCAL", *, inside=False, mode="auto"):
         try:
             result = subprocess.run([
                 terminal, "--window", "--maximize",
-                "--title=FrameBridge Console | " + ctx["node"], "--",
+                "--title=>framebridge_ · FrameBridge Console | " + ctx["node"], "--",
                 sys.executable, "-m", "framebridge_expanded.console",
                 "--state-dir", str(ctx["state"]), "--node", node, "--inside", "--mode", "gui",
             ], env=env, capture_output=True, text=True, timeout=15)

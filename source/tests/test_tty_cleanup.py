@@ -63,7 +63,10 @@ class CleanupTests(unittest.TestCase):
 
     def test_failed_shutdown_cannot_become_success_by_stop_or_restart(self):
         limits = tty.Limits()
-        home = self.state / "home"; home.mkdir()
+        # Mirror serve(): initialize the private runtime root before constructing
+        # the lower-level manager. Do not repair a pre-existing unsafe directory.
+        tty._private(tty.runtime_path(self.state))
+        home = self.state / "home"; home.mkdir(mode=0o700)
         manager = tty.PortableManager(self.state, limits, home)
         manager.cleanup_daemon = self.dead_daemon()
         manager._record_cleanup()
@@ -135,7 +138,10 @@ class CleanupTests(unittest.TestCase):
         self.assertTrue(tty.stop(self.state)["cleanup_verified"])
 
     def test_prelaunch_invalid_arguments_do_not_poison_profile(self):
-        home = self.state / "home"; home.mkdir()
+        # Mirror serve(): initialize the private runtime root before constructing
+        # the lower-level manager. Do not repair a pre-existing unsafe directory.
+        tty._private(tty.runtime_path(self.state))
+        home = self.state / "home"; home.mkdir(mode=0o700)
         manager = tty.PortableManager(self.state, tty.Limits(), home)
         manager.cleanup_daemon = self.dead_daemon()
         manager._record_cleanup()
@@ -165,7 +171,10 @@ class CleanupTests(unittest.TestCase):
                 self.assertTrue(tty.stop(self.state)["cleanup_verified"])
 
     def test_verified_launch_rollback_does_not_poison_profile(self):
-        home = self.state / "home"; home.mkdir()
+        # Mirror serve(): initialize the private runtime root before constructing
+        # the lower-level manager. Do not repair a pre-existing unsafe directory.
+        tty._private(tty.runtime_path(self.state))
+        home = self.state / "home"; home.mkdir(mode=0o700)
         manager = tty.PortableManager(self.state, tty.Limits(), home)
         manager.cleanup_daemon = self.dead_daemon(); manager._record_cleanup()
         self.addCleanup(manager.shutdown)
@@ -188,7 +197,10 @@ class CleanupTests(unittest.TestCase):
         self.assertTrue(manager.shutdown()["cleanup_verified"])
 
     def test_partial_launch_and_failed_rollback_remain_unverified(self):
-        home = self.state / "home"; home.mkdir()
+        # Mirror serve(): initialize the private runtime root before constructing
+        # the lower-level manager. Do not repair a pre-existing unsafe directory.
+        tty._private(tty.runtime_path(self.state))
+        home = self.state / "home"; home.mkdir(mode=0o700)
         manager = tty.PortableManager(self.state, tty.Limits(), home)
         manager.cleanup_daemon = self.dead_daemon()
         manager._record_cleanup(); self.pidfile(manager.cleanup_daemon)

@@ -17,7 +17,7 @@ from framebridge_expanded.console_ui import framebridge_console as ui
 @unittest.skipIf(os.getuid() == 0, "desktop migration requires a normal user")
 class DesktopMigrationTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
+        self.temp = tempfile.TemporaryDirectory(prefix="fbc-", dir="/tmp")
         self.addCleanup(self.temp.cleanup)
         root = Path(self.temp.name)
         self.home = root / "home"

@@ -22,6 +22,8 @@ class CandidateArchiveTests(unittest.TestCase):
         self.base.mkdir()
         self.input = self.base / "example.py"
         self.input.write_text("# candidate source\n")
+        self.policy = self.root / "identifiers.json"
+        self.policy.write_text(json.dumps(["synthetic-private-host"]))
 
     def run_archive(self, args):
         evidence = {"vendor_sha256": "a" * 64, "packages": [], "native_extensions": []}
@@ -68,13 +70,13 @@ class CandidateArchiveTests(unittest.TestCase):
     def test_public_archive_requires_matching_cp312_and_excludes_experimental_input(self):
         for args in (["--public-release"], ["--public-release", "--vendor-cp312", str(self.root), "--vendor-cp314", str(self.root)]):
             with self.assertRaises(SystemExit):
-                self.run_archive(args)
+                self.run_archive(args + ["--privacy-policy", str(self.policy)])
 
     def test_public_archive_describes_three_profiles_without_claiming_publication(self):
         vendor = self.root / "cp312"; vendor.mkdir()
         (vendor / "module.py").write_text("# reviewed cp312 input\n")
         with mock.patch.object(archive_sources, "CANDIDATE_VERSION", "0.4.0"):
-            output, warning = self.run_archive(["--public-release", "--vendor-cp312", str(vendor)])
+            output, warning = self.run_archive(["--public-release", "--vendor-cp312", str(vendor), "--privacy-policy", str(self.policy)])
         self.assertFalse(warning)
         manifest = json.loads((output.parent / "SOURCE-ARCHIVE-MANIFEST.json").read_text())
         self.assertEqual(manifest["status"], "RELEASE_SOURCE_ASSEMBLED")

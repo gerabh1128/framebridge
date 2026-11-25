@@ -1,5 +1,6 @@
 """Manual process supervision for FrameBridge Expanded; no system services."""
 from __future__ import annotations
+from .package_maintenance import guarded as _package_guard
 import argparse
 import fcntl
 import hashlib
@@ -54,6 +55,8 @@ def environment(state, config=None, prepare=False):
             env.pop(key, None)
     broker_source = PREFIX / "original/hub/FrameBridge-Broker-RC1/src"
     fleet_source = PREFIX / "original/hub/FrameBridge-Fleet-Hub/app"
+    from .viewer import profile_title
+    viewer_title = profile_title(state)
     env.update({
         "FRAMEBRIDGE_EXPANDED_STATE": str(state), "FRAMEBRIDGE_STATE_DIR": str(state),
         "FRAMEBRIDGE_EXPANDED_PREFIX": str(PREFIX),
@@ -67,7 +70,7 @@ def environment(state, config=None, prepare=False):
         "PYTHONPATH": os.pathsep.join(map(str, [PREFIX / "expanded", PREFIX / "portable",
             PREFIX / "original/hub/FrameBridge-Fleet-Hub/vendor", broker_source, fleet_source])),
         "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1",
-        "FBTERM_TITLE": "FrameBridge Expanded", "FRAMEBRIDGE_FBTERM_TITLE": "FrameBridge Expanded",
+        "FBTERM_TITLE": viewer_title, "FRAMEBRIDGE_FBTERM_TITLE": viewer_title,
     })
     from .display_context import configure
     configure(env, config.get("headless", "auto"), state)
@@ -336,6 +339,7 @@ def _signal(*_):
     global _STOP
     _STOP = True
 
+@_package_guard
 def _worker(state):
     state = state_path(state)
     config = load_config(state)
@@ -358,6 +362,7 @@ def _worker(state):
             ("fleet", [sys.executable, "-m", "framebridge_expanded.fleet"]),
             ("frontdoor", [sys.executable, str(PREFIX / "portable/front_door_mcp.py")])])
     processes = []
+    viewer_supervisor = None
     try:
         for role, command in commands:
             proc, rec = _spawn(command, env, state, role)
@@ -385,11 +390,20 @@ def _worker(state):
             raise RuntimeError("Components did not become ready before the startup deadline.")
         from .display_context import describe
         _atomic(state / "ready.json", {"ready": True, "display": env.get("DISPLAY", ""), "display_context": describe(env)})
+        # The original read-only viewer follows this profile across graphical
+        # login and window closure. UI failure must not stop execution services.
+        try:
+            from .viewer import Supervisor
+            viewer_supervisor = Supervisor(state, env).start()
+        except Exception as exc:
+            print("FBTERM_VIEWER " + json.dumps({"code": "viewer_unavailable", "error_type": type(exc).__name__}), flush=True)
         while not _STOP:
             if any(p.poll() is not None for p, _ in processes):
                 raise RuntimeError("A component stopped unexpectedly. Check this profile's component logs.")
             time.sleep(0.25)
     finally:
+        if viewer_supervisor is not None:
+            viewer_supervisor.close()
         _atomic(state / "ready.json", {"ready": False})
         try:
             from . import tty
@@ -400,6 +414,7 @@ def _worker(state):
             _terminate(proc, rec)
         subprocess.run(["tmux", "kill-server"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+@_package_guard
 def _manager(state):
     state = state_path(state)
     config = load_config(state)
@@ -466,6 +481,7 @@ def _manager(state):
         finally:
             lock.close()
 
+@_package_guard
 def start(state):
     state = state_path(state)
     config = load_config(state)

@@ -67,7 +67,10 @@ class PrivateCandidatePrermTests(unittest.TestCase):
         result = subprocess.run(["/bin/sh", str(script), "upgrade", target],
                                 capture_output=True, text=True, timeout=5)
         self.assertEqual(result.returncode, 0, result.stderr)
-        return [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
+        calls = [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
+        self.assertTrue(calls)
+        self.assertEqual(calls.pop(0), ["-I", "-S", "-"])  # new cold-upgrade gate
+        return calls
 
     def test_private_to_official_032_preserves_helper_grants(self):
         self.assertEqual(self.upgrade_target("0.3.2"), [])

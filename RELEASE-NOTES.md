@@ -1,4 +1,92 @@
+# Private candidate 0.3.9+fbterm.15
+
+Correct header visibility ownership; preserve the approved classic .14
+viewer unchanged. Default header text updates cannot toggle tmux visibility.
+Only a verified singular legacy attachment can request the legacy header.
+Separately installed legacy keepers require an explicit operator migration
+check. No automatic disabling of unrelated services or public release.
+
+# Private candidate 0.3.9+fbterm.14
+
+Classic FBTERM presentation approved in an isolated local preview: neutral
+palette, terminal-first layout, collapsible recorded history, explicit
+non-executed job labels and suppression of the redundant embedded header.
+The Original execution engine, read-only attachment and job records are
+retained. Approval of the visual prototype is not package acceptance or
+authorization to publish. Native lifecycle and signature validation remain
+separate release gates.
+
+# Private candidate 0.3.9+fbterm.10
+
+Enrollment recovery preserves the existing node identity and uses an individually approved pending request. Bounded node runtime failures apply to legacy managed services. Candidate only; no public release or deployment certification.
+
 # FrameBridge release notes
+
+## Cold package replacement — 0.3.9+fbterm.9 candidate
+
+Active-profile upgrades are deliberately refused. Package maintenance excludes cooperating runtime participants, persists until successful configuration, and does not schedule a delayed restart. Older versions require operator-enforced quiescence. See [cold package maintenance](docs/PACKAGE-MAINTENANCE.md). This remains a private candidate until native lifecycle validation and approval.
+
+
+## 0.3.9+fbterm.9 (corrective candidate)
+
+### Persistent FBTERM activity viewer
+
+The managed runtime now supervises the persistent **FrameBridge Expanded** activity viewer for both manual startup and configured autostart. The viewer is a read-only view of the original FBTERM session. It keeps the original execution pane and presents an English header with the local host, installed version, running jobs, queued jobs and unconfirmed outcomes.
+
+While the runtime is active and a validated graphical desktop is available, closing the viewer causes it to reopen. Minimizing it is respected. The supervisor does not focus an existing window or create another viewer while a matching window or client is still present. It refreshes the graphical environment after sign-in so an already-running service can attach to the available desktop.
+
+Without a validated desktop, the supervisor does not open a viewer or create a worker. An explicitly selected private virtual X11 display remains a supported separate context. If an established worker or session disappears, the viewer supervisor reports the missing runtime and waits for recovery; it does not replay a job or report a healthy session that has not been verified. Stopping the profile stops its viewer supervisor before the normal terminal cleanup.
+
+### Missing-engine requests fail before dispatch
+
+The job scheduler now checks that the original engine path exists as a readable file before preparing a worker lane or invoking the controller. This covers a stale runtime link or a missing engine after the adapter has already started. The request receives `FBTERM_ENGINE_UNAVAILABLE` with `execution_state: not_started`, instead of acquiring an uncertain outcome solely because the engine could not be invoked.
+
+The start deadline retains precedence. An identical job submission returns its existing result and does not execute again. After the dependency has been repaired, a new job ID is required for a new attempt. Failures after invocation and unverified execution receipts retain the conservative `outcome_unknown` state and reservation.
+
+### Existing migration and recovery protections
+
+The transactional role-path migration introduced in `.7` is retained. It repairs supported dangling package links, preserves displaced entries in a private journal and rejects unexpected entries or unfinished migrations. Profiles, historical queues and credentials are not reset by this migration.
+
+The local, interactive, offline reconciliation procedure introduced in `.8` is also retained. It requires exact job identity, quiescent execution locks, independent evidence and a durable review decision. It preserves the original uncertain outcome and does not permit the same job ID to be replayed. The new engine preflight does not reconstruct missing historical receipts or automatically reconcile old reservations.
+
+### Validation scope
+
+Artifact integrity and compatibility checks, source regression tests, native runtime tests and package-upgrade acceptance are recorded separately. A build for a named distribution does not by itself establish native installation, desktop, login or reboot acceptance. In particular, an extracted-profile migration test does not certify a complete `.4` to `.9` package upgrade, and CPython 3.12 artifact checks do not establish native Ubuntu 24.04 acceptance. Consult the acceptance record for the exact package hashes, tested environments and remaining gaps before promotion.
+
+## 0.3.9+fbterm.8 (private candidate)
+
+A missing original execution receipt can leave a permanent exclusive reservation.
+This candidate adds a local, interactive, offline reconciliation procedure for
+that case. It requires exact job identity, independent review of pending effects,
+quiescent scheduler and engine locks, a consistent backup, and a durable decision.
+The original state remains outcome_unknown, and the same job ID cannot be replayed.
+Changed identity/evidence invalidates the decision before further dispatch.
+The public release privacy gate and .7 layout migration are retained.
+See [the recovery procedure](docs/JOB-RECONCILIATION.md). No signed publication or
+native installation is claimed by this source revision.
+
+## 0.3.9+fbterm.7
+
+This revision retains the release privacy checks introduced in the previous
+privacy candidate and repairs the incompatible role-based runtime layout
+introduced by the prior public package. Existing profiles can retain stale
+symbolic links after an upgrade. Migration now uses a per-profile lock, verified
+directory descriptors, Linux no-replace renames and a private transaction
+journal. Unexpected entries are not overwritten. A completed rollback or
+migration retains its evidence; an unfinished journal stops preparation for
+operator review. Historical queues, profiles and credentials are not deleted.
+
+See the [layout recovery procedure](docs/LAYOUT-MIGRATION.md). Build and unit
+test success does not establish native installation, upgrade, reboot or signed
+publication acceptance.
+
+## 0.3.9+fbterm.5
+
+The public-release builders inspect the assembled source and both sections of
+each DEB before writing the finished files. The release review can also check the
+rendered website and use private, locally maintained identifiers. Findings
+identify the affected section without printing the value that triggered them.
+See [the publication checks](docs/PRIVACY-REVIEW.md#publication-checks).
 
 ## 0.3.9+fbterm.4
 

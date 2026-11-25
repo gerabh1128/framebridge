@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Modified for FrameBridge 0.3.9+fbterm.9 on 2026-11-24: English viewer banner.
+# Original FrameBridge material remains GPL-3.0-only; see the project LICENSE.
 
 umask 077
 
@@ -6,10 +8,8 @@ export HISTFILE=/dev/null
 set +o history 2>/dev/null || true
 
 printf '\n'
-printf '========================================\n'
-printf ' FrameBridge Terminal R1\n'
-printf ' PTY persistente / comandos controlados\n'
-printf '========================================\n'
+printf 'FrameBridge Expanded\n'
+printf 'Original execution output | Read-only viewer\n'
 printf '\n'
 
 # This pane displays jobs. Control records arrive over the private FIFO.

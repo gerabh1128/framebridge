@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">FrameBridge &gt;fb_</title>
+  <rect width="64" height="64" rx="10" fill="#111715"/>
+  <g fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 23 16 31 7 39" stroke="#eac27b"/>
+    <path d="M24 44V24q0-7 7-7h3M21 30h12M39 17v27m0-12q2-5 6-5 7 0 7 8t-7 8q-4 0-6-4" stroke="#f1f1e8"/>
+    <path d="M54 45h5" stroke="#eac27b"/>
+  </g>
+  <rect x="13" y="54" width="38" height="4" rx="2" fill="#8996a5"/>
+</svg>

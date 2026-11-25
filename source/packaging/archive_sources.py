@@ -9,10 +9,12 @@ import json
 import re
 from pathlib import Path
 import tarfile
+import tempfile
 import sys
 
 from build_profiles import CANDIDATE_VERSION, SOURCE_VENDOR, target_profile, validate_vendor, vendor_versions
 from release_metadata import PUBLIC_RELEASE_PROFILES, PUBLIC_RELEASE_VERSION
+from release_privacy import ReleasePrivacy, PrivacyError, external_public_policy
 
 BASE = Path(__file__).resolve().parents[1]
 ROOT = BASE.parent
@@ -39,11 +41,12 @@ The offline builder needs Python 3, dpkg/dpkg-deb and the documented host build
 prerequisites. It never fetches dependencies, installs packages or starts services.
 Extract the archive beside its matching sidecar and run from the extracted root:
 
-    python3 source/packaging/build_expanded.py --target debian13-amd64-py313 --public-release --source-manifest ../SOURCE-ARCHIVE-MANIFEST.json
-    python3 source/packaging/build_expanded.py --target ubuntu24.04-amd64-py312 --vendor-dir source/target-vendors/cp312 --public-release --source-manifest ../SOURCE-ARCHIVE-MANIFEST.json
-    python3 source/packaging/build_expanded.py --target mint22-amd64-py312 --vendor-dir source/target-vendors/cp312 --public-release --source-manifest ../SOURCE-ARCHIVE-MANIFEST.json
+    python3 source/packaging/build_expanded.py --target debian13-amd64-py313 --public-release --source-manifest ../SOURCE-ARCHIVE-MANIFEST.json --privacy-policy /path/outside/repository/private-identifiers.json
+    python3 source/packaging/build_expanded.py --target ubuntu24.04-amd64-py312 --vendor-dir source/target-vendors/cp312 --public-release --source-manifest ../SOURCE-ARCHIVE-MANIFEST.json --privacy-policy /path/outside/repository/private-identifiers.json
+    python3 source/packaging/build_expanded.py --target mint22-amd64-py312 --vendor-dir source/target-vendors/cp312 --public-release --source-manifest ../SOURCE-ARCHIVE-MANIFEST.json --privacy-policy /path/outside/repository/private-identifiers.json
 
-Public-release mode verifies the archive hash, every current project source file
+Public-release mode requires a nonempty local privacy policy outside the repository; never ship that policy.
+It verifies the archive hash, every current project source file
 and the selected reviewed vendor identity before assembling a package. It does
 not assert an independent rebuild of third-party native wheels or tunnel-client.
 --check-vendor validates inputs without staging a package.
@@ -127,7 +130,14 @@ def main(argv=None):
     parser.add_argument("--public-release", action="store_true", help="Assemble corresponding source for all three official release profiles")
     parser.add_argument("--vendor-cp312", type=Path, help="Reviewed cp312 vendor input to include")
     parser.add_argument("--vendor-cp314", type=Path, help="Reviewed cp314 vendor input to include")
+    parser.add_argument("--privacy-policy", type=Path, help="Local JSON array of private identifiers to reject")
     args = parser.parse_args(argv)
+    try:
+        if args.public_release:
+            args.privacy_policy = external_public_policy(args.privacy_policy, ROOT)
+        privacy = ReleasePrivacy(args.privacy_policy)
+    except PrivacyError as error:
+        parser.error(str(error))
     if args.public_release and not re.fullmatch(PUBLIC_RELEASE_VERSION, CANDIDATE_VERSION):
         parser.error("--public-release requires a stable project version")
     if args.public_release and (args.vendor_cp312 is None or args.vendor_cp314 is not None):
@@ -164,26 +174,30 @@ def main(argv=None):
     release = BASE / "release" / ("public-source" if args.public_release else "candidate-source")
     release.mkdir(parents=True, exist_ok=True)
     output = release / ARCHIVE_NAME
-    with output.open("wb") as raw:
-        with gzip.GzipFile(filename="", mode="wb", fileobj=raw,
-                           mtime=EPOCH, compresslevel=6) as zipped:
-            with tarfile.open(fileobj=zipped, mode="w", format=tarfile.GNU_FORMAT) as archive:
-                for relative, data in sorted(generated.items()):
-                    info = tarfile.TarInfo(ARCHIVE_ROOT + "/" + relative)
-                    info.uid = info.gid = 0
-                    info.uname = info.gname = ""
-                    info.mtime = EPOCH
-                    info.mode = 0o644
-                    info.size = len(data)
-                    archive.addfile(info, io.BytesIO(data))
-                for relative, path in sorted(names.items()):
-                    info = archive.gettarinfo(str(path), arcname=ARCHIVE_ROOT + "/" + relative)
-                    info.uid = info.gid = 0
-                    info.uname = info.gname = ""
-                    info.mtime = EPOCH
-                    info.mode = 0o755 if path.stat().st_mode & 0o111 else 0o644
-                    with path.open("rb") as stream:
-                        archive.addfile(info, stream)
+    with tempfile.TemporaryDirectory(prefix=".source-build-", dir=release) as temporary:
+        staged = Path(temporary) / ARCHIVE_NAME
+        with staged.open("wb") as raw, gzip.GzipFile(
+            filename="", mode="wb", fileobj=raw, mtime=EPOCH, compresslevel=6
+        ) as zipped, tarfile.open(fileobj=zipped, mode="w", format=tarfile.GNU_FORMAT) as archive:
+            for relative, data in sorted(generated.items()):
+                info = tarfile.TarInfo(ARCHIVE_ROOT + "/" + relative)
+                info.uid = info.gid = 0
+                info.uname = info.gname = ""
+                info.mtime = EPOCH
+                info.mode = 0o644
+                info.size = len(data)
+                archive.addfile(info, io.BytesIO(data))
+            for relative, path in sorted(names.items()):
+                info = archive.gettarinfo(str(path), arcname=ARCHIVE_ROOT + "/" + relative)
+                info.uid = info.gid = 0
+                info.uname = info.gname = ""
+                info.mtime = EPOCH
+                info.mode = 0o755 if path.stat().st_mode & 0o111 else 0o644
+                with path.open("rb") as stream:
+                    archive.addfile(info, stream)
+        if args.public_release or args.privacy_policy is not None:
+            privacy.source(staged)
+        staged.replace(output)
     manifest = {"status": "RELEASE_SOURCE_ASSEMBLED" if args.public_release else "COMPATIBILITY_CANDIDATE_BUILD", "version": CANDIDATE_VERSION, "vendor_inputs": provenance, "archive": output.name,
                 "bytes": output.stat().st_size, "sha256": sha(output),
                 "files": [{"path": name, "sha256": hashlib.sha256(data).hexdigest(), "generated": True}

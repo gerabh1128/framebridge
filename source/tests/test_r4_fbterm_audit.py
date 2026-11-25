@@ -100,7 +100,7 @@ class AuditTests(unittest.TestCase):
 
     def test_permission_or_io_failure_remains_fail_closed(self):
         with patch.object(os, 'scandir', side_effect=OSError('io')):
-            with self.assertRaisesRegex(CAND.FBTermError, 'no se pudo auditar jobs previos'):
+            with self.assertRaisesRegex(CAND.FBTermError, 'could not audit previous jobs'):
                 NEW_AUDIT(self.term)
 
     def test_scandir_is_closed_when_iteration_fails(self):

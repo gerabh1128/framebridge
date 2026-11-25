@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Modified for FrameBridge 0.3.5 on 2026-10-31:
 # select the validated graphical session for the read-only FBTERM viewer.
+# Modified for FrameBridge 0.3.9+fbterm.9 on 2026-11-24:
+# share viewer ownership with the profile supervisor and show English status.
 # Original FrameBridge material remains GPL-3.0-only; see the project LICENSE.
 
 import errno
@@ -113,7 +115,14 @@ class FBTerm:
             return None
 
     def _set_viewer_header(self):
-        """Place the release identity in the original viewer's pane border."""
+        """Present the native English viewer header when Expanded owns it."""
+        if os.environ.get("FRAMEBRIDGE_EXPANDED_STATE"):
+            try:
+                from framebridge_expanded.viewer import configure_header
+                configure_header(self.root, self.session, os.environ.copy())
+            except Exception:
+                pass
+            return
         try:
             from framebridge_expanded import __version__
         except ImportError:
@@ -166,7 +175,7 @@ class FBTerm:
 
             if p.returncode != 0:
                 raise FBTermError(
-                    "tmux new-session fallo: " + p.stderr.strip()
+                    "tmux new-session failed: " + p.stderr.strip()
                 )
 
             subprocess.run(
@@ -220,6 +229,16 @@ class FBTerm:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
+
+        if visible and os.environ.get("FRAMEBRIDGE_EXPANDED_STATE"):
+            try:
+                from framebridge_expanded.viewer import open_existing
+                open_existing(self.root, self.session, os.environ.copy())
+            except Exception:
+                # The runtime retries viewer prerequisites independently. Jobs
+                # keep the Original execution/receipt semantics on UI failure.
+                pass
+            return self.status()
 
         viewer_env = self._viewer_environment() if visible else None
         if viewer_env is not None and not self.visible_window(viewer_env):
@@ -511,7 +530,7 @@ class FBTerm:
                                 incomplete_jobs.append(prior.name)
             except OSError as exc:
                 raise FBTermError(
-                    "no se pudo auditar jobs previos: " + str(exc)
+                    "could not audit previous jobs: " + str(exc)
                 )
 
             if incomplete_jobs:
@@ -548,10 +567,10 @@ class FBTerm:
                     if self._cancel_unstarted(job):
                         raise FBTermNotStarted("FBTERM dispatch expired before start")
                     if not (job / "DONE").exists():
-                        raise FBTermOutcomeUnknown("resultado durable no aparecio")
+                        raise FBTermOutcomeUnknown("durable result did not appear")
                 lines = (job / "result.env").read_text(encoding="utf-8").splitlines()
             except (OSError, UnicodeError) as exc:
-                raise FBTermOutcomeUnknown("no se pudo verificar el resultado durable") from exc
+                raise FBTermOutcomeUnknown("could not verify the durable result") from exc
 
             expected_command_sha = hashlib.sha256(command.encode("utf-8")).hexdigest()
 
@@ -599,7 +618,7 @@ def file_text(path):
     )
 
 
-if __name__ == "__main__":
+def _main():
     import json
     import sys
 
@@ -649,3 +668,16 @@ if __name__ == "__main__":
 
     else:
         raise SystemExit(64)
+
+
+if __name__ == "__main__":
+    from contextlib import nullcontext
+    import sys
+    prefix = Path("/usr/lib/framebridge-expanded")
+    guard = nullcontext()
+    if Path(__file__).resolve().is_relative_to(prefix):
+        sys.path.insert(0, str(prefix / "expanded"))
+        from framebridge_expanded.package_maintenance import runtime_guard
+        guard = runtime_guard(prefix)
+    with guard:
+        _main()

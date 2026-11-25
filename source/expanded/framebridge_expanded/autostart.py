@@ -1,5 +1,6 @@
 """Explicit user-service startup with host-bound encrypted systemd credentials."""
 from __future__ import annotations
+from .package_maintenance import guarded as _package_guard
 import argparse
 from contextlib import contextmanager
 import fcntl
@@ -7,6 +8,7 @@ import getpass
 import hashlib
 import io
 import json
+import math
 import os
 from pathlib import Path
 import pwd
@@ -272,7 +274,11 @@ def _quote(value, *, command=False):
 def unit_text(state, encrypted, *, node=False):
     module_path = Path(__file__).resolve().parents[1]
     executable = [sys.executable, "-B", "-m", "framebridge_expanded.autostart", "_run", "--state", str(state)]
-    lines = ["# FrameBridge managed autostart v1", "[Unit]", "Description=FrameBridge profile and ChatGPT connection", "StartLimitIntervalSec=0", "ConditionPathExists=" + _quote(module_path / "framebridge_expanded/autostart.py"), "", "[Service]", "Type=simple", "UMask=0077", "LimitCORE=0", "Environment=" + _quote("PYTHONPATH=" + str(module_path)), "Environment=LANG=C.UTF-8", "Environment=LC_ALL=C.UTF-8"]
+    # A node can fail closed on a permanent broker rejection. Do not turn
+    # that terminal refusal into an unlimited systemd restart storm. Keep
+    # the existing central/standalone restart policy unchanged.
+    start_limit = ["StartLimitIntervalSec=600", "StartLimitBurst=4"] if node else ["StartLimitIntervalSec=0"]
+    lines = ["# FrameBridge managed autostart v1", "[Unit]", "Description=FrameBridge profile and ChatGPT connection", *start_limit, "ConditionPathExists=" + _quote(module_path / "framebridge_expanded/autostart.py"), "", "[Service]", "Type=simple", "UMask=0077", "LimitCORE=0", "Environment=" + _quote("PYTHONPATH=" + str(module_path)), "Environment=LANG=C.UTF-8", "Environment=LC_ALL=C.UTF-8"]
     lines += ["ExecStart=" + " ".join(_quote(x, command=True) for x in executable), "Restart=on-failure", "RestartSec=15", "TimeoutStopSec=25", "KillMode=control-group", "StandardInput=null", "StandardOutput=null", "StandardError=null", "", "[Install]", "WantedBy=default.target", ""]
     return "\n".join(lines)
 
@@ -1006,6 +1012,56 @@ def _worker_status(directory, name):
     _json(path, {"state": name, "updated_at": time.time()}, replace=True)
 
 
+def _node_failure_gate(directory, *, action="check"):
+    """Bound ordinary runtime failures even with a pre-upgrade managed unit."""
+    path = directory / "node-failure-gate.json"
+    boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    now = time.monotonic()
+    try:
+        record = json.loads(_read(path))
+    except FileNotFoundError:
+        record = {"schema": 1, "boot_id": boot, "failures": [], "blocked": False}
+    if (not isinstance(record, dict) or record.get("schema") != 1
+            or not isinstance(record.get("boot_id"), str)
+            or type(record.get("blocked")) is not bool
+            or type(record.get("failures")) is not list or len(record["failures"]) > 4
+            or any(type(t) not in (int, float) or not math.isfinite(t) or t < 0
+                   for t in record["failures"])):
+        raise RuntimeError("NODE_FAILURE_GATE_INVALID")
+    if record["boot_id"] != boot:
+        record = {"schema": 1, "boot_id": boot, "failures": [], "blocked": False}
+    if any(t > now for t in record["failures"]):
+        raise RuntimeError("NODE_FAILURE_GATE_INVALID")
+    if action == "reset":
+        record.update(failures=[], blocked=False)
+        _json(path, record, replace=True)
+    elif action == "failure" and not record["blocked"]:
+        record["failures"] = [t for t in record["failures"] if now - t < 600]
+        record["failures"].append(now)
+        record["blocked"] = len(record["failures"]) >= 4
+        _json(path, record, replace=True)
+    elif action not in ("failure", "check"):
+        raise ValueError("NODE_FAILURE_GATE_ACTION_INVALID")
+    return record["blocked"]
+
+
+def reset_node_failure_gate_for_start(directory, unit):
+    # A direct operator start may retry after diagnosing the failure.
+    # Never clear a live or automatically restarting worker's budget.
+    path = directory / "node-failure-gate.json"
+    if not path.exists() and not path.is_symlink():
+        return
+    observed = _systemctl("show", unit.name, "--property=ActiveState,MainPID", check=False)
+    if observed.returncode:
+        raise RuntimeError("NODE_FAILURE_GATE_SERVICE_UNAVAILABLE")
+    fields = dict(line.split("=", 1) for line in observed.stdout.decode().splitlines() if "=" in line)
+    if fields.get("ActiveState") in ("inactive", "failed") and fields.get("MainPID") == "0":
+        if _node_failure_gate(directory):
+            _systemctl("reset-failed", unit.name)
+            _node_failure_gate(directory, action="reset")
+
+
+@_package_guard
 def worker(state):
     global _STOP
     _STOP = False
@@ -1027,8 +1083,26 @@ def worker(state):
     attempted_connection = False
     last_revision = None
     next_connection_attempt = 0.0
+    terminal_worker_state = None
+    is_node = config["role"] == "node"
+
+    def failure_blocked(action="check"):
+        nonlocal terminal_worker_state
+        if not is_node:
+            return False
+        try:
+            if _node_failure_gate(directory, action=action):
+                terminal_worker_state = "node_restart_limit_reached"
+                return True
+        except (OSError, ValueError, RuntimeError):
+            terminal_worker_state = "node_restart_guard_unavailable"
+            return True
+        return False
+
     try:
         _clear_manual_stop(state)
+        if failure_blocked():
+            return 0
         while not _STOP:
             if manual_stop_requested(state):
                 return 0
@@ -1044,6 +1118,9 @@ def worker(state):
                 raise
             if current.get("running") and current.get("ready"):
                 break
+            if (current.get("error") and config.get("headless") not in ("no", False)
+                    and failure_blocked("failure")):
+                return 0
             _worker_status(directory, "waiting_for_graphical_login" if config.get("headless") in ("no", False) else "waiting_for_local_services")
             time.sleep(3)
         if _STOP:
@@ -1054,7 +1131,7 @@ def worker(state):
                 if manual_stop_requested(state):
                     return 0
                 if not runtime.status(state).get("running"):
-                    return 0 if manual_stop_requested(state) else 1
+                    return 0 if manual_stop_requested(state) or failure_blocked("failure") else 1
                 time.sleep(2)
             return 0
         while not _STOP:
@@ -1105,12 +1182,12 @@ def worker(state):
         return 0
     except Exception:
         _worker_status(directory, "failed")
-        return 1
+        return 0 if failure_blocked("failure") else 1
     finally:
         if connected:
             connection_background.disconnect(state)
         runtime.stop(state)
-        _worker_status(directory, "stopped")
+        _worker_status(directory, terminal_worker_state or "stopped")
         os.close(lockfd)
         for sig, handler in old.items():
             signal.signal(sig, handler)

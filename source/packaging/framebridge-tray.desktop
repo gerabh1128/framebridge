@@ -1,10 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=FrameBridge Tray
-Name[es]=Bandeja de FrameBridge
+Name=FrameBridge FBTERM
 Comment=Open FrameBridge controls from the notification area
-Comment[es]=Accede a los controles de FrameBridge desde la bandeja
-Exec=/usr/bin/framebridge-tray
+Exec=/usr/bin/framebridge-tray --show
 TryExec=/usr/bin/framebridge-tray
 Icon=framebridge-tray
 Terminal=false

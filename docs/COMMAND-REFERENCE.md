@@ -1,6 +1,6 @@
 # FrameBridge — command guide
 
-Version: 0.3.9+fbterm.4 | Guide schema: 1
+Version: 0.3.9+fbterm.15 | Guide schema: 1
 
 This reference is generated from the shared CLI/MCP guide. Use the matching installed version.
 
@@ -120,6 +120,15 @@ fb certificates --help
 fb screen-access --help
 ~~~
 
+### Single local FBTERM viewer
+
+The graphical tray opens the one persistent FBTERM window for the selected local profile. Its title is >framebridge_; the profile ID in its header distinguishes local profiles without showing their paths. The upper read-only history scrolls independently, displaying one compact JOB | STATE | EXIT line per recorded job. The lower terminal attaches to the existing Original tmux session in read-only mode; there is no extra activity window. The >fb_ mark and factual activity colours are retained in the notification area. Local start, stop and restart preserve boot policy. Stop/restart require confirmation and a fresh queue check, which is not an atomic drain. ChatGPT through the authorized administrator’s chat remains the administration interface. There is no additional login, remote host selection, enrollment dialog or credential prompt. Use fb doctor for local diagnostics. Headless execution needs no desktop. During a cold upgrade close a remaining legacy viewer of the same profile before starting the new viewer.
+
+~~~sh
+framebridge-tray --show
+fb viewer status
+~~~
+
 ### Human and structured output
 
 Use explicit commands in automation rather than the interactive no-argument menu. --json selects structured output for an agent; examine operation success, readiness and state separately. Read errors and the exit status. If human interaction is required, complete it in the normal terminal/interface rather than attempting to supply a secret through the agent. CLI JSON uses an envelope with schema_version, product, version, command, ok and result. Read runtime, connection and boot truth inside result; envelope ok denotes request success. Exit 0 means successful query/operation, not necessarily a connected transport; exit 1 reports operation/diagnostic failure, exit 2 invalid arguments or required human interaction/confirmation, and exit 130 cancellation.
@@ -181,7 +190,7 @@ fb --json status
 
 ### Current managed stack
 
-For an already configured managed profile, service start and service stop use the same current-stack boundary without changing boot enablement. Stop ends current managed work and transport but keeps profile, boot policy and saved material. Startup on the next boot follows the retained policy and intended connection state. A non-node profile without managed setup starts only local tools. Stopping a terminal service or session can interrupt its running work.
+For an already configured managed profile, service start and service stop use the same current-stack boundary without changing boot enablement. Stop ends current managed work and transport but keeps profile, boot policy and saved material. Startup on the next boot follows the retained policy and intended connection state. A non-node profile without managed setup starts only local tools. Stopping a terminal service or session can interrupt its running work. Repeated ordinary node runtime failures are bounded, including legacy managed units. Diagnose the cause before an explicit service start. A stopped node can reset its restart budget through the normal managed start command; automatic restarts cannot reset it.
 
 ~~~sh
 fb service start
@@ -237,6 +246,18 @@ Enrollment submission, central approval, node receipt of authorization and a run
 ~~~sh
 fb nodes list
 fb nodes pending
+fb nodes status
+~~~
+
+### Recover a lost central registration
+
+Use recover-enrollment only as the authenticated local profile owner after stopping the managed node, reviewing detached effects and verifying that the intended central lost this registration. Verify the UUID, public fingerprint and existing broker address against the central operator. The old standby must remain inactive. The stopped profile must have no queued, active or uncertain work. The existing trust and identity are retained. An owner-confirmed recovery can restrict the recognized owner-owned legacy node directory from 0755 to 0700 without modifying its contents. Other unexpected permissions, symbolic links and foreign owners are rejected. A validated signed pending request replaces the previous local association atomically; it does not grant authorization or start the node. The central operator must match the pending UUID and public fingerprint before approval. Poll the existing request to receive and confirm approval, then start the node. An ambiguous submission requires review; do not repeat it, delete the recovery journal, or restore an obsolete association. Only a confirmed recovery can be followed by another owner-confirmed recovery. Metadata-only recovery records preserve audit history without duplicating authorization material.
+
+~~~sh
+fb nodes recover-enrollment --help
+fb nodes pending
+fb nodes approve --help
+fb nodes poll
 fb nodes status
 ~~~
 
@@ -396,6 +417,14 @@ Normal connection presents concise progress and a final result, then returns to 
 ~~~sh
 fb help connection
 fb help lifecycle
+~~~
+
+### Offline reconciliation of unknown jobs
+
+An unknown execution outcome retains its reservation until authentic receipt recovery or a separately authorized local review. The recovery command requires the exact job/request/digest, an offline profile, quiescent FBTERM engines, a private evidence file and explicit interactive confirmation. It retains the unknown state and forbids replay. It does not prove the original outcome. Review external effects independently; do not use it merely because a receipt is missing. No remote MCP reconciliation or noninteractive override is available.
+
+~~~sh
+fb recovery reconcile --help
 ~~~
 
 

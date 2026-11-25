@@ -275,6 +275,28 @@ def nodes_command(args, state):
         node = _module("node")
         if args.node_command == "enroll":
             result = node.enroll(args.central or config.get("broker_url", ""), args.name or config["name"], state_dir=state)
+        elif args.node_command == "recover-enrollment":
+            if args.json or args.non_interactive or not sys.stdin.isatty() or not sys.stdout.isatty():
+                return _interaction_required("fb nodes recover-enrollment")
+            if not args.state_dir:
+                raise ValueError("Choose an explicit local profile with --state-dir.")
+            def confirm_recovery(summary):
+                print("Verify that the selected central has lost this registration.")
+                print("The old central/standby must not dispatch work. Review detached effects.")
+                print("A validated new pending request replaces the local association; approval is still required.")
+                for key in ("node_id", "fingerprint", "broker", "historical_jobs"):
+                    print(key + ": " + str(summary[key]))
+                if summary["node_directory_mode_before"] != summary["node_directory_mode_after"]:
+                    print("Your legacy node directory will be restricted from 0755 to 0700.")
+                    print("Only this directory is affected; identity files and keys are unchanged.")
+                    print("The restriction is retained even if submission later fails.")
+                phrase = "RECOVER ENROLLMENT " + summary["node_id"]
+                print("Type exactly: " + phrase)
+                return input("Confirm: ") == phrase
+            result = _module("enrollment_recovery").recover_enrollment(
+                Path(args.state_dir), expected_node_id=args.node_id,
+                expected_fingerprint=args.fingerprint, expected_broker=args.central,
+                confirm=confirm_recovery)
         elif args.node_command == "status":
             result = node.status(state_dir=state)
         elif args.node_command == "poll":
@@ -656,8 +678,21 @@ def build_parser():
     enroll = ns.add_parser("enroll", help="Submit enrollment; this does not start the agent.")
     enroll.add_argument("--central")
     enroll.add_argument("--name")
+    recover_node = ns.add_parser("recover-enrollment", help="Owner-confirmed offline request for a lost central registration.")
+    recover_node.add_argument("--node-id", required=True)
+    recover_node.add_argument("--fingerprint", required=True)
+    recover_node.add_argument("--central", required=True)
     run = ns.add_parser("run", help="Advanced foreground node agent.")
     run.add_argument("--once", action="store_true", help="Process at most one polling cycle.")
+    recovery = sub.add_parser("recovery", help="Local interactive maintenance of an offline job queue.")
+    reconcile = recovery.add_subparsers(dest="recovery_command", required=True).add_parser(
+        "reconcile", help="Retain an unknown outcome; release only its reviewed reservation.")
+    reconcile.add_argument("--job-id", required=True)
+    reconcile.add_argument("--request-id", required=True)
+    reconcile.add_argument("--command-sha256", required=True)
+    reconcile.add_argument("--evidence-file", required=True)
+    viewer = sub.add_parser("viewer", help="Manage automatic opening of the Original read-only FBTERM viewer.")
+    viewer.add_argument("viewer_action", choices=("status", "pause", "resume"))
     console = sub.add_parser("console", help="Open or reattach the shared text Bash/FBTERM work view.")
     console.add_argument("--node", default="LOCAL", help="Local alias; remote interactive attachment requires explicit SSH.")
     console.add_argument("--mode", choices=("auto", "gui", "tty"), default="auto")
@@ -890,6 +925,33 @@ def _dispatch(parser, args):
             if args.json and args.node_command == "run" and not args.once:
                 return _interaction_required("fb nodes run")
             return nodes_command(args, state)
+        if args.command == "viewer":
+            try:
+                value = _module("viewer").pause_control(state, args.viewer_action)
+                if args.viewer_action == "status":
+                    value.update(_module("viewer").observe_window(state))
+            except _module("viewer").Waiting as exc:
+                value = {"ok": False, "error": str(exc)}
+            _show(value)
+            return _result_code(value)
+        if args.command == "recovery":
+            if args.json or args.non_interactive or not sys.stdin.isatty() or not sys.stdout.isatty():
+                return _interaction_required("fb recovery reconcile")
+            if not args.state_dir:
+                raise ValueError("Choose an explicit local profile with --state-dir.")
+            def confirm_release(summary):
+                print("The original result remains UNKNOWN. No retry is authorized.")
+                print("Review detached processes and external effects before confirming.")
+                for key in ("job_id", "request_id", "command_sha256", "evidence_sha256", "review_reference"):
+                    print(key + ": " + summary[key])
+                phrase = "RELEASE UNKNOWN " + summary["job_id"]
+                print("Type exactly: " + phrase)
+                return input("Confirm: ") == phrase
+            result = _module("job_reconciliation").reconcile_offline(
+                state, job_id=args.job_id, request=args.request_id, digest=args.command_sha256,
+                evidence_path=Path(args.evidence_file), confirm=confirm_release)
+            _show(result)
+            return _result_code(result)
         if args.command == "console":
             if getattr(args, "console_desktop_action", None):
                 if args.node != "LOCAL" or args.status or args.login_action:

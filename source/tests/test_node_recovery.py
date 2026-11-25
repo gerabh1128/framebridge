@@ -235,7 +235,7 @@ class NodeRecoveryTests(unittest.TestCase):
 
     def test_auth_and_invalid_json_fail_without_retry(self):
         state, _ = self.pair("reject-node")
-        for code, body in [(403, b'{"ok":false}'), (500, b'{"ok":false}'),
+        for code, body in [(401, b'{"ok":false}'), (403, b'{"ok":false}'), (500, b'{"ok":false}'),
                            (200, b'not-json'), (200, b'{"ok":false}')]:
             with self.subTest(code=code, body=body):
                 attempts = []

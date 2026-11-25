@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set +e
 umask 077
-CFG="/home/framebridge/FrameBridge-MCP-Private/config.env"
+# Resolve the actual service account's home; never assume a laboratory path.
+ACCOUNT_HOME="$(getent passwd "$(id -u)" | cut -d: -f6)"
+case "$ACCOUNT_HOME" in
+  /*) ;;
+  *) exit 20 ;;
+esac
+CFG="$ACCOUNT_HOME/FrameBridge-MCP-Private/config.env"
 HEALTH_FILE="/run/framebridge-mcp-private/health.url"
 CRED_ID="framebridge-control-plane-api-key"
 [ -r "$CFG" ] || exit 20

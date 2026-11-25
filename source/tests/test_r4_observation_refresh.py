@@ -194,7 +194,15 @@ class ObservationRegression(unittest.TestCase):
     def test_worker_authority_and_input_guard_sources_unchanged(self):
         import hashlib
         guards = json.loads((FIXTURES / 'STRUCTURAL-GUARDS.json').read_text())
+        # Preserve the frozen R4 observation fixture. The separately accepted
+        # .10 restart-limit revision intentionally changed autostart.py.
+        # Its exact released bytes remain pinned; this is not a dynamic digest.
+        approved_autostart = '0be24a9d6206d2461eaeff6ebb30285be6ad576368d90fd9318ccc2eea80d228'
+        self.assertEqual(guards['unchanged_helpers']['autostart.py'],
+                         '6416954bcf206e63d1c8ed4ec96086ba85cdebf2fd1676cbf6d50769c9dccfc1')
         for name, expected in guards['unchanged_helpers'].items():
+            if name == 'autostart.py':
+                expected = approved_autostart
             self.assertEqual(hashlib.sha256((PACKAGE_ROOT / name).read_bytes()).hexdigest(), expected)
         # Only the chunk reader and its new bound changed. Keep a guard on all
         # capture provenance, permissions and input-binding helpers in this module.

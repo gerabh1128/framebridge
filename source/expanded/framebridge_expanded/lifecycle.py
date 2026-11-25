@@ -79,6 +79,8 @@ def service_start(state):
             result = runtime.start(state)
             return {"ok": bool(result.get("running") and result.get("ready")), "state": "started" if result.get("running") and result.get("ready") else "not_ready",
                     "scope": "local_tools", "boot_policy_changed": False, "runtime": result}
+        if record.get("node") is True:
+            autostart.reset_node_failure_gate_for_start(directory, unit)
         autostart._clear_manual_stop(state)
         autostart._systemctl("start", unit.name)
         return {"ok": True, "state": "start_requested", "scope": "managed_stack", "boot_policy_changed": False, "status": status(state)}

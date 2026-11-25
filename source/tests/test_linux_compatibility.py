@@ -83,7 +83,9 @@ class LinuxCompatibilityTests(unittest.TestCase):
                 output = io.StringIO()
                 globals_before = {name: getattr(build_expanded, name) for name in
                                   ("VERSION", "PUBLIC_RELEASE", "SOURCE_ARCHIVE", "PUBLIC_FILENAME", "RELEASE", "STAGE", "PREFIX")}
-                args = ["--target", profile_id, "--public-release", "--source-manifest", str(self.prefix / "source.json"), "--check-vendor"]
+                policy = self.prefix / "synthetic-policy.json"
+                policy.write_text(json.dumps(["synthetic-private-host"]))
+                args = ["--target", profile_id, "--public-release", "--source-manifest", str(self.prefix / "source.json"), "--check-vendor", "--privacy-policy", str(policy)]
                 if profile_id != "debian13-amd64-py313":
                     args += ["--vendor-dir", str(self.prefix / "reviewed-cp312")]
                 with patch.multiple(build_expanded, **globals_before), \

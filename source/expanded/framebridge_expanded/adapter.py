@@ -1,5 +1,6 @@
 """Original same-UID adapter with context checks at CUA dispatch."""
 from __future__ import annotations
+from .package_maintenance import guarded as _package_guard
 import importlib.util
 import base64
 import hashlib
@@ -120,6 +121,7 @@ def install_start_deadline_guard(adapter, *, jobs=False):
 
     adapter.handle = handle
 
+@_package_guard
 def main(argv=None):
     if list(sys.argv[1:] if argv is None else argv) != ["serve"]:
         raise SystemExit("Usage: python3 -m framebridge_expanded.adapter serve")

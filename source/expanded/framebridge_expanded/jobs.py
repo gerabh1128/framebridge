@@ -12,6 +12,8 @@ import time
 from contextlib import closing
 from pathlib import Path
 
+from . import job_reconciliation as reconciliation
+
 ID = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,79}")
 RESOURCE = re.compile(r"(read|write):([A-Za-z0-9][A-Za-z0-9_.:/-]{0,95})")
 OPEN = ("queued", "in_flight", "outcome_unknown")
@@ -77,6 +79,7 @@ class JobQueue:
                 CREATE INDEX IF NOT EXISTS jobs_active ON jobs(state,created);
                 CREATE INDEX IF NOT EXISTS jobs_session ON jobs(session,created);
             """)
+            db.execute(reconciliation.SCHEMA)
             # A previous command may still have effects. Never redispatch its claim.
             db.execute("UPDATE jobs SET state='outcome_unknown', script=NULL WHERE state='in_flight'")
         self.workers = [threading.Thread(target=self.work, daemon=True,
@@ -87,6 +90,7 @@ class JobQueue:
     def connect(self):
         db = sqlite3.connect(self.db, timeout=10)
         db.row_factory = sqlite3.Row
+        reconciliation.install_sql_guards(db, self.root.parent)
         return db
 
     def close(self):
@@ -155,10 +159,16 @@ class JobQueue:
 
     def waiting_receipt(self, db, row, *, private=False):
         result = self.receipt(row, private=private)
+        if row["state"] == "outcome_unknown":
+            result["ok"] = False
+            result["resource_reservation"] = (
+                "released_after_review" if reconciliation.released(db, row["id"]) else "held")
+            result["do_not_replay"] = True
         if row["state"] == "queued":
-            active = db.execute("""SELECT id,resources,state FROM jobs WHERE state IN ('in_flight','outcome_unknown')
-                                OR (state='queued' AND rowid < (SELECT rowid FROM jobs WHERE id=?))
-                                ORDER BY created,rowid""", (row["id"],)).fetchall()
+            active = db.execute(f"""SELECT j.id,j.resources,j.state FROM jobs AS j
+                                WHERE (j.state IN ('in_flight','outcome_unknown') AND {reconciliation.HELD})
+                                OR (j.state='queued' AND j.rowid < (SELECT rowid FROM jobs WHERE id=?))
+                                ORDER BY j.created,j.rowid""", (row["id"],)).fetchall()
             held = [r for r in active if r["state"] != "queued"]
             blocker = next((r["id"] for r in active if conflict(result["resources"], json.loads(r["resources"]))), None)
             if not blocker and len(held) >= self.slots:
@@ -177,9 +187,9 @@ class JobQueue:
     def recent(self, session=""):
         with closing(self.connect()) as db:
             if session:
-                rows = db.execute(f"SELECT {META_COLUMNS} FROM jobs WHERE session=? ORDER BY (state IN ('queued','in_flight','outcome_unknown')) DESC, created DESC LIMIT 100", (session,))
+                rows = db.execute(f"SELECT {META_COLUMNS} FROM jobs AS j WHERE session=? ORDER BY (state IN ('queued','in_flight','outcome_unknown') AND {reconciliation.HELD}) DESC, created DESC LIMIT 100", (session,))
             else:
-                rows = db.execute(f"SELECT {META_COLUMNS} FROM jobs ORDER BY (state IN ('queued','in_flight','outcome_unknown')) DESC, created DESC LIMIT 100")
+                rows = db.execute(f"SELECT {META_COLUMNS} FROM jobs AS j ORDER BY (state IN ('queued','in_flight','outcome_unknown') AND {reconciliation.HELD}) DESC, created DESC LIMIT 100")
             return [self.waiting_receipt(db, row) for row in rows]
 
     def wait(self, job):
@@ -195,8 +205,11 @@ class JobQueue:
         with closing(self.connect()) as db, db:
             db.execute("""UPDATE jobs SET state='expired_before_start',finished=?,script=NULL,
                        blocker=NULL WHERE state='queued' AND deadline<=?""", (now, now))
-            rows = db.execute(f"""SELECT {META_COLUMNS} FROM jobs WHERE state IN ('queued','in_flight','outcome_unknown')
-                              ORDER BY created,rowid""").fetchall()
+            reconciliation.invalidate_changed_decisions(db, now)
+            rows = db.execute(f"""SELECT {META_COLUMNS} FROM jobs AS j
+                              WHERE j.state IN ('queued','in_flight','outcome_unknown')
+                              AND {reconciliation.HELD}
+                              ORDER BY j.created,j.rowid""").fetchall()
             if self.recover:
                 for row in rows:
                     if row["state"] == "outcome_unknown":
@@ -270,6 +283,18 @@ def install(adapter):
 
     def execute(row, slot):
         directory = lane(slot)
+        if time.time() >= row["deadline"]:
+            return failure("REQUEST_EXPIRED", row["id"], "expired_before_start")
+        # A profile link may become stale after the adapter has started. Check
+        # before invoking the original controller or preparing slot links: no
+        # user command has been dispatched, so this is known to be not_started.
+        # Failures after invocation retain the original fail-closed semantics.
+        try:
+            engine_ready = adapter.ENGINE.is_file() and os.access(adapter.ENGINE, os.R_OK)
+        except OSError:
+            engine_ready = False
+        if not engine_ready:
+            return failure("FBTERM_ENGINE_UNAVAILABLE", row["id"])
         if slot:
             # Old jobs predate resource declarations. Preserve the original
             # fail-closed policy across migration, including unresolved records.

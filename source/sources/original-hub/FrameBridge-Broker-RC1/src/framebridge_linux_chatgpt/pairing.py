@@ -5,6 +5,7 @@ import ipaddress
 import json
 import fcntl
 import os
+import stat
 import secrets
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -337,6 +338,35 @@ class PairingStore:
                 raise PairingError("PAIR_ALREADY_PAIRED")
             if current.get("state") == "pair_requested":
                 raise PairingError("PAIR_REQUEST_ALREADY_PENDING")
+            self._save_unlocked(pending)
+            return public_pairing_view(pending)
+
+    def begin_recovery(self, pending: dict[str, Any], expected_current_sha256: str) -> dict[str, Any]:
+        """Atomically replace a reviewed old association with a validated pending request.
+        
+        This is not a receipt and grants no authorization. The ordinary begin()
+        continues to reject an already paired store.
+        """
+        with self._exclusive():
+            fd = os.open(self.path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+            with os.fdopen(fd, "rb") as stream:
+                info = os.fstat(stream.fileno())
+                if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                        or info.st_nlink != 1 or info.st_mode & 0o077
+                        or info.st_size > 131072):
+                    raise PairingError("RECOVERY_OLD_ASSOCIATION_UNSAFE")
+                raw = stream.read(131073)
+            if hashlib.sha256(raw).hexdigest() != expected_current_sha256:
+                raise PairingError("RECOVERY_OLD_ASSOCIATION_CHANGED")
+            current = json.loads(raw)
+            if (current.get("state") != "paired"
+                    or current.get("broker_confirm_required") is True
+                    or pending.get("state") != "pair_requested"
+                    or any(not current.get(key) or current.get(key) != pending.get(key)
+                           for key in ("node_id", "node_label", "node_host_id", "broker_base_url"))
+                    or not pending.get("pair_id")
+                    or pending["pair_id"] == current.get("pair_id")):
+                raise PairingError("RECOVERY_ASSOCIATION_BINDING_MISMATCH")
             self._save_unlocked(pending)
             return public_pairing_view(pending)
 

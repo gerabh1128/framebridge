@@ -10,7 +10,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packaging"))
-from build_expanded import INSTALLATION, bytecode_cleanup_source, maintainer_postinst
+from build_expanded import INSTALLATION, bytecode_cleanup_source, maintainer_postinst, maintenance_hook
 
 
 class PackageBytecodeTests(unittest.TestCase):
@@ -126,7 +126,7 @@ class PackageBytecodeTests(unittest.TestCase):
         self.assertIn("BYTECODE_DIRECTORY_UNTRUSTED", result.stderr)
         self.assertTrue(self.cache.exists())
 
-    def hook(self, prefix):
+    def hook(self, prefix, *, begin_fail=False, configure_fail=False):
         trace = self.root / "schedule.json"
         stub = self.root / "schedule-stub"
         stub.write_text(
@@ -140,13 +140,17 @@ class PackageBytecodeTests(unittest.TestCase):
         stub.chmod(0o755)
         script = maintainer_postinst().replace(bytecode_cleanup_source(),
                                               bytecode_cleanup_source(prefix))
-        script = script.replace(INSTALLATION, ":")
-        script = script.replace(
-            "/usr/bin/python3 -I -S /usr/lib/framebridge-expanded/expanded/framebridge_expanded/package_upgrade.py schedule",
-            shlex.quote(str(stub)))
+        marker = self.root / "maintenance-state"
+        begin = "printf '%s' MAINTENANCE > " + shlex.quote(str(marker)) + "\n"
+        if begin_fail:
+            begin = "false\n"
+        finish = shlex.quote(str(stub)) + "\nprintf '%s' READY > " + shlex.quote(str(marker)) + "\n"
+        script = script.replace(INSTALLATION, "false" if configure_fail else ":")
+        script = script.replace(maintenance_hook("begin"), begin)
+        script = script.replace(maintenance_hook("finish"), finish)
         return script, trace
 
-    def test_configure_invalidates_before_importing_upgrade_scheduler(self):
+    def test_configure_invalidates_before_finishing_maintenance(self):
         self.replace_source_with_same_size_and_time()
         self.assertEqual(self.interpreter_version(), "0.3.4")
         script, trace = self.hook(self.prefix)
@@ -154,8 +158,9 @@ class PackageBytecodeTests(unittest.TestCase):
                                 input=script, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(trace.read_text()), {"version": "0.3.5"})
+        self.assertEqual((self.root / "maintenance-state").read_text(), "READY")
 
-    def test_cleanup_failure_prevents_importing_upgrade_scheduler(self):
+    def test_cleanup_failure_prevents_finishing_maintenance(self):
         link = self.root / "prefix-link"
         link.symlink_to(self.prefix, target_is_directory=True)
         script, trace = self.hook(link)
@@ -163,8 +168,9 @@ class PackageBytecodeTests(unittest.TestCase):
                                 input=script, capture_output=True, text=True, timeout=10)
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(trace.exists())
+        self.assertEqual((self.root / "maintenance-state").read_text(), "MAINTENANCE")
 
-    def test_non_configure_actions_neither_cleanup_nor_schedule(self):
+    def test_non_configure_actions_neither_cleanup_nor_open_gate(self):
         script, trace = self.hook(self.prefix)
         for action in ("abort-upgrade", "abort-remove", "triggered"):
             with self.subTest(action=action):
@@ -173,6 +179,22 @@ class PackageBytecodeTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertTrue(self.cache.exists())
                 self.assertFalse(trace.exists())
+
+    def test_busy_begin_prevents_any_package_bytecode_change(self):
+        script, trace = self.hook(self.prefix, begin_fail=True)
+        result = subprocess.run(["/bin/sh", "-s", "--", "configure", "0.3.4"],
+                                input=script, capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(self.cache.exists())
+        self.assertFalse(trace.exists())
+
+    def test_configure_failure_keeps_maintenance_closed(self):
+        script, trace = self.hook(self.prefix, configure_fail=True)
+        result = subprocess.run(["/bin/sh", "-s", "--", "configure", "0.3.4"],
+                                input=script, capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(trace.exists())
+        self.assertEqual((self.root / "maintenance-state").read_text(), "MAINTENANCE")
 
     def test_no_root_or_relative_prefix_is_accepted(self):
         for prefix in ("/", "relative/path", "/usr/lib/../elsewhere"):

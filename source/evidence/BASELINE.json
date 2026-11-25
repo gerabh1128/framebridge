@@ -4,7 +4,7 @@
   "source_file_count": 983,
   "source_hashes": {
     "original-workstation/SOURCE-MANIFEST.json": "750881b2eb355241911fe3af973f36e243f4a76ffbd114dd5c0214ec431e2450",
-    "original-hub/MANIFEST.json": "3a49fcd821b329fa0f4b4b099bc483482439da847425329839c3e00068f87b50",
+    "original-hub/MANIFEST.json": "ae7870032ff581f159a52b30a45f6d658271924835b1cb397867948c7bcdddcd",
     "original-hub/FrameBridge-Broker-RC1/dev/fbpair_dev_broker.py": "4f75f78d40228db8fa1b23768f8b3660bfd25669e8198ebb4d7afbcb500c1c75",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/classic_tty.py": "f195566a43eaefd329080c12f4095cdbfa49f8548cbd6afeb5fd83c70ae832f6",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/network_security.py": "3ee930c6ff4d7ffdbe7157b1f5c960e2f0a55e4f163b2142a4cb939b8593fd19",
@@ -18,19 +18,19 @@
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/network_lifecycle.py": "7ce7f2ec4af8a1527b3e4c4265f792ab9f4c19e2d3d8d5a5408caf95008a7ac1",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/seed_core.py": "038e6f1f2183acf572e75eaba4e3c639dccecddcebed38521fe6bf5301245bea",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/plan_engine.py": "a23c40066d025a6f5d360fa65c2e8e5f21773a425ee5d5513361fa1025c7fb0b",
-    "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/pairing_client.py": "21ba5e2c594919dfc326361a7b5a227273b78bb05b47a800c0206a3bc4edfb4b",
+    "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/pairing_client.py": "057b7aabeead740669fc8aa8bfc057c4ea9ea43ef0f01c9c010a2e5567a6cbe7",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/outbound_agent.py": "05732b60cb77684867f065203f27448dc9d95cbd2fb6c3cec8bc4a70f97daf70",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/seed_cli.py": "41f1877a50d25f46f4a70496fc7edd8a750e9c9e3c71a5a51dbf3100b0c3b68b",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/seed_capabilities.py": "d1ef2a59ecd30447fb666ce359681ea0896f9d7a4b9aeba5b2e7e00163845d24",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/node_identity.py": "dbc712dfbbebd540d9e9c138ff9fcf5661f4c9c9ad7fd6bf31dc16135360d35f",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/priv_helper.py": "4be811b4a3b54d9dc4361ab7783c91547faeedc265c5a801729d3d0cbdaf2638",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/memory_store.py": "c6967bb40014db050ba93457d0d9c4b007d70c077fb3c3bed4eacf057fa138dd",
-    "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/pairing.py": "72d5acf12771ef63ca7c901cb6000a40ad3c11c26d186de23e5d0713a21bdf13",
+    "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/pairing.py": "9604cfbf30d7e34ea6df1532b576f473d9481441138487879f401835b01b5828",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/pairing_window.py": "201152a71337d3935af74398e092221c40bf915e79e05186cf1d2a93858f665e",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/first_run.py": "654197d18d339b7bfca269131f6cdeaea47ae8e37c7c7627c64bd9717742f22b",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/vendor/__init__.py": "3d59115f22e975989afff8452a43f5346df435d7775c6521b38461922b7b6e0f",
     "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/vendor/qrcodegen.py": "9f4ed1dd201dcb92b1bc0d6e14f46c754bcff0ce48580c5d7e8ace8f6926c8ef",
-    "original-hub/FrameBridge-MCP-Private/bin/framebridge-mcp-private-run": "61fc24212d60599589b451e6babe6aad81c8f5f0401e4b168409df6bc3d72f68",
+    "original-hub/FrameBridge-MCP-Private/bin/framebridge-mcp-private-run": "b65e131c1ccbac870f137e3338029d5cd7bdb0faf3755322d16ab6d8666b619a",
     "original-hub/FrameBridge-MCP-Private/bin/tunnel-client": "472eb9dd9dd625b4e6023c3b4a5736b3a2e5a1b6dbe9338e001887a64ec992a6",
     "original-hub/FrameBridge-Front-Door/bin/front_door_mcp.py": "799158b5550c3c070ced075e4b4b2feeeb01fac0e58bf4d214f275f6c3d1b7c8",
     "original-hub/FrameBridge-Front-Door/bin/terminal_node_cua_frontdoor.py": "d0451a72e719f0597e4f1c5d33b6d1165ea2e5363cf45153ad11280dfa84337d",
@@ -973,11 +973,11 @@
     "original-hub/.local/share/framebridge/tool-adapter/bin/framebridge_tool_adapter.py": "609657517fa0077b5ee425bb0a114e0bc65d0d790a1db13744a0186613d059d8",
     "original-workstation/tool-adapter/bin/framebridge_tool_client.py": "1d1514f08653c31f6b67ebcdcf61686947321bec96752a692b7e46cee6285f6e",
     "original-workstation/tool-adapter/bin/framebridge_tool_adapter.py": "62c433ee2ff41a6e3f06457fb2ce45ef0a15036b32651106e28cbc35935a3dae",
-    "original-workstation/fbterm/bin/fbterm_engine.py": "52681c04b0b9694af7eaa8d7962183e231c625b6fdcb83670e3889f3229dab8f",
+    "original-workstation/fbterm/bin/fbterm_engine.py": "37385bd861fddb5d2ea863bc26dd9cd1c8c2eab4df7dcf7da194cbd41bb832ce",
     "original-workstation/fbterm/bin/fbx": "84589ad19ea0eab7cfc766ef4dba736be05c509c3918f572f4054585ee4c5efb",
     "original-workstation/fbterm/bin/fbterm-run": "c9d42c5448cf53337bf82732875af310e4cb78febfe0eb6b475ef2381fe97acc",
     "original-workstation/fbterm/bin/fbterm-prompt-ready": "276f657e23ff26c75f5e430731fdf5b095d777eabcbaad86e11c69b0919c691c",
-    "original-workstation/fbterm/bin/fbterm-shell": "0a6df860feecd6b1462caf306881e022eb934b36e9c408ccf4aedd3e0c6fbe48",
+    "original-workstation/fbterm/bin/fbterm-shell": "43e1e3b861f2c7303369a38a9913aabaa01d53d3a588b9c7c0b270ecd7a99e1d",
     "original-workstation/framebridge-native/host/open-progress-console.sh": "adc359d9468dfd4cc5372a2e133b8f0e1555c13a457204b40a04288dc363ec90",
     "original-workstation/framebridge-native/host/framebridge_host.py": "84fc26baca02eecdf7bc6ae043da2e2f31f86af1d16d2491bfa67b59e8b11b44",
     "original-workstation/framebridge-native/host/open-terminal.sh": "facaea7a5ca6635311a4c05e18edecdec98a137ce552fce39bdbc0ee755aa34c",
@@ -1106,6 +1106,68 @@
       "previous_sha256": "921cfbb2751e9ef9c7f671248ec8e559edab0bd6c743d5ce7bcd4b075ce22808",
       "reviewed_sha256": "8f274697039946b3d648acd1fbb4f261c35bc3dc41bd594acb7697bf8be55e74",
       "reason": "Verify and deliver bounded captured output in the producing adapter."
+    },
+    {
+      "version": "0.3.9+fbterm.7",
+      "date": "2026-11-23",
+      "path": "original-hub/FrameBridge-MCP-Private/bin/framebridge-mcp-private-run",
+      "previous_sha256": "61fc24212d60599589b451e6babe6aad81c8f5f0401e4b168409df6bc3d72f68",
+      "reviewed_sha256": "b65e131c1ccbac870f137e3338029d5cd7bdb0faf3755322d16ab6d8666b619a",
+      "reason": "Resolve the service account home rather than embedding an installation-specific path."
+    },
+    {
+      "version": "0.3.9+fbterm.7",
+      "date": "2026-11-23",
+      "path": "original-hub/MANIFEST.json",
+      "previous_sha256": "3a49fcd821b329fa0f4b4b099bc483482439da847425329839c3e00068f87b50",
+      "reviewed_sha256": "ae7870032ff581f159a52b30a45f6d658271924835b1cb397867948c7bcdddcd",
+      "reason": "Refresh the active hub manifest after the reviewed service account path correction; historical source snapshots remain unchanged."
+    },
+    {
+      "version": "0.3.9+fbterm.9",
+      "date": "2026-11-23",
+      "path": "original-workstation/fbterm/bin/fbterm_engine.py",
+      "previous_sha256": "52681c04b0b9694af7eaa8d7962183e231c625b6fdcb83670e3889f3229dab8f",
+      "reviewed_sha256": "bcf449899f3b2deb71fdd126d9499c819256b2c16fe73e5d1cc15b713558e478",
+      "reason": "Delegate the visual header/opening to the profile-owned persistent viewer and translate existing error literals; retain Original execution and receipt logic."
+    },
+    {
+      "version": "0.3.9+fbterm.9",
+      "date": "2026-11-23",
+      "path": "original-workstation/fbterm/bin/fbterm-shell",
+      "previous_sha256": "0a6df860feecd6b1462caf306881e022eb934b36e9c408ccf4aedd3e0c6fbe48",
+      "reviewed_sha256": "43e1e3b861f2c7303369a38a9913aabaa01d53d3a588b9c7c0b270ecd7a99e1d",
+      "reason": "Use an English professional activity-viewer banner; retain the Original serve invocation."
+    },
+    {
+      "version": "0.3.9+fbterm.9",
+      "date": "2026-11-23",
+      "path": "original-workstation/fbterm/bin/fbterm_engine.py",
+      "previous_sha256": "bcf449899f3b2deb71fdd126d9499c819256b2c16fe73e5d1cc15b713558e478",
+      "reviewed_sha256": "37385bd861fddb5d2ea863bc26dd9cd1c8c2eab4df7dcf7da194cbd41bb832ce",
+      "reason": "Hold a shared package maintenance lease during installed Original engine entrypoints; preserve execution and receipt body."
+    },
+    {
+      "version": "0.3.9+fbterm.10",
+      "date": "2026-11-24",
+      "path": "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/pairing_client.py",
+      "previous_sha256": "21ba5e2c594919dfc326361a7b5a227273b78bb05b47a800c0206a3bc4edfb4b",
+      "reviewed_sha256": "057b7aabeead740669fc8aa8bfc057c4ea9ea43ef0f01c9c010a2e5567a6cbe7",
+      "provenance": "Private candidate based on frozen .9 source and reviewed R1 patch",
+      "patch": "ENROLLMENT-RECOVERY-CANDIDATE.patch",
+      "patch_sha256": "23de923ca7893a25a0e7e27a17c577b0c36b28bd2775be3664436f78d28b6028",
+      "reason": "Validate and atomically commit a pending enrollment recovery using the original authenticated pairing protocol."
+    },
+    {
+      "version": "0.3.9+fbterm.10",
+      "date": "2026-11-24",
+      "path": "original-hub/FrameBridge-Broker-RC1/src/framebridge_linux_chatgpt/pairing.py",
+      "previous_sha256": "72d5acf12771ef63ca7c901cb6000a40ad3c11c26d186de23e5d0713a21bdf13",
+      "reviewed_sha256": "9604cfbf30d7e34ea6df1532b576f473d9481441138487879f401835b01b5828",
+      "provenance": "Private candidate based on frozen .9 source and reviewed R1 patch",
+      "patch": "ENROLLMENT-RECOVERY-CANDIDATE.patch",
+      "patch_sha256": "23de923ca7893a25a0e7e27a17c577b0c36b28bd2775be3664436f78d28b6028",
+      "reason": "Validate and atomically commit a pending enrollment recovery using the original authenticated pairing protocol."
     }
   ]
 }

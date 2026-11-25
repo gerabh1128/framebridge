@@ -15,6 +15,25 @@ class CatalogTests(unittest.TestCase):
     def setUp(self):
         self.meta = json.loads((BASE / "release.example.json").read_text())
 
+    def test_donation_urls_accept_public_paypal_configurations(self):
+        hosted = "https://www.paypal.com/donate/?hosted_button_id=FIXTURE"
+        shareable = ("https://www.paypal.com/donate/?business=ABC123XYZ4567"
+                     "&no_recurring=1&item_name=Support+the+project&currency_code=USD")
+        for url in (hosted, shareable):
+            self.assertEqual(catalog["paypal_donation_url"](url), url)
+
+    def test_donation_urls_reject_emails_and_redirects(self):
+        shareable = ("https://www.paypal.com/donate/?business=ABC123XYZ4567"
+                     "&no_recurring=1&item_name=Support+the+project&currency_code=USD")
+        for url in (shareable.replace("ABC123XYZ4567", "someone%40example.org"),
+                    shareable.replace("www.paypal.com", "paypal.com.example.org"),
+                    shareable + "&return=https%3A%2F%2Fexample.org",
+                    shareable + "&business=ABC123XYZ4567",
+                    shareable.replace("Support+the+project", "a%40example.org"),
+                    "https://www.paypal.com/donate/?hosted_button_id=AB#CD"):
+            with self.subTest(url=url), self.assertRaises(ValueError):
+                catalog["paypal_donation_url"](url)
+
     def ready(self):
         meta = copy.deepcopy(self.meta)
         meta.update(state="ready", signing_fingerprint=catalog["FINGERPRINT"],

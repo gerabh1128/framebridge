@@ -5,6 +5,7 @@ an installed ALPHA. _tty_backend.py preserves RealTerminalMixin with a recorded
 portability diff. The public RPC uses same-UID sockets plus authorized=True.
 """
 from __future__ import annotations
+from .package_maintenance import guarded as _package_guard
 
 import argparse
 import base64
@@ -462,6 +463,7 @@ def status(state=None):
     return request(state, {"op": "status", "authorized": True})
 
 
+@_package_guard
 def serve(state=None):
     state = _private(state_path(state))
     limits, home = _config(state)
@@ -499,6 +501,7 @@ def serve(state=None):
         pidfile.unlink(missing_ok=True)
 
 
+@_package_guard
 def start(state=None):
     state = _private(state_path(state))
     current = status(state)

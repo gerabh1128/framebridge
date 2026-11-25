@@ -124,6 +124,7 @@ def start_pairing(
     broker_base_url: str,
     allow_insecure_dev: bool=False,
     poster: Callable[..., dict[str,Any]]=post_json,
+    recovery_expected_sha256: str | None = None,
 ) -> dict[str,Any]:
     if not _broker_base_ok(broker_base_url,allow_insecure_dev):
         raise PairingClientError("PAIR_BROKER_URL_INVALID")
@@ -153,7 +154,11 @@ def start_pairing(
         request,response,allow_insecure_dev=allow_insecure_dev
     )
     pending["broker_base_url"]=str(broker_base_url).rstrip("/")
-    PairingStore(Path(state_dir)).begin(pending)
+    store = PairingStore(Path(state_dir))
+    if recovery_expected_sha256 is None:
+        store.begin(pending)
+    else:
+        store.begin_recovery(pending, recovery_expected_sha256)
     return public_pairing_view(pending)
 
 
