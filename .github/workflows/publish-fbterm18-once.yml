@@ -1,0 +1,121 @@
+name: Publish reviewed FrameBridge fbterm18
+on:
+  push:
+    branches: [publication/fbterm18-once]
+    paths: ['.github/workflows/publish-fbterm18-once.yml']
+permissions: {}
+concurrency:
+  group: framebridge-public-apt-mirror
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'gerabh1128/framebridge' && github.ref == 'refs/heads/publication/fbterm18-once'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Obtain public repository history
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Verify exact reviewed commits and signed stable mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GIT_TERMINAL_PROMPT=0
+          BASE=1612158028e6f45d114b85066db51907ed775b14
+          HEAD18=c4ecdaa2c87de8c351c17fd5d16a946033c34e2c
+          SOURCE=6229e11dcee37f9e0981b8fbb53981f851736707
+          MBASE=6d7490e169f3e2ceefdae56753be857ec24bc46f
+          MHEAD=7819ce8ce91a9a7ccf334a01e5984ff35a76b4bb
+          TAG=v0.3.9+fbterm.18
+          GITEA=https://framebridge.betancourt.one/git/gerardo/framebridge.git
+          case "$(git remote get-url origin)" in
+            https://github.com/gerabh1128/framebridge|https://github.com/gerabh1128/framebridge.git) ;;
+            *) echo 'Unexpected GitHub destination'; exit 1 ;;
+          esac
+          ref() { git ls-remote --refs origin "$1" | awk '{print $1}'; }
+          check_before() {
+            test "$(ref refs/heads/main)" = "$BASE"
+            test "$(ref refs/heads/apt-mirror)" = "$MBASE"
+            test -z "$(ref refs/heads/release/fbterm18)"
+            test -z "$(ref "refs/tags/$TAG")"
+          }
+          check_before
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main refs/heads/apt-mirror:refs/remotes/origin/apt-mirror
+          test "$(git rev-parse refs/remotes/origin/main)" = "$BASE"
+          test "$(git rev-parse refs/remotes/origin/apt-mirror)" = "$MBASE"
+          git -c http.followRedirects=false -c http.sslVerify=true fetch --no-tags "$GITEA" refs/heads/main:refs/remotes/gitea/fbterm18 "refs/tags/$TAG:refs/tags/$TAG"
+          test "$(git rev-parse refs/remotes/gitea/fbterm18)" = "$HEAD18"
+          test "$(git rev-parse "$HEAD18^{tree}")" = c1fb9a3afefde5237a1887c2533d5ee6d002e636
+          test "$(git rev-parse "refs/tags/$TAG")" = b0429cabfd8d6c9b77ab509e9fdc0234333ff518
+          test "$(git rev-parse "refs/tags/$TAG^{}")" = "$SOURCE"
+          test "$(git rev-parse "$SOURCE^{tree}")" = e2b3566a222b738cf854b0eba691ac7bec5be4a5
+          git merge-base --is-ancestor "$BASE" "$SOURCE"
+          git merge-base --is-ancestor "$SOURCE" "$HEAD18"
+          m="$RUNNER_TEMP/fb18-mirror"
+          t="$RUNNER_TEMP/fb18-reviewed"
+          mkdir "$t"
+          git worktree add --detach "$m" "$MBASE"
+          git show "$HEAD18:tools/refresh-stable-apt.py" > "$t/refresh.py"
+          git show "$HEAD18:source/packaging/portable-archive-keyring.gpg" > "$t/key.gpg"
+          test "$(git hash-object "$t/refresh.py")" = 94141921e1df0cd7cedf61ffe5d0c134f3acf2aa
+          test "$(sha256sum "$t/key.gpg" | cut -d' ' -f1)" = e969ce8e22d0068c6b855b0d188e9afed6543875acbb7ff6a6a02cd9095acf1b
+          python3 -B "$t/refresh.py" --mirror "$m" --key "$t/key.gpg"
+          git -C "$m" add -- debian/stable sources/framebridge-stable.sources README-stable.md
+          test "$(git -C "$m" write-tree)" = e2f775b19d65faf4c675f6973c8b39bdca0bd90b
+          q="$RUNNER_TEMP/fb18-apt-check"
+          mkdir -p "$q/lists/partial" "$q/cache/archives/partial" "$q/empty" "$q/download"
+          touch "$q/status"
+          printf 'deb [arch=amd64 signed-by=%s] file:%s stable main\n' "$t/key.gpg" "$m/debian/stable" > "$q/sources.list"
+          opts=(-o "Dir::Etc::sourcelist=$q/sources.list" -o "Dir::Etc::sourceparts=$q/empty" -o "Dir::State::lists=$q/lists" -o "Dir::State::status=$q/status" -o "Dir::Cache=$q/cache" -o "Dir::Cache::archives=$q/cache/archives" -o 'APT::Architecture=amd64' -o 'Debug::NoLocking=true' -o 'Acquire::Languages=none')
+          apt-get "${opts[@]}" update
+          (cd "$q/download" && apt-get "${opts[@]}" download 'framebridge-original-expanded=0.3.9+fbterm.18')
+          printf '%s  %s\n' 8d462384089417c1435074828ad29a536bac77a6824ea076b5bdfc184aae6ec4 "$q/download/"*.deb | sha256sum -c -
+          # Preserve the exact previously reviewed, unsigned Git commit object.
+          mirror_commit=$(printf '%s\n' \
+            'tree e2f775b19d65faf4c675f6973c8b39bdca0bd90b' \
+            'parent 6d7490e169f3e2ceefdae56753be857ec24bc46f' \
+            'author FrameBridge Release <350017858+gerabh1128@users.noreply.github.com> 1795650954 -0500' \
+            'committer FrameBridge Release <350017858+gerabh1128@users.noreply.github.com> 1795650954 -0500' \
+            '' 'Mirror verified signed stable APT 0.3.9+fbterm.18' | git hash-object -t commit -w --stdin)
+          test "$mirror_commit" = "$MHEAD"
+          git merge-base --is-ancestor "$MBASE" "$MHEAD"
+          check_before
+          git push --dry-run --atomic origin "$HEAD18:refs/heads/main" "$HEAD18:refs/heads/release/fbterm18" "refs/tags/$TAG:refs/tags/$TAG" "$MHEAD:refs/heads/apt-mirror"
+          check_before
+          git push --atomic origin "$HEAD18:refs/heads/main" "$HEAD18:refs/heads/release/fbterm18" "refs/tags/$TAG:refs/tags/$TAG" "$MHEAD:refs/heads/apt-mirror"
+          test "$(ref refs/heads/main)" = "$HEAD18"
+          test "$(ref refs/heads/release/fbterm18)" = "$HEAD18"
+          test "$(ref refs/heads/apt-mirror)" = "$MHEAD"
+          test "$(ref "refs/tags/$TAG")" = b0429cabfd8d6c9b77ab509e9fdc0234333ff518
+          echo 'RESULT=EXACT_PUBLICATION_PASS'
+      - name: Publish release description
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/fb18-release-notes.md"
+          cat > "$notes" <<'NOTES'
+          FrameBridge 0.3.9+fbterm.18 is the signed portable Linux release.
+
+          - Persistent informational FBTERM: inspect job details, verified output and job ID.
+          - One amd64 DEB with a permanent signed stable APT channel.
+          - Existing history and execution safeguards are preserved.
+          - No new job-review, edit or cancellation controls in the viewer.
+
+          Official signed downloads: https://framebridge.betancourt.one/downloads/fbterm18/SHA256SUMS
+
+          Permanent APT origin: https://framebridge.betancourt.one/debian/stable/
+
+          DEB SHA-256: 8d462384089417c1435074828ad29a536bac77a6824ea076b5bdfc184aae6ec4
+
+          Corresponding source SHA-256: a2efa42ccc0d7523514e5e1b3b449c305265089eae5be688e9575b2995b0abcf
+
+          Follow the cold-maintenance procedure for existing installations. The artifact signatures, not the Git tag or automatically generated GitHub archives, identify the signed release.
+          NOTES
+          gh release create 'v0.3.9+fbterm.18' --repo gerabh1128/framebridge --verify-tag --title 'FrameBridge 0.3.9+fbterm.18' --notes-file "$notes" --latest
+          gh release view 'v0.3.9+fbterm.18' --repo gerabh1128/framebridge --json tagName,url,isDraft,isPrerelease
