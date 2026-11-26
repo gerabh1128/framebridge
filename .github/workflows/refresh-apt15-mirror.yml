@@ -1,11 +1,6 @@
-name: Refresh signed FrameBridge fbterm15 APT mirror
+name: Refresh historical FrameBridge fbterm15 APT mirror (manual)
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/refresh-apt15-mirror.yml']
-  schedule:
-    - cron: '37 8 * * *'
 permissions: {}
 concurrency:
   group: framebridge-public-apt-mirror
@@ -95,15 +90,8 @@ jobs:
               "Follow the [official cold-upgrade and signing-key instructions](https://framebridge.betancourt.one/download/). "
               "Existing installations are not migrated automatically.\n\n"
               "The mirror refreshes signed indexes and verifies actual APT downloads independently of the legacy channel.\n")
-          readme = p/"README.md"
-          s = readme.read_text()
-          line = "> Current signed maintenance channel: [FrameBridge 0.3.9+fbterm.15](README-fbterm15.md). The instructions below describe the legacy channel.\n"
-          if line not in s:
-              marker = "# FrameBridge Linux APT mirror\n"
-              assert s.startswith(marker)
-              readme.write_text(s.replace(marker, marker+"\n"+line, 1))
           PY
-          git -C mirror add -- debian/fbterm15 sources/framebridge15-trixie.sources sources/framebridge15-noble.sources sources/framebridge15-mint22.sources README-fbterm15.md README.md
+          git -C mirror add -- debian/fbterm15 sources/framebridge15-trixie.sources sources/framebridge15-noble.sources sources/framebridge15-mint22.sources README-fbterm15.md
       - name: Publish the verified data if changed
         shell: bash
         env:

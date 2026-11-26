@@ -2,7 +2,7 @@
 import argparse, email.parser, email.utils, hashlib, os, re, shutil, subprocess, tempfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 ORIGIN="https://framebridge.betancourt.one/debian/stable/"
 FPR="69D0E9D83699F96AB986B06F3C24F85D892A517E"
@@ -18,12 +18,25 @@ def safe_path(name):
     return p
 def get(root,name,limit=100*1024*1024):
     p=root/safe_path(name);p.parent.mkdir(parents=True,exist_ok=True)
-    with urlopen(ORIGIN+name,timeout=40) as r,p.open("xb") as f:
+    with urlopen(Request(ORIGIN+name, headers={"X-FrameBridge-Audit":"mirror-apt-stable"}),timeout=40) as r,p.open("xb") as f:
         need(r.geturl()==ORIGIN+name,"Unexpected redirect")
         n=0
         while b:=r.read(1024*1024):
             n+=len(b);need(n<=limit,"Download exceeds limit");f.write(b)
     return p
+def package_from_cache_or_origin(work,repo,name,digest,size):
+    """Do not transfer an immutable, already verified package again."""
+    rel=safe_path(name)
+    need(name.startswith("pool/main/f/framebridge-original-expanded/") and name.endswith(".deb"),"Unexpected pool path")
+    need(re.fullmatch("[a-f0-9]{64}",digest) and 0<size<=100*1024*1024,"Invalid signed package identity")
+    cached=repo/rel
+    need(not any(q.is_symlink() for q in (cached,*cached.parents) if q==repo.parent or q==repo or repo in q.parents),"Symlink refused")
+    if cached.exists():
+        need(cached.is_file() and cached.stat().st_size==size and sha(cached)==digest,"Immutable pool conflict")
+        print("VERIFIED_CACHE_REUSED",name)
+        return cached
+    print("NEW_SIGNED_PACKAGE_REQUIRED",name)
+    return get(work,name,size)
 def fields(path):return email.parser.Parser().parsestr(path.read_text())
 def time_fields(m):
     a=email.utils.parsedate_to_datetime(m["Date"]);b=email.utils.parsedate_to_datetime(m["Valid-Until"])
@@ -80,7 +93,7 @@ def main():
             need(subprocess.run(["dpkg","--compare-versions",p["Version"],"ge",oldversion]).returncode==0,"Version rollback refused")
         path=p["Filename"]
         need(path.startswith("pool/main/f/framebridge-original-expanded/"),"Unexpected pool path")
-        deb=get(work,path)
+        deb=package_from_cache_or_origin(work,repo,path,p["SHA256"],int(p["Size"]))
         need(sha(deb)==p["SHA256"] and deb.stat().st_size==int(p["Size"]),"Package digest mismatch")
         need(subprocess.check_output(["dpkg-deb","-f",str(deb),"Version"],text=True).strip()==p["Version"],"DEB version mismatch")
         for f in work.rglob("*"):

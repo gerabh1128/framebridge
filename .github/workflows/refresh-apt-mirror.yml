@@ -1,11 +1,6 @@
-name: Refresh signed FrameBridge APT mirror
+name: Refresh historical FrameBridge APT mirror (manual)
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/refresh-apt-mirror.yml']
-  schedule:
-    - cron: '27 8 * * *'
 permissions: {}
 concurrency:
   group: framebridge-public-apt-mirror

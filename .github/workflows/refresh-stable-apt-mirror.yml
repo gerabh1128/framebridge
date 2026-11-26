@@ -1,0 +1,64 @@
+name: Refresh signed FrameBridge stable APT mirror
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/refresh-stable-apt-mirror.yml', 'tools/refresh-stable-apt.py', 'tools/test_refresh_stable_apt.py']
+  schedule:
+    - cron: '27 8 * * *'
+permissions: {}
+concurrency:
+  group: framebridge-public-apt-mirror
+  cancel-in-progress: false
+jobs:
+  refresh:
+    if: github.repository == 'gerabh1128/framebridge' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Test transfer policy without network
+        shell: bash
+        run: python3 -B -m unittest discover -s tools -p test_refresh_stable_apt.py
+      - name: Verify signed stable origin and reuse verified payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin refs/heads/apt-mirror
+          old=$(git rev-parse FETCH_HEAD)
+          printf '%s\n' "$old" > "$RUNNER_TEMP/fb-mirror-base"
+          git worktree add --detach "$RUNNER_TEMP/fb-mirror" "$old"
+          python3 -B tools/refresh-stable-apt.py --mirror "$RUNNER_TEMP/fb-mirror" --key source/packaging/portable-archive-keyring.gpg
+          git -C "$RUNNER_TEMP/fb-mirror" add -- debian/stable sources/framebridge-stable.sources README-stable.md
+      - name: Verify APT against the local mirror snapshot only
+        shell: bash
+        run: |
+          set -euo pipefail
+          m="$RUNNER_TEMP/fb-mirror"
+          q=$(mktemp -d)
+          mkdir -p "$q/lists/partial" "$q/cache/archives/partial" "$q/empty" "$q/download"
+          touch "$q/status"
+          printf 'deb [arch=amd64 signed-by=%s] file:%s stable main\n' "$m/debian/stable/framebridge-archive-keyring.gpg" "$m/debian/stable" > "$q/sources.list"
+          opts=(-o "Dir::Etc::main=/dev/null" -o "Dir::Etc::parts=$q/empty" -o "Dir::Etc::sourcelist=$q/sources.list" -o "Dir::Etc::sourceparts=$q/empty" -o "Dir::State::lists=$q/lists" -o "Dir::State::status=$q/status" -o "Dir::Cache=$q/cache" -o "Dir::Cache::archives=$q/cache/archives" -o 'APT::Architecture=amd64' -o 'Debug::NoLocking=true' -o 'Acquire::Languages=none')
+          apt-get "${opts[@]}" update
+          (cd "$q/download" && apt-get "${opts[@]}" download framebridge-original-expanded)
+          cmp "$q/download/"*.deb "$m/debian/stable/$(sed -n 's/^Filename: //p' "$m/debian/stable/dists/stable/main/binary-amd64/Packages")"
+      - name: Publish changed signed snapshot without force
+        shell: bash
+        run: |
+          set -euo pipefail
+          m="$RUNNER_TEMP/fb-mirror"
+          if git -C "$m" diff --cached --quiet; then
+            echo 'Stable mirror already current; no new artifact transfer was needed if cache was reused.'
+            exit 0
+          fi
+          old=$(cat "$RUNNER_TEMP/fb-mirror-base")
+          test "$(git ls-remote origin refs/heads/apt-mirror | awk '{print $1}')" = "$old"
+          git -C "$m" -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m 'Refresh verified signed stable APT data'
+          git -C "$m" push origin HEAD:refs/heads/apt-mirror
+          test "$(git ls-remote origin refs/heads/apt-mirror | awk '{print $1}')" = "$(git -C "$m" rev-parse HEAD)"
