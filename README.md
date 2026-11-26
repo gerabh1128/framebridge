@@ -1,25 +1,28 @@
 # FrameBridge Linux APT mirror
 
-> Current signed maintenance channel: [FrameBridge 0.3.9+fbterm.15](README-fbterm15.md). The instructions below describe the legacy channel.
+> **Current signed portable channel:** [stable/main](README-stable.md) — one amd64 package for Debian 13, Ubuntu 24.04 and Linux Mint 22.x.
 
-This branch serves the public FrameBridge Debian repository over HTTPS. It mirrors signed metadata and packages from the official origin. APT verifies the release using the FrameBridge archive key. The package name is `framebridge-original-expanded`.
+- [Official installation, verification and cold-maintenance guide](https://framebridge.betancourt.one/download/)
+- [Current stable source definition](sources/framebridge-stable.sources)
+- [Stable archive public key](debian/stable/framebridge-archive-keyring.gpg)
+- [Current signed mirror maintenance](https://github.com/gerabh1128/framebridge/actions/workflows/refresh-stable-apt-mirror.yml)
 
-| Distribution | Suite | Source definition |
+Mirror URI: `https://raw.githubusercontent.com/gerabh1128/framebridge/apt-mirror/debian/stable/`
+
+Verify the independently trusted archive fingerprint `69D0 E9D8 3699 F96A B986 B06F 3C24 F85D 892A 517E`. For existing installations, use the documented cold-maintenance procedure and review obsolete APT sources before enabling stable. The mirror checks signed metadata daily and reuses verified existing packages instead of transferring them from the origin again.
+
+## Historical channels — not recommended for new installations
+
+The [fbterm15 channel](README-fbterm15.md) and the following original distribution suites remain available for historical recovery. Their maintenance workflows are manual-only. They do not redirect to stable. Historical signed indexes may expire; do not disable signature or expiry verification.
+
+| Historical distribution | Historical suite | Source definition |
 | --- | --- | --- |
 | Debian 13 amd64 | `trixie` | [framebridge-trixie.sources](sources/framebridge-trixie.sources) |
 | Ubuntu 24.04 amd64 | `noble` | [framebridge-noble.sources](sources/framebridge-noble.sources) |
 | Linux Mint 22.x amd64 | `mint22` | [framebridge-mint22.sources](sources/framebridge-mint22.sources) |
 
-Mirror URI: `https://raw.githubusercontent.com/gerabh1128/framebridge/apt-mirror/debian/`
+Historical mirror URI: `https://raw.githubusercontent.com/gerabh1128/framebridge/apt-mirror/debian/`
 
-Use the definition for your own distribution. All three suites can carry the same package name and version with different Python and distribution dependencies. For an existing FrameBridge APT installation, use the existing trusted archive key and select the source definition corresponding to the installed distribution.
+Historical workflows: [original suites](https://github.com/gerabh1128/framebridge/actions/workflows/refresh-apt-mirror.yml) and [fbterm15](https://github.com/gerabh1128/framebridge/actions/workflows/refresh-apt15-mirror.yml). These remain separately signed snapshots; a mirror cannot extend signed validity periods. The old archive key and package bytes are preserved.
 
-For a new installation, verify the archive key against the independently obtained FrameBridge fingerprint `2B1F 01BC 806C 0B33 CB6C EDDE 5285 9CEB C91B 8808`. Place the verified public key at `/etc/apt/keyrings/framebridge-archive-keyring.asc` with read access for APT, then enable the chosen source definition under `/etc/apt/sources.list.d/`. Run `sudo apt update`, inspect `apt-cache policy framebridge-original-expanded`, then install with `sudo apt install framebridge-original-expanded`.
-
-[Official installation and downloads](https://framebridge.betancourt.one/download/) · [Project source and license](https://github.com/gerabh1128/framebridge) · [Archive public key](debian/framebridge-archive-keyring.asc)
-
-## Refreshing the snapshot
-
-[GitHub Actions](https://github.com/gerabh1128/framebridge/actions/workflows/refresh-apt-mirror.yml) checks the official origin daily at 08:27 UTC and on manual dispatch. It checks the signatures and downloads each suite through APT before publishing a changed snapshot. Each run records its result. The origin maintainer renews the signed indexes before their expiration date.
-
-To refresh manually, use a clean checkout of this branch and run `python3 tools/refresh.py` with Python 3 and GnuPG. It verifies the origin signing key, both release signatures, the validity period, the package lists and every referenced package. It keeps immutable pool and by-hash paths for clients holding older indexes. Review the resulting diff, commit it and fast-forward this branch. The branch update makes the complete snapshot available under the same URI. The origin controls release signing and expiration. A mirror cannot extend the signed validity period.
+[Project source and license](https://github.com/gerabh1128/framebridge)
