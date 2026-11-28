@@ -1,0 +1,112 @@
+name: Attach verified FrameBridge fbterm18 public assets (one time)
+on:
+  push:
+    branches: [publication/fbterm18-assets-20261128-r1]
+    paths: ['.github/workflows/publish-fbterm18-assets-once.yml']
+permissions: {}
+concurrency:
+  group: framebridge-fbterm18-release-assets
+  cancel-in-progress: false
+jobs:
+  attach:
+    if: github.repository == 'gerabh1128/framebridge' && github.ref == 'refs/heads/publication/fbterm18-assets-20261128-r1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Verify existing release identity and empty asset list
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo=gerabh1128/framebridge
+          test "$(gh api "repos/$repo/git/ref/tags/v0.3.9%2Bfbterm.18" --jq '.object.sha')" = b0429cabfd8d6c9b77ab509e9fdc0234333ff518
+          test "$(gh api "repos/$repo/git/tags/b0429cabfd8d6c9b77ab509e9fdc0234333ff518" --jq '.object.sha')" = 6229e11dcee37f9e0981b8fbb53981f851736707
+          gh api "repos/$repo/releases/458835176" --jq '[.id,.tag_name,.draft,.prerelease,.immutable,(.assets|length)]' | python3 -c 'import sys,json; assert json.load(sys.stdin)==[458835176,"v0.3.9+fbterm.18",False,False,False,0]'
+      - name: Obtain and verify only existing public release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/fb18-assets"
+          cd "$RUNNER_TEMP/fb18-assets"
+          python3 -B - <<'PY'
+          import hashlib, json, urllib.request, time
+          from pathlib import Path
+          from datetime import datetime, timezone
+          origin="https://framebridge.betancourt.one/downloads/fbterm18/"
+          files = [
+              ("framebridge-stable-archive.gpg",250,"e969ce8e22d0068c6b855b0d188e9afed6543875acbb7ff6a6a02cd9095acf1b"),
+              ("SHA256SUMS",697,"37da2e2e6d6211a1f55792a00c151877632a8bb792281e88713aee9d356a37e7"),
+              ("SHA256SUMS.asc",228,"c451ad5be594b0354e64506a0e3d17f3f8fffea614fd3d31ad9922e49ba7d9c0"),
+              ("FrameBridge-0.3.9+fbterm.18-linux-amd64-cp313.deb.asc",228,"9fa1e727948935e8312dc3171c82867935d397035f883417ca6598d5046f124d"),
+              ("FrameBridge-0.3.9+fbterm.18-source-manifest.json",297804,"c8f824ff90f14a08c6d3e08203ef039f25f6f40de08fe5ad89016f6407a4dbd2"),
+              ("RUNTIME-SOURCES-MANIFEST.json",10322,"0eb806ddf047d8deb8af58c8cb813c9aae3e324393ed7a32ca7e148518e83dac"),
+              ("FrameBridge-0.3.9+fbterm.18-linux-amd64-cp313.deb",75233872,"8d462384089417c1435074828ad29a536bac77a6824ea076b5bdfc184aae6ec4"),
+              ("FrameBridge-0.3.9+fbterm.18-source.tar.gz",18818956,"a2efa42ccc0d7523514e5e1b3b449c305265089eae5be688e9575b2995b0abcf"),
+              ("FrameBridge-0.3.1-Community-Preview1-dependency-sources.tar.gz",82606998,"64540a85bd65eac3f394d8c0a967cacbc00e112676d57d644dcd1bb691c1926a"),
+              ("FrameBridge-0.3.1-tunnel-client-dependency-sources.tar.gz",26941745,"6445d4f0e773aba833fe5c610fbae54102b92de2ce636438f769f21e890c2bd9"),
+              ("FrameBridge-CPython-3.13.18-20261110-runtime-sources.tar",162846720,"40a3de7801956e5b7648668e0287a528b3ce537b23c8635206ca2669c23a2e9d"),
+          ]
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs):
+                  return None
+          opener=urllib.request.build_opener(NoRedirect())
+          for name,size,digest in files:
+              url=origin+name
+              start=datetime.now(timezone.utc).isoformat()
+              req=urllib.request.Request(url,headers={"Accept-Encoding":"identity","User-Agent":"FrameBridge-release-publication","X-FrameBridge-Audit":"release-publication"})
+              h=hashlib.sha256()
+              n=0
+              deadline=time.monotonic()+180
+              with opener.open(req,timeout=30) as r, Path(name).open("xb") as f:
+                  assert r.status==200 and r.geturl()==url
+                  assert r.headers.get("Content-Encoding","identity").lower()=="identity"
+                  assert r.headers.get("Content-Length")==str(size)
+                  while True:
+                      if time.monotonic()>deadline:
+                          raise TimeoutError("asset deadline")
+                      b=r.read(1024*1024)
+                      if not b:
+                          break
+                      n+=len(b)
+                      assert n<=size
+                      h.update(b)
+                      f.write(b)
+              assert n==size and h.hexdigest()==digest, name
+              print("VERIFIED_PUBLIC_ASSET",json.dumps({"name":name,"size":n,"sha256":digest,"start_utc":start,"end_utc":datetime.now(timezone.utc).isoformat()}),flush=True)
+          PY
+          key="$PWD/framebridge-stable-archive.gpg"
+          gpgv --keyring "$key" SHA256SUMS.asc SHA256SUMS
+          sha256sum -c SHA256SUMS
+          gpgv --keyring "$key" FrameBridge-0.3.9+fbterm.18-linux-amd64-cp313.deb.asc FrameBridge-0.3.9+fbterm.18-linux-amd64-cp313.deb
+          test "$(dpkg-deb -f FrameBridge-0.3.9+fbterm.18-linux-amd64-cp313.deb Version)" = '0.3.9+fbterm.18'
+          test "$(dpkg-deb -f FrameBridge-0.3.9+fbterm.18-linux-amd64-cp313.deb Architecture)" = amd64
+      - name: Attach exact verified assets without overwriting
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo=gerabh1128/framebridge
+          test "$(gh api "repos/$repo/git/ref/tags/v0.3.9%2Bfbterm.18" --jq '.object.sha')" = b0429cabfd8d6c9b77ab509e9fdc0234333ff518
+          gh api "repos/$repo/releases/458835176" --jq '[.id,.tag_name,.draft,.prerelease,.immutable,(.assets|length)]' | python3 -c 'import sys,json; assert json.load(sys.stdin)==[458835176,"v0.3.9+fbterm.18",False,False,False,0]'
+          gh release upload 'v0.3.9+fbterm.18' "$RUNNER_TEMP/fb18-assets/"* --repo "$repo"
+          gh api "repos/$repo/releases/458835176" --jq '.assets | map({id,name,size,state,digest,download_count})' > "$RUNNER_TEMP/fb18-assets-readback.json"
+          python3 -B - <<'PY'
+          import os,json,hashlib
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          local={p.name:p for p in (root/"fb18-assets").iterdir()}
+          assets=json.loads((root/"fb18-assets-readback.json").read_text())
+          assert len(assets)==len(local)==11
+          assert set(local)=={a["name"] for a in assets}
+          for a in assets:
+              p=local[a["name"]]
+              digest="sha256:"+hashlib.file_digest(p.open("rb"),"sha256").hexdigest()
+              assert a["state"]=="uploaded" and a["size"]==p.stat().st_size
+              assert a.get("digest")==digest, a["name"]
+          print("RESULT=EXACT_RELEASE_ASSETS_PASS")
+          print(json.dumps(assets))
+          PY
